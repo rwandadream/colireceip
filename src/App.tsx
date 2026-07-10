@@ -18,6 +18,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { LogsPage } from './pages/LogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { OfflinePage } from './pages/OfflinePage';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
 const queryClient = new QueryClient({
@@ -67,27 +68,30 @@ function OfflineDetector() {
 
 function AppRoutes() {
   const { user } = useAuth();
+  const location = useLocation();
 
   return (
     <>
       <OfflineDetector />
-      <Routes>
-        <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
-        <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/parcels" element={<ProtectedRoute><ParcelsListPage /></ProtectedRoute>} />
-        <Route path="/parcels/new" element={<ProtectedRoute><ParcelNewPage /></ProtectedRoute>} />
-        <Route path="/parcels/:id" element={<ProtectedRoute><ParcelDetailPage /></ProtectedRoute>} />
-        <Route path="/clients" element={<ProtectedRoute><ClientsListPage /></ProtectedRoute>} />
-        <Route path="/clients/new" element={<ProtectedRoute><ClientNewPage /></ProtectedRoute>} />
-        <Route path="/clients/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute><PaymentsListPage /></ProtectedRoute>} />
-        <Route path="/payments/new" element={<ProtectedRoute><PaymentNewPage /></ProtectedRoute>} />
-        <Route path="/agents" element={<ProtectedRoute adminOnly><AgentsPage /></ProtectedRoute>} />
-        <Route path="/reports" element={<ProtectedRoute adminOnly><ReportsPage /></ProtectedRoute>} />
-        <Route path="/logs" element={<ProtectedRoute adminOnly><LogsPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute adminOnly><SettingsPage /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/login" element={user ? <Navigate to="/" replace /> : <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><LoginPage /></motion.div>} />
+          <Route path="/" element={<ProtectedRoute><motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}><DashboardPage /></motion.div></ProtectedRoute>} />
+          <Route path="/parcels" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ParcelsListPage /></motion.div></ProtectedRoute>} />
+          <Route path="/parcels/new" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ParcelNewPage /></motion.div></ProtectedRoute>} />
+          <Route path="/parcels/:id" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ParcelDetailPage /></motion.div></ProtectedRoute>} />
+          <Route path="/clients" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ClientsListPage /></motion.div></ProtectedRoute>} />
+          <Route path="/clients/new" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ClientNewPage /></motion.div></ProtectedRoute>} />
+          <Route path="/clients/:id" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ClientDetailPage /></motion.div></ProtectedRoute>} />
+          <Route path="/payments" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PaymentsListPage /></motion.div></ProtectedRoute>} />
+          <Route path="/payments/new" element={<ProtectedRoute><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PaymentNewPage /></motion.div></ProtectedRoute>} />
+          <Route path="/agents" element={<ProtectedRoute adminOnly><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><AgentsPage /></motion.div></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute adminOnly><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ReportsPage /></motion.div></ProtectedRoute>} />
+          <Route path="/logs" element={<ProtectedRoute adminOnly><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><LogsPage /></motion.div></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute adminOnly><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SettingsPage /></motion.div></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AnimatePresence>
     </>
   );
 }

@@ -1,5 +1,7 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface ModalProps {
   open: boolean;
@@ -17,40 +19,39 @@ const sizeClasses = {
 };
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [open]);
-
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
-      <div
-        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl animate-slide-up max-h-[90vh] flex flex-col`}
-      >
-        {title && (
-          <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        )}
-        <div className="overflow-y-auto scrollbar-thin flex-1 p-5">{children}</div>
-      </div>
-    </div>
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay asChild>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+          />
+        </Dialog.Overlay>
+
+        <Dialog.Content asChild>
+          <motion.div
+            initial={{ opacity: 0, translateY: 8, scale: 0.98 }}
+            animate={{ opacity: 1, translateY: 0, scale: 1 }}
+            exit={{ opacity: 0, translateY: 8, scale: 0.98 }}
+            transition={{ duration: 0.18 }}
+            className={`fixed left-1/2 top-1/2 z-50 w-full ${sizeClasses[size]} -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col`}
+          >
+            {title && (
+              <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                <Dialog.Title className="text-lg font-bold text-slate-900 dark:text-white">{title}</Dialog.Title>
+                <Dialog.Close aria-label="Fermer" className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                  <X size={20} />
+                </Dialog.Close>
+              </div>
+            )}
+            <div className="overflow-y-auto scrollbar-thin flex-1 p-5">{children}</div>
+          </motion.div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
