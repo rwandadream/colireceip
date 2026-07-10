@@ -80,6 +80,11 @@ body {
     @apply btn bg-success-600 text-white hover:bg-success-700 px-4 py-2.5 text-sm shadow-sm hover:shadow;
   }
 
+  /* Accent button (primary actions like Create Shipment) */
+  .btn-accent {
+    @apply btn bg-accent-500 text-white hover:bg-accent-600 px-4 py-2.5 text-sm shadow-md;
+  }
+
   .input {
     @apply w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all duration-200 text-sm;
   }
