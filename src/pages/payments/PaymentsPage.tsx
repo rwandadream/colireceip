@@ -6,7 +6,6 @@ import {
   Plus,
   Wallet,
   TrendingUp,
-  ArrowLeft,
   Save,
 } from 'lucide-react';
 import {
@@ -23,6 +22,7 @@ import { Card, StatCard } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { formatCurrency, formatDateTime, isToday } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
 
@@ -56,16 +56,16 @@ export function PaymentsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Paiements</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{payments.length} paiements enregistrés</p>
-        </div>
-        <Link to="/payments/new" className="btn-primary w-full sm:w-auto">
-          <Plus size={18} />
-          Nouveau paiement
-        </Link>
-      </div>
+      <PageHeader
+        title="Paiements"
+        description={`${payments.length} paiements enregistrés`}
+        actions={
+          <Link to="/payments/new" className="btn-primary w-full sm:w-auto">
+            <Plus size={18} />
+            Nouveau paiement
+          </Link>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-4">
         <StatCard label="Encaissé aujourd'hui" value={formatCurrency(totalToday)} icon={<Wallet size={20} />} color="success" />
@@ -206,15 +206,11 @@ export function PaymentNewPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center gap-3">
-        <Link to="/payments" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Nouveau paiement</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Enregistrer un paiement</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Nouveau paiement"
+        description="Ajoutez un paiement pour un colis et générez un reçu instantané"
+        backLink={{ to: '/payments', label: 'Retour aux paiements' }}
+      />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Card className="p-5">

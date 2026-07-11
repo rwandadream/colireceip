@@ -1,36 +1,53 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
 
 const steps = [
-  { key: 'ordered', label: 'Commandé', color: 'bg-slate-200 text-slate-700' },
-  { key: 'prepared', label: 'Préparation', color: 'bg-accent-100 text-accent-700' },
-  { key: 'in_transit', label: 'En transit', color: 'bg-brand-100 text-brand-700' },
-  { key: 'arrived', label: 'Arrivé', color: 'bg-yellow-100 text-warning-700' },
-  { key: 'delivered', label: 'Livré', color: 'bg-success-100 text-success-700' },
+  { key: 'ordered', label: 'Commandé' },
+  { key: 'prepared', label: 'Préparation' },
+  { key: 'in_transit', label: 'En transit' },
+  { key: 'arrived', label: 'Arrivé' },
+  { key: 'delivered', label: 'Livré' },
 ];
 
 export function DeliveryTimeline({ current = 2 }: { current?: number }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="card p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-slate-900">Timeline de livraison</h3>
-        <div className="text-xs text-slate-400">Statut en direct</div>
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="card p-5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Timeline de livraison</h3>
+          <p className="mt-1 text-sm text-slate-400">Étapes clés du cycle de livraison.</p>
+        </div>
+        <span className="rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-300">Analyse</span>
       </div>
 
-      <div className="flex items-center gap-2 w-full">
-        {steps.map((s, i) => (
-          <div key={s.key} className="flex-1 flex items-center">
-            <div className="flex items-center flex-col w-full">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${i <= current ? 'ring-4 ring-brand-200' : 'bg-white'} ${i <= current ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                <span className="text-sm font-semibold">{i + 1}</span>
+      <div className="mt-6 space-y-5">
+        {steps.map((step, index) => {
+          const active = index <= current;
+          return (
+            <div key={step.key} className="flex items-center gap-4">
+              <div className="relative flex h-11 w-11 items-center justify-center rounded-3xl border border-white/10 bg-slate-950/80 text-white">
+                <span className={active ? 'bg-accent-500 text-white' : 'bg-slate-900 text-slate-400'} style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: 18 }}>
+                  {index + 1}
+                </span>
+                {index < steps.length - 1 && (
+                  <span className="absolute right-[-18px] top-1/2 h-0.5 w-10 -translate-y-1/2 bg-white/10"></span>
+                )}
               </div>
-              <div className="mt-2 text-xs text-center">{s.label}</div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-white">{step.label}</p>
+                <p className="mt-1 text-xs text-slate-500">{active ? 'Complété' : 'A venir'}</p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${active ? 'bg-accent-500/15 text-accent-200' : 'bg-white/5 text-slate-400'}`}>
+                {active ? 'Terminé' : 'En attente'}
+              </span>
             </div>
-            {i < steps.length - 1 && (
-              <div className={`h-1 flex-1 ${i < current ? 'bg-brand-500' : 'bg-slate-200'}`} style={{ margin: '0 8px' }} />
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
-    </motion.div>
+    </motion.section>
   );
 }

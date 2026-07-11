@@ -19,6 +19,7 @@ import type { Parcel, Payment, Client, ActivityLog } from '../lib/types';
 import { PARCEL_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../lib/types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { formatCurrency, formatDate, formatDateTime } from '../lib/format';
 import { generateReportPDF } from '../lib/pdf';
 import * as XLSX from 'xlsx';
@@ -294,12 +295,10 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Rapports</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-          Générez et exportez des rapports en PDF ou Excel
-        </p>
-      </div>
+      <PageHeader
+        title="Rapports"
+        description="Générez et exportez des rapports clients, colis et paiements en un clic"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {reports.map((report) => (

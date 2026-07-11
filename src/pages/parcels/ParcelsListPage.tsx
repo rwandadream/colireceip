@@ -14,6 +14,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
 import { formatCurrency, formatDate } from '../../lib/format';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 export function ParcelsListPage() {
   const [parcels, setParcels] = useState<Parcel[]>([]);
@@ -44,18 +45,16 @@ export function ParcelsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Colis</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            {parcels.length} colis au total
-          </p>
-        </div>
-        <Link to="/parcels/new" className="btn-primary w-full sm:w-auto">
-          <Plus size={18} />
-          Nouveau colis
-        </Link>
-      </div>
+      <PageHeader
+        title="Colis"
+        description={`${parcels.length} colis au total`}
+        actions={
+          <Link to="/parcels/new" className="btn-primary w-full sm:w-auto">
+            <Plus size={18} />
+            Nouveau colis
+          </Link>
+        }
+      />
 
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row gap-3">

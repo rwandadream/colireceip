@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Sarah-Groupe logo">
+  <path d="M30 20 L60 6 L90 20 V60 L60 74 L30 60 Z" fill="#2563EB" />
+  <path d="M30 20 V60 L60 74 V34 Z" fill="#1E3A8A" />
+  <path d="M60 34 L90 20 V60 L60 74 Z" fill="#F97316" />
+  <path d="M38 28 L65 16 L82 28" stroke="#1E3A8A" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.9" />
+  <path d="M34 40 H66" stroke="#2563EB" strokeWidth="3" strokeLinecap="round" opacity="0.85" />
+  <path d="M100 28 H116" stroke="#F97316" strokeWidth="6" strokeLinecap="round" />
+  <path d="M100 42 H118" stroke="#F97316" strokeWidth="4" strokeLinecap="round" />
+  <path d="M100 56 H113" stroke="#F97316" strokeWidth="3" strokeLinecap="round" />
+</svg>

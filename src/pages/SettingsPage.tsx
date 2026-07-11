@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Save, Building2, DollarSign } from 'lucide-react';
 import { getSettings, updateSettings, logActivity } from '../lib/data';
 import type { AppSettings } from '../lib/types';
@@ -6,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Skeleton } from '../components/ui/Badge';
 
 export function SettingsPage() {
@@ -37,10 +39,10 @@ export function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Paramètres</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Configuration de l'application</p>
-      </div>
+      <PageHeader
+        title="Paramètres"
+        description="Ajustez les informations de l'entreprise et la configuration financière de votre plateforme"
+      />
 
       <Card className="p-5">
         <h2 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -96,6 +98,21 @@ export function SettingsPage() {
             value={settings.currency}
             onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
           />
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-bold text-slate-900 dark:text-white">Journal des actions</h2>
+            <p className="mt-2 text-sm text-slate-500">Accédez aux événements opérationnels et au suivi des activités depuis les paramètres.</p>
+          </div>
+          <Link
+            to="/logs"
+            className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 transition"
+          >
+            Voir le journal
+          </Link>
         </div>
       </Card>
 

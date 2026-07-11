@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { formatCurrency, formatDate } from '../../lib/format';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 export function ClientsListPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -41,16 +42,16 @@ export function ClientsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Clients</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{clients.length} clients enregistrés</p>
-        </div>
-        <Link to="/clients/new" className="btn-primary w-full sm:w-auto">
-          <Plus size={18} />
-          Nouveau client
-        </Link>
-      </div>
+      <PageHeader
+        title="Clients"
+        description={`${clients.length} clients enregistrés`}
+        actions={
+          <Link to="/clients/new" className="btn-primary w-full sm:w-auto">
+            <Plus size={18} />
+            Nouveau client
+          </Link>
+        }
+      />
 
       <Card className="p-4">
         <Input

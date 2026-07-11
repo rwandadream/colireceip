@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  ArrowLeft,
   Phone,
   MessageCircle,
   MapPin,
@@ -28,6 +27,7 @@ import { Badge, Skeleton } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { formatCurrency, formatDate, formatDateTime } from '../../lib/format';
 
 export function ClientDetailPage() {
@@ -90,27 +90,23 @@ export function ClientDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to="/clients" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0">
-            <ArrowLeft size={20} />
-          </Link>
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">{client.full_name}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Client depuis {formatDate(client.created_at)}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-            <Edit size={16} /> Modifier
-          </Button>
-          {isAdmin && (
-            <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
-              <Trash2 size={16} />
+      <PageHeader
+        title={client.full_name}
+        description={`Client depuis ${formatDate(client.created_at)}`}
+        backLink={{ to: '/clients', label: 'Retour aux clients' }}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+              <Edit size={16} /> Modifier
             </Button>
-          )}
-        </div>
-      </div>
+            {isAdmin && (
+              <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
+                <Trash2 size={16} /> Supprimer
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       {/* Contact Info */}
       <Card className="p-5">

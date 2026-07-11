@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, UserPlus, Save } from 'lucide-react';
+import { Plus, UserPlus, Save } from 'lucide-react';
 import { getClients, createParcel, logActivity } from '../../lib/data';
 import type { Client } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ import { Card } from '../../components/ui/Card';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { formatCurrency } from '../../lib/format';
 import { createClient } from '../../lib/data';
 
@@ -106,15 +107,11 @@ export function ParcelNewPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center gap-3">
-        <Link to="/parcels" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Nouveau colis</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Enregistrer un nouveau colis</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Nouveau colis"
+        description="Créez une nouvelle expédition et suivez chaque colis depuis l'enregistrement jusqu'à la livraison"
+        backLink={{ to: '/parcels', label: 'Retour aux colis' }}
+      />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Card className="p-5">

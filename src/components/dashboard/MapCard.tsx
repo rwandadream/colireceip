@@ -1,50 +1,63 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
+import { Activity, Package, CreditCard, Truck, UserPlus, ArrowRight } from 'lucide-react';
+import type { ActivityLog } from '../../lib/types';
+import { timeAgo } from '../../lib/format';
 
-export function MapCard() {
+interface RealtimeActivityCardProps {
+  logs: ActivityLog[];
+}
+
+const actionMap = (action: string) => {
+  const normalized = action.toLowerCase();
+  if (normalized.includes('paiement')) return { icon: <CreditCard size={18} />, label: 'Paiement reçu' };
+  if (normalized.includes('livré') || normalized.includes('livraison')) return { icon: <Truck size={18} />, label: 'Colis livré' };
+  if (normalized.includes('client')) return { icon: <UserPlus size={18} />, label: 'Nouveau client' };
+  if (normalized.includes('colis')) return { icon: <Package size={18} />, label: 'Colis enregistré' };
+  return { icon: <Activity size={18} />, label: 'Statut modifié' };
+};
+
+export function RealtimeActivityCard({ logs }: RealtimeActivityCardProps) {
   return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="card p-4">
-      <div className="flex items-start justify-between mb-3">
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="card p-5"
+    >
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-slate-900">Carte: Suivi en temps réel</h3>
-          <p className="text-xs text-slate-500">Positions des livreurs et itinéraires actifs</p>
+          <h3 className="text-lg font-semibold text-white">Activité en temps réel</h3>
+          <p className="mt-1 text-sm text-slate-400">Journal d’événements opérationnels récents.</p>
         </div>
-        <div className="text-xs text-slate-400">Mise à jour: maintenant</div>
+        <span className="rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-300">Live</span>
       </div>
 
-      <div className="w-full h-64 bg-slate-50 dark:bg-slate-800 rounded-xl overflow-hidden relative">
-        {/* Simple illustrative map with route and moving vehicle dot */}
-        <svg viewBox="0 0 800 400" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="mapg" x1="0" x2="1">
-              <stop offset="0" stopColor="#eaf2ff" />
-              <stop offset="1" stopColor="#ffffff" />
-            </linearGradient>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#mapg)" />
-          <g stroke="#2563EB" strokeWidth="3" fill="none" strokeLinecap="round">
-            <path id="route" d="M40 300 C180 200 300 320 420 240 C540 160 660 280 760 220" />
-          </g>
-          <circle cx="40" cy="300" r="8" fill="#1E3A8A" />
-          <circle r="8" fill="#F97316">
-            <animateMotion dur="8s" repeatCount="indefinite" path="M40 300 C180 200 300 320 420 240 C540 160 660 280 760 220" />
-          </circle>
-          <g transform="translate(680,60)">
-            <rect x="0" y="0" width="110" height="36" rx="8" fill="#ffffff" opacity="0.9" />
-            <text x="12" y="22" fontSize="12" fill="#1E293B">Livreur #42 · 7min</text>
-          </g>
-        </svg>
+      <div className="mt-5 space-y-4">
+        {logs.length === 0 ? (
+          <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 text-center text-sm text-slate-400">
+            Aucune activité récente à afficher.
+          </div>
+        ) : (
+          logs.map((log) => {
+            const activity = actionMap(log.action);
+            return (
+              <div key={log.id} className="flex items-start gap-4 rounded-3xl border border-white/10 bg-slate-950/70 p-4 transition hover:border-accent-500/30 hover:bg-slate-900/80">
+                <div className="grid h-11 w-11 place-items-center rounded-3xl bg-accent-500/10 text-accent-300">
+                  {activity.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-white"><span className="font-semibold text-white">{log.user_name}</span> {log.action.toLowerCase()}</p>
+                  <p className="mt-1 text-xs text-slate-500">{timeAgo(log.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-1 rounded-full bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-300">
+                  <ArrowRight size={12} />
+                  {log.entity_type || 'Entité'}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
-
-      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-accent-500" />
-          En cours
-        </div>
-        <div className="flex items-center gap-4">
-          <div>Vitesse moyenne: <strong className="ml-1">48 km/h</strong></div>
-          <div>Dernière position: <strong className="ml-1">5 min</strong></div>
-        </div>
-      </div>
-    </motion.div>
+    </motion.section>
   );
 }

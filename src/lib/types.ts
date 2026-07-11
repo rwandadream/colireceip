@@ -138,12 +138,12 @@ export const PARCEL_STATUS_LABELS: Record<ParcelStatus, string> = {
 };
 
 export const PARCEL_STATUS_COLORS: Record<ParcelStatus, string> = {
-  received: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  in_transit: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-  arrived: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
-  delivered: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  received: 'bg-slate-800 text-slate-100 border border-white/10',
+  pending: 'bg-amber-900/50 text-amber-200 border border-amber-300/20',
+  in_transit: 'bg-violet-900/50 text-violet-200 border border-violet-300/20',
+  arrived: 'bg-cyan-900/50 text-cyan-200 border border-cyan-300/20',
+  delivered: 'bg-emerald-900/50 text-emerald-200 border border-emerald-300/20',
+  cancelled: 'bg-rose-900/50 text-rose-200 border border-rose-300/20',
 };
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

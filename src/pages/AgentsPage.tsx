@@ -28,6 +28,7 @@ import { Badge, EmptyState, Skeleton } from '../components/ui/Badge';
 import { Input, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Modal, ConfirmModal } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
 import { formatDate } from '../lib/format';
 
 export function AgentsPage() {
@@ -131,16 +132,16 @@ export function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Agents</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{users.length} utilisateurs</p>
-        </div>
-        <Button onClick={openCreate} className="w-full sm:w-auto">
-          <Plus size={18} />
-          Nouvel agent
-        </Button>
-      </div>
+      <PageHeader
+        title="Agents"
+        description={`${users.length} utilisateurs`}
+        actions={
+          <Button onClick={openCreate} className="w-full sm:w-auto">
+            <Plus size={18} />
+            Nouvel agent
+          </Button>
+        }
+      />
 
       <Card className="p-4">
         <Input

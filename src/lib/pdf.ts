@@ -12,13 +12,13 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   // Header
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('TRANSIT MALI CI', pageWidth / 2, y, { align: 'center' });
+  doc.text('SARAH-GROUPE', pageWidth / 2, y, { align: 'center' });
   y += 6;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Transport de colis Bamako - Abidjan', pageWidth / 2, y, { align: 'center' });
+  doc.text('Logistique & livraison de colis', pageWidth / 2, y, { align: 'center' });
   y += 5;
-  doc.text('Tél: +223 76 00 00 00 | Email: contact@transitmali.ci', pageWidth / 2, y, { align: 'center' });
+  doc.text('Tél: +223 76 00 00 00 | Email: contact@sarah-groupe.ci', pageWidth / 2, y, { align: 'center' });
   y += 8;
 
   doc.setLineWidth(0.3);
@@ -102,7 +102,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
   doc.text(
-    `Reçu généré le ${formatDateTime(new Date().toISOString())} - Transit Mali CI`,
+    `Reçu généré le ${formatDateTime(new Date().toISOString())} - Sarah-Groupe`,
     pageWidth / 2,
     doc.internal.pageSize.getHeight() - 10,
     { align: 'center' }
@@ -123,7 +123,7 @@ export function generateReportPDF(
 
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('TRANSIT MALI CI', pageWidth / 2, y, { align: 'center' });
+  doc.text('SARAH-GROUPE', pageWidth / 2, y, { align: 'center' });
   y += 8;
   doc.setFontSize(12);
   doc.text(title, pageWidth / 2, y, { align: 'center' });

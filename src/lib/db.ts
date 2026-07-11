@@ -94,9 +94,9 @@ export async function seedDefaultData(): Promise<void> {
   if (!settings) {
     await db.put('settings', {
       id: '1' as any,
-      company_name: 'Transit Mali CI',
+      company_name: 'Sarah-Groupe',
       company_phone: '+223 76 00 00 00',
-      company_email: 'contact@transitmali.ci',
+      company_email: 'contact@sarah-groupe.ci',
       bamako_address: 'Bamako, Mali',
       abidjan_address: 'Abidjan, Côte d\'Ivoire',
       default_transport_price: 5000,

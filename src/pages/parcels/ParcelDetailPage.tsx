@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  ArrowLeft,
   Package,
   User as UserIcon,
   Phone,
@@ -31,6 +30,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, Skeleton } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Select } from '../../components/ui/Input';
 import { formatCurrency, formatDateTime, formatDate } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
@@ -105,26 +105,33 @@ export function ParcelDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to="/parcels" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0">
-            <ArrowLeft size={20} />
-          </Link>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">
-                {parcel.tracking_number}
-              </h1>
-              <Badge className={PARCEL_STATUS_COLORS[parcel.status]}>
-                {PARCEL_STATUS_LABELS[parcel.status]}
-              </Badge>
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Enregistré le {formatDate(parcel.received_date)} par {parcel.registered_by_name}
-            </p>
+      <PageHeader
+        title={parcel.tracking_number}
+        description={`Enregistré le ${formatDate(parcel.received_date)} par ${parcel.registered_by_name}`}
+        backLink={{ to: '/parcels', label: 'Retour aux colis' }}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={handlePrint}>
+              <Printer size={16} />
+              Imprimer le reçu
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setStatusModalOpen(true)}>
+              <Clock size={16} />
+              Changer le statut
+            </Button>
+            <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-secondary inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold text-slate-100 bg-slate-950/80 border border-white/10 hover:bg-slate-900 transition">
+              <CreditCard size={16} />
+              Enregistrer paiement
+            </Link>
+            {isAdmin && (
+              <Button variant="danger" size="sm" onClick={() => setDeleteModalOpen(true)}>
+                <Trash2 size={16} />
+                Supprimer
+              </Button>
+            )}
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2">

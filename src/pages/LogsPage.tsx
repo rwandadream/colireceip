@@ -5,6 +5,7 @@ import type { ActivityLog, User } from '../lib/types';
 import { Card } from '../components/ui/Card';
 import { EmptyState, Skeleton } from '../components/ui/Badge';
 import { Input, Select } from '../components/ui/Input';
+import { PageHeader } from '../components/ui/PageHeader';
 import { formatDateTime, timeAgo } from '../lib/format';
 
 export function LogsPage() {
@@ -37,10 +38,10 @@ export function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Journal des actions</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{logs.length} actions enregistrées</p>
-      </div>
+      <PageHeader
+        title="Journal des actions"
+        description={`${logs.length} actions enregistrées`}
+      />
 
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row gap-3">

@@ -1,60 +1,95 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
+import { Plus, Sparkles, Truck, ShieldCheck, Clock } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import type { DashboardStats } from '../../lib/types';
+import { formatCurrency } from '../../lib/format';
 
-export function HeroDashboard() {
+interface HeroDashboardProps {
+  stats: DashboardStats;
+}
+
+export function HeroDashboard({ stats }: HeroDashboardProps) {
   return (
-    <motion.div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-brand-600 to-brand-500 text-white p-6 lg:p-8 shadow-lg" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-      <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-        <div className="flex-1">
-          <h2 className="text-2xl lg:text-3xl font-bold">Suivi des livraisons en temps réel</h2>
-          <p className="mt-2 text-sm text-white/90 max-w-xl">Visualisez vos opérations, suivez vos coursiers et optimisez vos itinéraires depuis un seul tableau de bord.</p>
-
-          <div className="mt-4 flex items-center gap-3">
-            <span className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-medium">Live&nbsp;<span className="inline-block w-2 h-2 rounded-full bg-accent-500 animate-pulse"/></span>
-            <span className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs">Colis en transit: <strong className="ml-1">{/* dynamic count placeholder */} {" "}</strong></span>
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45 }}
+      className="rounded-[28px] bg-gradient-to-br from-brand-700 via-[#122144] to-[#131a2b] p-6 lg:p-8 shadow-[0_30px_90px_-50px_rgba(0,0,0,0.85)] overflow-hidden"
+    >
+      <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-6 items-center">
+        <div className="space-y-5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs uppercase tracking-[0.3em] text-slate-200">
+            <Sparkles size={14} /> Opérations miroir
+          </div>
+          <div>
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white">Pipeline logistique haut de gamme</h2>
+            <p className="mt-3 max-w-2xl text-sm text-slate-300 sm:text-base">
+              Suivez les livraisons, contrôlez les paiements et supervisez l’activité en temps réel sur une interface sombre, raffinée et rapide.
+            </p>
           </div>
 
-          <div className="mt-6 hidden lg:flex gap-3">
-            <div className="bg-white/10 rounded-lg p-3">
-              <div className="text-xs text-white/80">Taux de livraison</div>
-              <div className="text-lg font-semibold">{Math.round(92)}%</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-[24px] bg-white/5 border border-white/10 p-4">
+              <div className="text-sm text-slate-300">Livraisons en transit</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{stats.in_transit}</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
-              <div className="text-xs text-white/80">Temps moyen</div>
-              <div className="text-lg font-semibold">2h 14m</div>
+            <div className="rounded-[24px] bg-white/5 border border-white/10 p-4">
+              <div className="text-sm text-slate-300">Montant encaissé aujourd’hui</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{formatCurrency(stats.collected_today)}</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
-              <div className="text-xs text-white/80">Satisfaction</div>
-              <div className="text-lg font-semibold">4.8 ★</div>
-            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3 items-center">
+            <Link to="/parcels/new" className="btn btn-accent">
+              <Plus size={16} />
+              Nouveau colis
+            </Link>
+            <button type="button" className="btn btn-ghost text-white border border-white/10 px-4 py-3">
+              <Truck size={16} />
+              Voir les expéditions
+            </button>
           </div>
         </div>
 
-        <div className="w-full lg:w-1/2">
-          {/* SVG illustration representing a delivery vehicle and route - integrated into UI */}
-          <div className="w-full h-48 lg:h-40 bg-white/5 rounded-xl flex items-center justify-center">
-            <svg viewBox="0 0 560 240" className="w-full h-full" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-              <defs>
-                <linearGradient id="g1" x1="0" x2="1">
-                  <stop offset="0" stopColor="#ffffff" stopOpacity="0.08" />
-                  <stop offset="1" stopColor="#ffffff" stopOpacity="0.04" />
-                </linearGradient>
-              </defs>
-              <rect x="0" y="0" width="100%" height="100%" fill="url(#g1)" />
-              <g transform="translate(40,40)">
-                <path d="M0 120 C80 80 160 160 240 120 C320 80 400 160 480 120" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="0" cy="120" r="6" fill="#fff" />
-                <circle cx="240" cy="120" r="8" fill="#F97316" />
-                <circle cx="480" cy="120" r="6" fill="#fff" />
-                <g transform="translate(220,80)">
-                  <rect x="0" y="10" width="70" height="30" rx="6" fill="#fff" opacity="0.95" />
-                  <rect x="6" y="16" width="58" height="18" rx="4" fill="#e6eefb" />
-                  <rect x="-12" y="28" width="96" height="6" rx="3" fill="#1E3A8A" />
-                </g>
-              </g>
-            </svg>
+        <div className="rounded-[28px] bg-slate-950/40 border border-white/10 p-6 backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm uppercase tracking-[0.24em] text-slate-400">Performance</h3>
+              <p className="mt-2 text-2xl font-semibold text-white">{stats.delivered} colis livrés</p>
+            </div>
+            <div className="grid place-items-center h-14 w-14 rounded-3xl bg-brand-500/20 text-brand-200">
+              <ShieldCheck size={24} />
+            </div>
+          </div>
+          <div className="mt-6 space-y-4 text-slate-300">
+            <div className="flex items-center justify-between gap-3 rounded-3xl bg-white/5 p-4">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-3xl bg-brand-500/15 text-brand-300">
+                  <Truck size={18} />
+                </span>
+                <div>
+                  <p className="text-sm text-slate-300">Colis prêts à partir</p>
+                  <p className="text-lg font-semibold text-white">{stats.pending}</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">En attente</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-3xl bg-white/5 p-4">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-3xl bg-accent-500/15 text-accent-300">
+                  <Clock size={18} />
+                </span>
+                <div>
+                  <p className="text-sm text-slate-300">Nouveaux colis aujourd’hui</p>
+                  <p className="text-lg font-semibold text-white">{stats.received_today}</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">Live</span>
+            </div>
           </div>
         </div>
       </div>
-    </motion.div>
+    </motion.section>
   );
 }

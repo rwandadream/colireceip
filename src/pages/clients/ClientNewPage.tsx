@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { createClient, logActivity } from '../../lib/data';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Input, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 export function ClientNewPage() {
   const navigate = useNavigate();
@@ -35,15 +36,11 @@ export function ClientNewPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center gap-3">
-        <Link to="/clients" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Nouveau client</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Ajouter un nouveau client</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Nouveau client"
+        description="Enregistrez un client pour suivre les expéditions et les paiements"
+        backLink={{ to: '/clients', label: 'Retour aux clients' }}
+      />
 
       <form onSubmit={handleSubmit}>
         <Card className="p-5 space-y-4">

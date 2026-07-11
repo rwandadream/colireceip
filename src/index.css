@@ -19,7 +19,10 @@ html {
 
 body {
   margin: 0;
+  min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior-y: none;
@@ -27,86 +30,86 @@ body {
 
 @layer base {
   :root {
-    --bg-primary: #f8fafc;
-    --bg-secondary: #ffffff;
-    --bg-tertiary: #f1f5f9;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-tertiary: #94a3b8;
-    --border-color: #e2e8f0;
+    --bg-primary: #08111f;
+    --bg-secondary: #0d1726;
+    --bg-tertiary: #111c2e;
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+    --border-color: rgba(255,255,255,0.08);
   }
 
   .dark {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
+    --bg-primary: #08111f;
+    --bg-secondary: #0d1726;
+    --bg-tertiary: #111c2e;
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
     --text-tertiary: #64748b;
-    --border-color: #334155;
+    --border-color: rgba(255,255,255,0.08);
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all duration-200;
+    @apply rounded-[28px] border border-white/10 bg-[#111C2E] shadow-[0_30px_80px_-40px_rgba(0,0,0,0.65)] transition-all duration-200;
   }
 
   .card-hover {
-    @apply hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600;
+    @apply hover:shadow-[0_30px_70px_-40px_rgba(0,0,0,0.8)] hover:-translate-y-0.5;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none select-none;
+    @apply inline-flex items-center justify-center gap-2 font-semibold rounded-2xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none select-none;
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 px-4 py-2.5 text-sm shadow-sm hover:shadow;
+    @apply btn bg-brand-600 text-white hover:bg-brand-500 px-4 py-2.5 text-sm shadow-md;
   }
 
   .btn-secondary {
-    @apply btn bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 px-4 py-2.5 text-sm;
+    @apply btn bg-slate-900 text-slate-200 hover:bg-slate-800 px-4 py-2.5 text-sm;
   }
 
   .btn-ghost {
-    @apply btn text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 text-sm;
+    @apply btn text-slate-300 hover:bg-slate-900 px-3 py-2 text-sm;
   }
 
   .btn-danger {
-    @apply btn bg-error-600 text-white hover:bg-error-700 px-4 py-2.5 text-sm;
+    @apply btn bg-error-600 text-white hover:bg-error-500 px-4 py-2.5 text-sm;
   }
 
   .btn-success {
-    @apply btn bg-success-600 text-white hover:bg-success-700 px-4 py-2.5 text-sm shadow-sm hover:shadow;
+    @apply btn bg-success-600 text-white hover:bg-success-500 px-4 py-2.5 text-sm shadow-md;
   }
 
   /* Accent button (primary actions like Create Shipment) */
   .btn-accent {
-    @apply btn bg-accent-500 text-white hover:bg-accent-600 px-4 py-2.5 text-sm shadow-md;
+    @apply btn bg-accent-500 text-slate-950 hover:bg-accent-400 px-4 py-2.5 text-sm shadow-lg shadow-accent-500/20;
   }
 
   .input {
-    @apply w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all duration-200 text-sm;
+    @apply w-full rounded-2xl border border-white/10 bg-[#111c2e] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-transparent transition-all duration-200 text-sm px-4 py-3;
   }
 
   .label {
-    @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5;
+    @apply block text-sm font-medium text-slate-200 mb-1.5;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold;
   }
 
   .stat-card {
-    @apply card p-5 flex flex-col gap-2 relative overflow-hidden;
+    @apply p-5 flex flex-col gap-4 relative overflow-hidden;
   }
 
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200;
+    @apply flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-slate-300 hover:bg-slate-900/80 transition-all duration-200;
   }
 
   .nav-link-active {
-    @apply bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 font-semibold;
+    @apply bg-accent-500/15 text-white shadow-[0_15px_35px_-20px_rgba(249,115,22,0.65)] font-semibold;
   }
 }
 
