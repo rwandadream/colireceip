@@ -32,9 +32,9 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'Transit Mali CI',
-        short_name: 'TransitMali',
-        description: 'Gestion des colis Bamako - Abidjan',
+        name: 'Sarah-Groupe',
+        short_name: 'Sarah-Groupe',
+        description: 'Sarah-Groupe - Logistique & Transit',
         theme_color: '#2563eb',
         background_color: '#f8fafc',
         display: 'standalone',

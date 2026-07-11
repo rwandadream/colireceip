@@ -111,6 +111,8 @@ export interface AppSettings {
   abidjan_address: string;
   default_transport_price: number;
   currency: string;
+  default_origin?: string;
+  default_destination?: string;
 }
 
 export interface DashboardStats {

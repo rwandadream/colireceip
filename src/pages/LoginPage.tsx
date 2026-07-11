@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Truck, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { LogoBrand } from '../components/ui/Logo';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -24,36 +25,40 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-brand-50 to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-xl mb-4">
-            <Truck size={40} />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 lg:p-8 transition-colors duration-300">
+      <div className="w-full max-w-md space-y-6">
+        
+        {/* Centered Logo & Welcome Header */}
+        <div className="flex flex-col items-center text-center space-y-4">
+          <LogoBrand size={46} subtitle="Livraison rapide et sécurisée" className="justify-center" />
+          
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Bienvenue !
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Connectez-vous à votre espace
+              <br />
+              pour continuer
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Transit Mali CI</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Gestion de colis Bamako → Abidjan
-          </p>
         </div>
 
-        <div className="card p-6 sm:p-8 animate-slide-up">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Connexion</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-            Connectez-vous à votre compte
-          </p>
-
+        {/* Card Form */}
+        <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-3xl border border-slate-200/60 dark:border-slate-700/60 shadow-xl space-y-5 animate-slide-up">
+          
           {error && (
-            <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-error-50 dark:bg-error-900/20 text-error-700 dark:text-error-300 text-sm animate-fade-in">
+            <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-error-50 dark:bg-error-950/20 text-error-700 dark:text-error-400 text-sm animate-fade-in border border-error-100 dark:border-error-900/30">
               <AlertCircle size={18} className="flex-shrink-0" />
-              {error}
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Adresse email"
+              label="Adresse e-mail"
               type="email"
-              placeholder="admin@transitmali.ci"
+              placeholder="exemple@mail.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               icon={<Mail size={18} />}
@@ -65,7 +70,7 @@ export function LoginPage() {
               <Input
                 label="Mot de passe"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
+                placeholder="•••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 icon={<Lock size={18} />}
@@ -75,29 +80,41 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-9 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="absolute right-3 top-9.5 p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
 
-            <Button type="submit" loading={loading} className="w-full" size="lg">
+            {/* Forgot password */}
+            <div className="flex justify-end text-xs">
+              <a
+                href="#forgot"
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert('Veuillez contacter votre administrateur pour réinitialiser votre mot de passe.');
+                }}
+                className="font-semibold text-[#2563EB] dark:text-brand-400 hover:underline"
+              >
+                Mot de passe oublié ?
+              </a>
+            </div>
+
+            <Button
+              type="submit"
+              loading={loading}
+              variant="ghost"
+              className="w-full mt-4 bg-[#F97316] hover:bg-[#EA580C] text-white px-6 py-3 font-semibold rounded-xl text-base shadow-md hover:shadow-lg focus:ring-2 focus:ring-orange-500/20 active:scale-95 transition-all duration-300 flex items-center justify-center gap-2"
+              icon={<LogIn size={18} />}
+            >
               Se connecter
             </Button>
           </form>
-
-          <div className="mt-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
-              Compte de démonstration:
-            </p>
-            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center mt-1">
-              admin@transitmali.ci / admin123
-            </p>
-          </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-6">
-          Transit Mali CI — Fonctionne hors connexion
+        {/* Footer */}
+        <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8">
+          © 2025 Sarah-Groupe. Tous droits réservés.
         </p>
       </div>
     </div>

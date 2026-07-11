@@ -1,0 +1,64 @@
+<svg
+  width="512"
+  height="512"
+  viewBox="0 0 100 100"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <!-- Gradients for 3D Isometric Cube -->
+    <linearGradient id="logo-top-grad" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#60A5FA" />
+    </linearGradient>
+    <linearGradient id="logo-right-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+    <linearGradient id="logo-left-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F97316" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+
+    <!-- Speed Lines Gradient Fading In -->
+    <linearGradient id="logo-speed-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F97316" stop-opacity="0.1" />
+      <stop offset="50%" stop-color="#F97316" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#F97316" stop-opacity="1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Speed Lines -->
+  <path
+    d="M 8,37 L 33,37"
+    stroke="url(#logo-speed-grad)"
+    stroke-width="3.5"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 4,47 L 41,47"
+    stroke="url(#logo-speed-grad)"
+    stroke-width="4.5"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 10,57 L 36,57"
+    stroke="url(#logo-speed-grad)"
+    stroke-width="4.5"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 16,67 L 31,67"
+    stroke="url(#logo-speed-grad)"
+    stroke-width="3.5"
+    stroke-linecap="round"
+  />
+
+  <!-- 3D Isometric Cube -->
+  <!-- Top Face -->
+  <polygon points="60,22 85,33 60,45 35,33" fill="url(#logo-top-grad)" />
+  <!-- Right Face -->
+  <polygon points="60,45 85,33 85,66 60,78" fill="url(#logo-right-grad)" />
+  <!-- Left Face -->
+  <polygon points="35,33 60,45 60,78 35,66" fill="url(#logo-left-grad)" />
+</svg>

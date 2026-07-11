@@ -149,7 +149,7 @@ export function PaymentNewPage() {
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [form, setForm] = useState({
     parcel_id: parcelIdParam || '',
-    amount: 0,
+    amount: '' as string | number,
     payment_method: 'cash' as PaymentMethod,
     note: '',
   });
@@ -176,14 +176,15 @@ export function PaymentNewPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.parcel_id || form.amount <= 0 || !selectedParcel) return;
+    const amountNum = Number(form.amount);
+    if (!form.parcel_id || amountNum <= 0 || !selectedParcel) return;
     setSaving(true);
     const payment = await createPayment({
       parcel_id: form.parcel_id,
       parcel_tracking: selectedParcel.tracking_number,
       client_id: selectedParcel.client_id,
       client_name: selectedParcel.client_name,
-      amount: Number(form.amount),
+      amount: amountNum,
       payment_method: form.payment_method,
       payment_date: new Date().toISOString(),
       recorded_by: user?.id || '',
@@ -193,7 +194,7 @@ export function PaymentNewPage() {
     await logActivity(
       user?.id || '',
       user?.full_name || '',
-      `a enregistré un paiement de ${formatCurrency(form.amount)} pour le colis ${selectedParcel.tracking_number}`,
+      `a enregistré un paiement de ${formatCurrency(amountNum)} pour le colis ${selectedParcel.tracking_number}`,
       'payment',
       payment.id,
       `Mode: ${PAYMENT_METHOD_LABELS[form.payment_method]}`
@@ -262,7 +263,7 @@ export function PaymentNewPage() {
             type="number"
             min={1}
             value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
+            onChange={(e) => setForm({ ...form, amount: e.target.value === '' ? '' : Number(e.target.value) })}
             required
           />
           <Select

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Plus, UserPlus, Save } from 'lucide-react';
-import { getClients, createParcel, logActivity } from '../../lib/data';
+import { getClients, createParcel, logActivity, getSettings } from '../../lib/data';
 import type { Client } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
@@ -23,13 +23,13 @@ export function ParcelNewPage() {
     client_id: '',
     merchandise_type: '',
     description: '',
-    quantity: 1,
-    weight: 0,
-    transport_price: 5000,
-    additional_fees: 0,
-    amount_paid: 0,
-    origin: 'Bamako',
-    destination: 'Abidjan',
+    quantity: 1 as string | number,
+    weight: '' as string | number,
+    transport_price: '' as string | number,
+    additional_fees: '' as string | number,
+    amount_paid: '' as string | number,
+    origin: '',
+    destination: '',
   });
 
   const [newClient, setNewClient] = useState({
@@ -42,14 +42,36 @@ export function ParcelNewPage() {
 
   useEffect(() => {
     (async () => {
-      const data = await getClients();
-      setClients(data);
+      const [clientsData, appSettings] = await Promise.all([
+        getClients(),
+        getSettings(),
+      ]);
+      setClients(clientsData);
+      if (appSettings) {
+        setForm((prev) => ({
+          ...prev,
+          transport_price: appSettings.default_transport_price || 5000,
+          origin: appSettings.default_origin || 'Bamako',
+          destination: appSettings.default_destination || 'Abidjan',
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          transport_price: 5000,
+          origin: 'Bamako',
+          destination: 'Abidjan',
+        }));
+      }
       setLoading(false);
     })();
   }, []);
 
-  const total = (form.transport_price || 0) + (form.additional_fees || 0);
-  const balance = total - (form.amount_paid || 0);
+  const transportPriceNum = Number(form.transport_price) || 0;
+  const additionalFeesNum = Number(form.additional_fees) || 0;
+  const amountPaidNum = Number(form.amount_paid) || 0;
+
+  const total = transportPriceNum + additionalFeesNum;
+  const balance = total - amountPaidNum;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,7 +176,7 @@ export function ParcelNewPage() {
               type="number"
               min={1}
               value={form.quantity}
-              onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, quantity: e.target.value === '' ? '' : Number(e.target.value) })}
               required
             />
             <Input
@@ -163,7 +185,7 @@ export function ParcelNewPage() {
               step="0.1"
               min={0}
               value={form.weight}
-              onChange={(e) => setForm({ ...form, weight: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, weight: e.target.value === '' ? '' : Number(e.target.value) })}
             />
             <div className="grid grid-cols-2 gap-3">
               <Input
@@ -197,7 +219,7 @@ export function ParcelNewPage() {
               type="number"
               min={0}
               value={form.transport_price}
-              onChange={(e) => setForm({ ...form, transport_price: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, transport_price: e.target.value === '' ? '' : Number(e.target.value) })}
               required
             />
             <Input
@@ -205,14 +227,14 @@ export function ParcelNewPage() {
               type="number"
               min={0}
               value={form.additional_fees}
-              onChange={(e) => setForm({ ...form, additional_fees: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, additional_fees: e.target.value === '' ? '' : Number(e.target.value) })}
             />
             <Input
               label="Montant payé (FCFA)"
               type="number"
               min={0}
               value={form.amount_paid}
-              onChange={(e) => setForm({ ...form, amount_paid: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, amount_paid: e.target.value === '' ? '' : Number(e.target.value) })}
             />
           </div>
 

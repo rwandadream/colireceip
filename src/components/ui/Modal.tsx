@@ -31,14 +31,17 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-t-3xl sm:rounded-2xl shadow-2xl animate-slide-up max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-t-[2rem] sm:rounded-2xl shadow-2xl animate-slide-up-sheet sm:animate-scale-in max-h-[92vh] sm:max-h-[90vh] flex flex-col`}
       >
+        {/* Mobile Drag Indicator */}
+        <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mt-3.5 mb-1 sm:hidden flex-shrink-0" />
+        
         {title && (
-          <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between px-5 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-700/50">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
             <button
               onClick={onClose}
