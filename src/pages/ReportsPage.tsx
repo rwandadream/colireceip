@@ -68,7 +68,7 @@ export function ReportsPage() {
           `${parcels.length} colis · Généré le ${now}`
         );
         break;
-      case 'delivered':
+      case 'delivered': {
         const delivered = parcels.filter((p) => p.status === 'delivered');
         generateReportPDF(
           'Colis livrés',
@@ -84,7 +84,8 @@ export function ReportsPage() {
           `${delivered.length} colis livrés · Généré le ${now}`
         );
         break;
-      case 'pending':
+      }
+      case 'pending': {
         const pending = parcels.filter((p) => p.status === 'pending' || p.status === 'received');
         generateReportPDF(
           'Colis en attente',
@@ -101,6 +102,7 @@ export function ReportsPage() {
           `${pending.length} colis en attente · Généré le ${now}`
         );
         break;
+      }
       case 'payments':
         generateReportPDF(
           'Paiements',
@@ -119,11 +121,10 @@ export function ReportsPage() {
       case 'clients':
         generateReportPDF(
           'Clients',
-          ['Nom', 'Téléphone', 'WhatsApp', 'Ville', 'Adresse', 'Date création'],
+          ['Nom', 'Téléphone', 'Ville', 'Adresse', 'Date création'],
           clients.map((c) => [
             c.full_name,
             c.phone || '—',
-            c.whatsapp || '—',
             c.city || '—',
             c.address || '—',
             formatDate(c.created_at),
@@ -148,7 +149,7 @@ export function ReportsPage() {
   };
 
   const exportExcel = (type: ReportType) => {
-    let data: Record<string, any>[] = [];
+    let data: Record<string, string | number>[] = [];
     let filename = '';
 
     switch (type) {
@@ -206,7 +207,6 @@ export function ReportsPage() {
         data = clients.map((c) => ({
           Nom: c.full_name,
           Téléphone: c.phone || '',
-          WhatsApp: c.whatsapp || '',
           Ville: c.city || '',
           Adresse: c.address || '',
           'Date création': formatDate(c.created_at),

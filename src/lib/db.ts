@@ -10,11 +10,12 @@ import type {
 } from './types';
 
 const DB_NAME = 'sarah-groupe-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface TransitDB extends DBSchema {
   users: { key: string; value: User };
   clients: { key: string; value: Client; indexes: { 'by-name': string; 'by-phone': string } };
+  products: { key: string; value: import('./types').Product; indexes: { 'by-name': string } };
   parcels: {
     key: string;
     value: Parcel;
@@ -24,6 +25,11 @@ interface TransitDB extends DBSchema {
       'by-status': string;
       'by-date': string;
     };
+  };
+  parcel_items: {
+    key: string;
+    value: import('./types').ParcelItem;
+    indexes: { 'by-parcel': string };
   };
   payments: {
     key: string;
@@ -57,12 +63,20 @@ export async function getDB(): Promise<IDBPDatabase<TransitDB>> {
         store.createIndex('by-name', 'full_name');
         store.createIndex('by-phone', 'phone');
       }
+      if (!db.objectStoreNames.contains('products')) {
+        const store = db.createObjectStore('products', { keyPath: 'id' });
+        store.createIndex('by-name', 'name');
+      }
       if (!db.objectStoreNames.contains('parcels')) {
         const store = db.createObjectStore('parcels', { keyPath: 'id' });
         store.createIndex('by-tracking', 'tracking_number');
         store.createIndex('by-client', 'client_id');
         store.createIndex('by-status', 'status');
         store.createIndex('by-date', 'received_date');
+      }
+      if (!db.objectStoreNames.contains('parcel_items')) {
+        const store = db.createObjectStore('parcel_items', { keyPath: 'id' });
+        store.createIndex('by-parcel', 'parcel_id');
       }
       if (!db.objectStoreNames.contains('payments')) {
         const store = db.createObjectStore('payments', { keyPath: 'id' });
@@ -93,7 +107,7 @@ export async function seedDefaultData(): Promise<void> {
   const settings = await db.get('settings', '1');
   if (!settings) {
     await db.put('settings', {
-      id: '1' as any,
+      id: '1',
       company_name: 'Sarah-Groupe',
       company_phone: '+223 76 00 00 00',
       company_email: 'contact@sarah-groupe.com',
@@ -122,5 +136,35 @@ export async function seedDefaultData(): Promise<void> {
       created_at: now,
       updated_at: now,
     });
+  }
+
+  const products = await db.getAll('products');
+  if (products.length === 0) {
+    const now = new Date().toISOString();
+    const defaultProducts = [
+      { name: 'Carton parfum', category: 'Carton', default_price: 4000 },
+      { name: 'Carton Uniparco', category: 'Carton', default_price: 4500 },
+      { name: 'Carton Sivop', category: 'Carton', default_price: 4200 },
+      { name: 'Sac', category: 'Sacs', default_price: 6000 },
+      { name: 'Moto', category: 'Véhicules', default_price: 250000 },
+      { name: 'Compresseur', category: 'Équipement', default_price: 120000 },
+      { name: 'Batterie', category: 'Équipement', default_price: 30000 },
+      { name: 'Thé', category: 'Produits', default_price: 2000 },
+      { name: 'Balles', category: 'Produits', default_price: 1500 },
+      { name: 'Rouleaux', category: 'Produits', default_price: 8000 },
+      { name: 'Colis', category: 'Divers', default_price: 10000 },
+      { name: 'Gros colis', category: 'Divers', default_price: 25000 },
+    ];
+
+    for (const product of defaultProducts) {
+      await db.put('products', {
+        id: crypto.randomUUID(),
+        name: product.name,
+        category: product.category,
+        default_price: product.default_price,
+        created_at: now,
+        updated_at: now,
+      });
+    }
   }
 }

@@ -1,15 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, UserPlus, Save } from 'lucide-react';
-import { getClients, createParcel, logActivity, getSettings } from '../../lib/data';
-import type { Client } from '../../lib/types';
+import { ArrowLeft, Plus, UserPlus, Save, Copy, Trash2 } from 'lucide-react';
+import {
+  getClients,
+  getProducts,
+  getProductByName,
+  createParcel,
+  createParcelItem,
+  createProduct,
+  logActivity,
+  getSettings,
+  createClient,
+} from '../../lib/data';
+import type { Client, Product, PaymentCondition } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { formatCurrency } from '../../lib/format';
-import { createClient } from '../../lib/data';
 
 export function ParcelNewPage() {
   const navigate = useNavigate();
@@ -21,13 +30,21 @@ export function ParcelNewPage() {
 
   const [form, setForm] = useState({
     client_id: '',
-    merchandise_type: '',
+    recipient_name: '',
+    recipient_phone: '',
+    recipient_address: '',
+    vehicle: '',
+    departure_branch: '',
+    arrival_branch: '',
+    agent_id: '',
+    agent_name: '',
     description: '',
-    quantity: 1 as string | number,
+    package_type: '' as 'Petit colis' | 'Gros colis' | '',
     weight: '' as string | number,
     transport_price: '' as string | number,
     additional_fees: '' as string | number,
     amount_paid: '' as string | number,
+    payment_condition: 'unpaid' as PaymentCondition,
     origin: '',
     destination: '',
   });
@@ -35,31 +52,63 @@ export function ParcelNewPage() {
   const [newClient, setNewClient] = useState({
     full_name: '',
     phone: '',
-    whatsapp: '',
     city: '',
     address: '',
   });
 
+  const [items, setItems] = useState<{
+    id: string;
+    product_id?: string;
+    designation: string;
+    quantity: string | number;
+    unit_price: string | number;
+    amount: number;
+  }[]>([
+    { id: crypto.randomUUID(), designation: '', quantity: '', unit_price: '', amount: 0 },
+  ]);
+
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const getSuggestions = (query: string) => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return [];
+    return products
+      .filter((product) => product.name.toLowerCase().includes(normalized))
+      .slice(0, 6);
+  };
+
+  const selectSuggestion = (id: string, product: Product) => {
+    updateItem(id, {
+      product_id: product.id,
+      designation: product.name,
+      unit_price: product.default_price,
+    });
+  };
+
   useEffect(() => {
     (async () => {
-      const [clientsData, appSettings] = await Promise.all([
+      const [clientsData, productsData, appSettings] = await Promise.all([
         getClients(),
+        getProducts(),
         getSettings(),
       ]);
       setClients(clientsData);
+      setProducts(productsData);
       if (appSettings) {
         setForm((prev) => ({
           ...prev,
-          transport_price: appSettings.default_transport_price || 5000,
           origin: appSettings.default_origin || 'Bamako',
           destination: appSettings.default_destination || 'Abidjan',
+          departure_branch: appSettings.default_origin || 'Bamako',
+          arrival_branch: appSettings.default_destination || 'Abidjan',
         }));
       } else {
         setForm((prev) => ({
           ...prev,
-          transport_price: 5000,
           origin: 'Bamako',
           destination: 'Abidjan',
+          departure_branch: 'Bamako',
+          arrival_branch: 'Abidjan',
         }));
       }
       setLoading(false);
@@ -70,28 +119,93 @@ export function ParcelNewPage() {
   const additionalFeesNum = Number(form.additional_fees) || 0;
   const amountPaidNum = Number(form.amount_paid) || 0;
 
-  const total = transportPriceNum + additionalFeesNum;
-  const balance = total - amountPaidNum;
+  const subTotal = items.reduce((sum, item) => sum + item.amount, 0);
+  const totalAmount = subTotal + transportPriceNum + additionalFeesNum;
+  const balance = totalAmount - amountPaidNum;
+  const totalQuantity = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+
+  const updateItem = (id: string, changes: Partial<typeof items[number]>) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const next = { ...item, ...changes };
+        if (changes.product_id) {
+          const product = products.find((p) => p.id === changes.product_id);
+          if (product) {
+            next.designation = product.name;
+            next.unit_price = product.default_price;
+          }
+        }
+        const quantity = Number(next.quantity) || 0;
+        const unitPrice = Number(next.unit_price) || 0;
+        next.amount = quantity * unitPrice;
+        return next;
+      })
+    );
+  };
+
+  const addItem = () => {
+    setItems((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), designation: '', quantity: '', unit_price: '', amount: 0 },
+    ]);
+  };
+
+  const duplicateItem = (id: string) => {
+    setItems((prev) => {
+      const source = prev.find((item) => item.id === id);
+      if (!source) return prev;
+      return [
+        ...prev,
+        {
+          ...source,
+          id: crypto.randomUUID(),
+        },
+      ];
+    });
+  };
+
+  const removeItem = (id: string) => {
+    setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.id !== id) : prev));
+  };
+
+  const paymentConditions = [
+    { value: 'paid_origin', label: 'Payé au départ' },
+    { value: 'paid_destination', label: 'Payé à destination' },
+    { value: 'partial', label: 'Paiement partiel' },
+    { value: 'unpaid', label: 'Non payé' },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.client_id) return;
+    if (!form.client_id || !form.package_type || items.length === 0 || items.some((item) => !item.designation || Number(item.quantity) <= 0)) return;
     setSaving(true);
     const client = clients.find((c) => c.id === form.client_id);
     const parcel = await createParcel({
       client_id: form.client_id,
       client_name: client?.full_name || '',
       client_phone: client?.phone || '',
-      merchandise_type: form.merchandise_type,
+      recipient_name: form.recipient_name,
+      recipient_phone: form.recipient_phone,
+      recipient_address: form.recipient_address,
+      vehicle: form.vehicle,
+      departure_branch: form.departure_branch,
+      arrival_branch: form.arrival_branch,
+      agent_id: form.agent_id,
+      agent_name: form.agent_name,
+      package_type: form.package_type,
+      merchandise_type: items[0]?.designation || '',
       description: form.description,
-      quantity: Number(form.quantity),
+      quantity: totalQuantity,
       weight: Number(form.weight),
-      transport_price: Number(form.transport_price),
-      additional_fees: Number(form.additional_fees),
-      amount_paid: Number(form.amount_paid),
-      status: 'received',
+      transport_price: transportPriceNum,
+      additional_fees: additionalFeesNum,
+      sub_total: subTotal,
+      amount_paid: amountPaidNum,
+      payment_condition: form.payment_condition,
       origin: form.origin,
       destination: form.destination,
+      status: 'received',
       received_date: new Date().toISOString(),
       departure_date: null,
       arrival_date: null,
@@ -99,13 +213,42 @@ export function ParcelNewPage() {
       registered_by: user?.id || '',
       registered_by_name: user?.full_name || '',
     });
+
+    await Promise.all(
+      items.map(async (item) => {
+        let product_id = item.product_id;
+        const designation = item.designation.trim();
+        if (!product_id && designation) {
+          const existingProduct = await getProductByName(designation);
+          if (existingProduct) {
+            product_id = existingProduct.id;
+          } else {
+            const createdProduct = await createProduct({
+              name: designation,
+              category: 'Historique',
+              default_price: Number(item.unit_price) || 0,
+            });
+            product_id = createdProduct.id;
+            setProducts((prev) => [createdProduct, ...prev]);
+          }
+        }
+        return createParcelItem({
+          parcel_id: parcel.id,
+          product_id,
+          designation,
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unit_price),
+        });
+      })
+    );
+
     await logActivity(
       user?.id || '',
       user?.full_name || '',
-      `a créé le colis ${parcel.tracking_number}`,
+      `a créé le bordereau ${parcel.tracking_number}`,
       'parcel',
       parcel.id,
-      `Colis pour ${parcel.client_name}, montant: ${formatCurrency(parcel.total_amount)}`
+      `Expédition pour ${parcel.client_name}, total: ${formatCurrency(parcel.total_amount)}`
     );
     navigate(`/parcels/${parcel.id}`);
   };
@@ -113,7 +256,10 @@ export function ParcelNewPage() {
   const handleCreateClient = async () => {
     if (!newClient.full_name) return;
     const client = await createClient({
-      ...newClient,
+      full_name: newClient.full_name,
+      phone: newClient.phone,
+      city: newClient.city,
+      address: newClient.address,
       notes: '',
       created_by: user?.id || '',
       created_by_name: user?.full_name || '',
@@ -121,7 +267,7 @@ export function ParcelNewPage() {
     setClients((prev) => [client, ...prev]);
     setForm({ ...form, client_id: client.id });
     setShowNewClient(false);
-    setNewClient({ full_name: '', phone: '', whatsapp: '', city: '', address: '' });
+    setNewClient({ full_name: '', phone: '', city: '', address: '' });
   };
 
   if (loading) return <div className="animate-pulse"><div className="skeleton h-96 rounded-xl" /></div>;
@@ -163,31 +309,74 @@ export function ParcelNewPage() {
         </Card>
 
         <Card className="p-5">
-          <h2 className="font-bold text-slate-900 dark:text-white mb-4">Informations du colis</h2>
+          <h2 className="font-bold text-slate-900 dark:text-white mb-4">Destinataire</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Type de marchandise"
-              placeholder="Ex: Vêtements, Électronique..."
-              value={form.merchandise_type}
-              onChange={(e) => setForm({ ...form, merchandise_type: e.target.value })}
-            />
-            <Input
-              label="Nombre de colis"
-              type="number"
-              min={1}
-              value={form.quantity}
-              onChange={(e) => setForm({ ...form, quantity: e.target.value === '' ? '' : Number(e.target.value) })}
+              label="Nom du destinataire"
+              value={form.recipient_name}
+              onChange={(e) => setForm({ ...form, recipient_name: e.target.value })}
               required
             />
             <Input
-              label="Poids (kg)"
-              type="number"
-              step="0.1"
-              min={0}
-              value={form.weight}
-              onChange={(e) => setForm({ ...form, weight: e.target.value === '' ? '' : Number(e.target.value) })}
+              label="Téléphone du destinataire"
+              value={form.recipient_phone}
+              onChange={(e) => setForm({ ...form, recipient_phone: e.target.value })}
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <Input
+                label="Adresse du destinataire"
+                value={form.recipient_address}
+                onChange={(e) => setForm({ ...form, recipient_address: e.target.value })}
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-bold text-slate-900 dark:text-white mb-4">Transport</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Camion / Convoi"
+              value={form.vehicle}
+              onChange={(e) => setForm({ ...form, vehicle: e.target.value })}
+            />
+            <Input
+              label="Agent"
+              value={form.agent_name}
+              onChange={(e) => setForm({ ...form, agent_name: e.target.value })}
+            />
+            <Input
+              label="Agence départ"
+              value={form.departure_branch}
+              onChange={(e) => setForm({ ...form, departure_branch: e.target.value })}
+            />
+            <Input
+              label="Agence arrivée"
+              value={form.arrival_branch}
+              onChange={(e) => setForm({ ...form, arrival_branch: e.target.value })}
+            />
+            <Select
+              label="Type de colis"
+              value={form.package_type}
+              onChange={(e) => setForm({ ...form, package_type: e.target.value as 'Petit colis' | 'Gros colis' | '' })}
+              required
+            >
+              <option value="">— Choisir un type —</option>
+              <option value="Petit colis">Petit colis</option>
+              <option value="Gros colis">Gros colis</option>
+            </Select>
+            <Select
+              label="Condition de paiement"
+              value={form.payment_condition}
+              onChange={(e) => setForm({ ...form, payment_condition: e.target.value as PaymentCondition })}
+            >
+              {paymentConditions.map((condition) => (
+                <option key={condition.value} value={condition.value}>
+                  {condition.label}
+                </option>
+              ))}
+            </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Origine"
                 value={form.origin}
@@ -204,7 +393,7 @@ export function ParcelNewPage() {
             <Textarea
               label="Description"
               rows={2}
-              placeholder="Description du contenu..."
+              placeholder="Informations complémentaires sur l'expédition..."
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
@@ -212,42 +401,122 @@ export function ParcelNewPage() {
         </Card>
 
         <Card className="p-5">
-          <h2 className="font-bold text-slate-900 dark:text-white mb-4">Informations financières</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Prix du transport (FCFA)"
-              type="number"
-              min={0}
-              value={form.transport_price}
-              onChange={(e) => setForm({ ...form, transport_price: e.target.value === '' ? '' : Number(e.target.value) })}
-              required
-            />
-            <Input
-              label="Frais supplémentaires (FCFA)"
-              type="number"
-              min={0}
-              value={form.additional_fees}
-              onChange={(e) => setForm({ ...form, additional_fees: e.target.value === '' ? '' : Number(e.target.value) })}
-            />
-            <Input
-              label="Montant payé (FCFA)"
-              type="number"
-              min={0}
-              value={form.amount_paid}
-              onChange={(e) => setForm({ ...form, amount_paid: e.target.value === '' ? '' : Number(e.target.value) })}
-            />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-slate-900 dark:text-white">Liste des marchandises</h2>
+            <Button type="button" variant="secondary" size="sm" onClick={addItem}>
+              <Plus size={16} />
+              Ajouter une ligne
+            </Button>
           </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="py-2 px-3">Marchandise</th>
+                  <th className="py-2 px-3">Quantité</th>
+                  <th className="py-2 px-3">Prix unitaire</th>
+                  <th className="py-2 px-3">Montant</th>
+                  <th className="py-2 px-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-200 dark:border-slate-700">
+                    <td className="py-2 px-3">
+                      <div className="relative">
+                        <Input
+                          label=""
+                          value={item.designation}
+                          onChange={(e) => updateItem(item.id, { designation: e.target.value, product_id: undefined })}
+                          placeholder="Saisir une marchandise"
+                          className="w-full"
+                        />
+                        {item.designation.trim() && getSuggestions(item.designation).length > 0 && (
+                          <div className="absolute z-20 left-0 right-0 mt-1 rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                            {getSuggestions(item.designation).map((suggestion) => (
+                              <button
+                                key={suggestion.id}
+                                type="button"
+                                onClick={() => selectSuggestion(item.id, suggestion)}
+                                className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
+                              >
+                                {suggestion.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2 px-3">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(e) => updateItem(item.id, { quantity: e.target.value === '' ? '' : Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(item.id, { unit_price: e.target.value === '' ? '' : Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </td>
+                    <td className="py-2 px-3">{formatCurrency(item.amount)}</td>
+                    <td className="py-2 px-3">
+                      <div className="flex gap-2">
+                        <Button type="button" variant="secondary" onClick={() => duplicateItem(item.id)}>
+                          <Copy size={16} />
+                        </Button>
+                        <Button type="button" variant="danger" onClick={() => removeItem(item.id)}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
-          <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Montant total</span>
-              <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(total)}</span>
+        <Card className="p-5">
+          <h2 className="font-bold text-slate-900 dark:text-white mb-4">Résumé</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-400">Sous-total marchandises</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(subTotal)}</p>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Reste à payer</span>
-              <span className={`font-bold ${balance > 0 ? 'text-error-600 dark:text-error-400' : 'text-success-600 dark:text-success-400'}`}>
-                {formatCurrency(balance)}
-              </span>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-400">Nombre total d'articles</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{totalQuantity}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-400">Transport</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(transportPriceNum)}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+              <p className="text-xs text-slate-400">Frais supplémentaires</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(additionalFeesNum)}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 sm:col-span-2">
+              <p className="text-xs text-slate-400">Montant total</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(totalAmount)}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 sm:col-span-2">
+              <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400">
+                <span>Montant payé</span>
+                <span>{formatCurrency(amountPaidNum)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400">
+                <span>Reste à payer</span>
+                <span className={balance > 0 ? 'text-error-600 dark:text-error-400 font-semibold' : 'text-success-600 dark:text-success-400 font-semibold'}>
+                  {formatCurrency(balance)}
+                </span>
+              </div>
             </div>
           </div>
         </Card>
@@ -274,11 +543,6 @@ export function ParcelNewPage() {
               label="Téléphone"
               value={newClient.phone}
               onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
-            />
-            <Input
-              label="WhatsApp"
-              value={newClient.whatsapp}
-              onChange={(e) => setNewClient({ ...newClient, whatsapp: e.target.value })}
             />
           </div>
           <Input

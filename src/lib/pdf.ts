@@ -4,6 +4,8 @@ import type { Parcel, Payment } from './types';
 import { PARCEL_STATUS_LABELS, PAYMENT_METHOD_LABELS } from './types';
 import { formatCurrency, formatDateTime } from './format';
 
+type LastAutoTableInfo = { lastAutoTable: { finalY: number } };
+
 export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   const doc = new jsPDF({ unit: 'mm', format: 'a5' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -58,7 +60,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
     ],
   });
 
-  y = (doc as any).lastAutoTable.finalY + 6;
+  y = (doc.internal as unknown as LastAutoTableInfo).lastAutoTable.finalY + 6;
 
   // Financial summary
   autoTable(doc, {
@@ -78,7 +80,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
     footStyles: { fontSize: 10, fillColor: [220, 38, 38] },
   });
 
-  y = (doc as any).lastAutoTable.finalY + 6;
+  y = (doc.internal as unknown as LastAutoTableInfo).lastAutoTable.finalY + 6;
 
   // Payment history
   if (payments.length > 0) {
@@ -95,7 +97,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
         p.recorded_by_name,
       ]),
     });
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = (doc.internal as unknown as LastAutoTableInfo).lastAutoTable.finalY + 8;
   }
 
   // Footer
@@ -144,7 +146,7 @@ export function generateReportPDF(
     headStyles: { fontSize: 8, fillColor: [37, 99, 235] },
     bodyStyles: { fontSize: 8 },
     head: [headers],
-    body: rows as any,
+    body: rows,
     styles: { cellPadding: 2 },
   });
 

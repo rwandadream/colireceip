@@ -26,7 +26,6 @@ export interface Client {
   id: string;
   full_name: string;
   phone: string;
-  whatsapp: string;
   city: string;
   address: string;
   notes: string;
@@ -36,24 +35,58 @@ export interface Client {
   updated_at: string;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  category: string;
+  default_price: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ParcelItem {
+  id: string;
+  parcel_id: string;
+  product_id?: string;
+  designation: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PaymentCondition = 'paid_origin' | 'paid_destination' | 'partial' | 'unpaid';
+
 export interface Parcel {
   id: string;
   tracking_number: string;
   client_id: string;
   client_name: string;
   client_phone: string;
+  recipient_name: string;
+  recipient_phone: string;
+  recipient_address: string;
   merchandise_type: string;
   description: string;
   quantity: number;
   weight: number;
+  vehicle: string;
+  origin: string;
+  destination: string;
+  departure_branch: string;
+  arrival_branch: string;
+  agent_id: string;
+  agent_name: string;
+  payment_condition: PaymentCondition;
+  package_type: 'Petit colis' | 'Gros colis';
+  sub_total: number;
   transport_price: number;
   additional_fees: number;
   total_amount: number;
   amount_paid: number;
   balance: number;
   status: ParcelStatus;
-  origin: string;
-  destination: string;
   received_date: string;
   departure_date: string | null;
   arrival_date: string | null;

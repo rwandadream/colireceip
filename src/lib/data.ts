@@ -2,7 +2,9 @@ import { getDB, seedDefaultData } from './db';
 import type {
   User,
   Client,
+  Product,
   Parcel,
+  ParcelItem,
   Payment,
   StatusHistory,
   ActivityLog,
@@ -112,6 +114,38 @@ export async function getParcelByTracking(tracking: string): Promise<Parcel | un
   return db.getFromIndex('parcels', 'by-tracking', tracking);
 }
 
+export async function getParcelItems(parcelId: string): Promise<ParcelItem[]> {
+  const db = await getDB();
+  const items = await db.getAllFromIndex('parcel_items', 'by-parcel', parcelId);
+  return items.sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+export async function getProducts(): Promise<Product[]> {
+  const db = await getDB();
+  const all = await db.getAll('products');
+  return all.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getProductById(id: string): Promise<Product | undefined> {
+  const db = await getDB();
+  return db.get('products', id);
+}
+
+export async function getProductByName(name: string): Promise<Product | undefined> {
+  const db = await getDB();
+  return db.getFromIndex('products', 'by-name', name);
+}
+
+export async function createProduct(
+  data: Omit<Product, 'id' | 'created_at' | 'updated_at'>
+): Promise<Product> {
+  const db = await getDB();
+  const now = toISO();
+  const product: Product = { ...data, id: generateId(), created_at: now, updated_at: now };
+  await db.put('products', product);
+  return product;
+}
+
 export async function createParcel(
   data: Omit<Parcel, 'id' | 'tracking_number' | 'total_amount' | 'balance' | 'created_at' | 'updated_at'>
 ): Promise<Parcel> {
@@ -119,7 +153,7 @@ export async function createParcel(
   const all = await db.getAll('parcels');
   const tracking = generateTrackingNumber(all.map((p) => p.tracking_number));
   const now = toISO();
-  const total_amount = (data.transport_price || 0) + (data.additional_fees || 0);
+  const total_amount = (data.sub_total || 0) + (data.transport_price || 0) + (data.additional_fees || 0);
   const parcel: Parcel = {
     ...data,
     id: generateId(),
@@ -138,7 +172,8 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
   const existing = await db.get('parcels', id);
   if (!existing) return;
   const updated = { ...existing, ...data, id, updated_at: toISO() };
-  updated.total_amount = (updated.transport_price || 0) + (updated.additional_fees || 0);
+  updated.sub_total = updated.sub_total ?? existing.sub_total ?? 0;
+  updated.total_amount = (updated.sub_total || 0) + (updated.transport_price || 0) + (updated.additional_fees || 0);
   updated.balance = updated.total_amount - (updated.amount_paid || 0);
   await db.put('parcels', updated);
 }
@@ -146,6 +181,8 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
 export async function deleteParcel(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('parcels', id);
+  const items = await db.getAllFromIndex('parcel_items', 'by-parcel', id);
+  for (const item of items) await db.delete('parcel_items', item.id);
   const payments = await db.getAllFromIndex('payments', 'by-parcel', id);
   for (const p of payments) await db.delete('payments', p.id);
   const history = await db.getAllFromIndex('status_history', 'by-parcel', id);
@@ -185,6 +222,40 @@ export async function updateParcelStatus(
     created_at: now,
   };
   await db.put('status_history', history);
+}
+
+// ============================================================
+// PARCEL ITEMS
+// ============================================================
+export async function createParcelItem(
+  data: Omit<ParcelItem, 'id' | 'amount' | 'created_at' | 'updated_at'>
+): Promise<ParcelItem> {
+  const db = await getDB();
+  const now = toISO();
+  const amount = (data.quantity || 0) * (data.unit_price || 0);
+  const item: ParcelItem = {
+    ...data,
+    id: generateId(),
+    amount,
+    created_at: now,
+    updated_at: now,
+  };
+  await db.put('parcel_items', item);
+  return item;
+}
+
+export async function updateParcelItem(id: string, data: Partial<ParcelItem>): Promise<void> {
+  const db = await getDB();
+  const existing = await db.get('parcel_items', id);
+  if (!existing) return;
+  const updated = { ...existing, ...data, id, updated_at: toISO() };
+  updated.amount = (updated.quantity || 0) * (updated.unit_price || 0);
+  await db.put('parcel_items', updated);
+}
+
+export async function deleteParcelItem(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('parcel_items', id);
 }
 
 // ============================================================

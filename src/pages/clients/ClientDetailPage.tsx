@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Phone,
-  MessageCircle,
   MapPin,
   Calendar,
   Package,
@@ -128,17 +127,7 @@ export function ClientDetailPage() {
               </div>
             </div>
           )}
-          {client.whatsapp && (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-success-50 dark:bg-success-900/30 flex items-center justify-center text-success-600 dark:text-success-400">
-                <MessageCircle size={18} />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">WhatsApp</p>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{client.whatsapp}</p>
-              </div>
-            </div>
-          )}
+          {/* WhatsApp removed from display */}
           {client.city && (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-accent-50 dark:bg-accent-900/30 flex items-center justify-center text-accent-600 dark:text-accent-400">
@@ -255,11 +244,7 @@ export function ClientDetailPage() {
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
               />
-              <Input
-                label="WhatsApp"
-                value={editForm.whatsapp}
-                onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })}
-              />
+              {/* WhatsApp removed from edit form */}
             </div>
             <Input
               label="Ville"

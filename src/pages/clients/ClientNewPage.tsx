@@ -14,11 +14,11 @@ export function ClientNewPage() {
   const [form, setForm] = useState({
     full_name: '',
     phone: '',
-    whatsapp: '',
     city: '',
     address: '',
     notes: '',
   });
+       // whatsapp removed
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,12 +61,7 @@ export function ClientNewPage() {
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
-            <Input
-              label="WhatsApp"
-              placeholder="+223 ..."
-              value={form.whatsapp}
-              onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-            />
+              {/* WhatsApp removed: only phone is required */}
           </div>
           <Input
             label="Ville"

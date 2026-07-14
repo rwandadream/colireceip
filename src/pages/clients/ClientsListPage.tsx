@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, Plus, Phone, MessageCircle, MapPin } from 'lucide-react';
+import { Users, Search, Plus, Phone, MapPin } from 'lucide-react';
 import { getClients, getParcels } from '../../lib/data';
 import type { Client, Parcel } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
@@ -108,12 +108,7 @@ export function ClientsListPage() {
                         <span>{client.phone}</span>
                       </div>
                     )}
-                    {client.whatsapp && (
-                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                        <MessageCircle size={14} className="text-slate-400" />
-                        <span>{client.whatsapp}</span>
-                      </div>
-                    )}
+                    {/* WhatsApp removed from list view */}
                     {client.city && (
                       <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                         <MapPin size={14} className="text-slate-400" />
