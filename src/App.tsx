@@ -13,6 +13,8 @@ import { ClientsListPage } from './pages/clients/ClientsListPage';
 import { ClientNewPage } from './pages/clients/ClientNewPage';
 import { ClientDetailPage } from './pages/clients/ClientDetailPage';
 import { PaymentsListPage, PaymentNewPage } from './pages/payments/PaymentsPage';
+import { ExpensesPage } from './pages/expenses/ExpensesPage';
+import { ExpenseTripDetailPage } from './pages/expenses/ExpenseTripDetailPage';
 import { AgentsPage } from './pages/AgentsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { LogsPage } from './pages/LogsPage';
@@ -82,6 +84,8 @@ function AppRoutes() {
         <Route path="/clients/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsListPage /></ProtectedRoute>} />
         <Route path="/payments/new" element={<ProtectedRoute><PaymentNewPage /></ProtectedRoute>} />
+        <Route path="/expenses" element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
+        <Route path="/expenses/trip/:id" element={<ProtectedRoute><ExpenseTripDetailPage /></ProtectedRoute>} />
         <Route path="/agents" element={<ProtectedRoute adminOnly><AgentsPage /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute adminOnly><ReportsPage /></ProtectedRoute>} />
         <Route path="/logs" element={<ProtectedRoute adminOnly><LogsPage /></ProtectedRoute>} />

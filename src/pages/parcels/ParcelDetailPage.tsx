@@ -32,6 +32,7 @@ import { Badge, Skeleton } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Input';
+import { AttachmentManager } from '../../components/ui/AttachmentManager';
 import { formatCurrency, formatDateTime, formatDate } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
 
@@ -146,6 +147,23 @@ export function ParcelDetailPage() {
             Supprimer
           </Button>
         )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {(['received', 'in_transit', 'arrived', 'delivered'] as ParcelStatus[]).map((status) => (
+          <Button
+            key={status}
+            variant={parcel.status === status ? 'primary' : 'secondary'}
+            size="sm"
+            disabled={parcel.status === status}
+            onClick={async () => {
+              setNewStatus(status);
+              await handleStatusChange();
+            }}
+          >
+            {PARCEL_STATUS_LABELS[status]}
+          </Button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -307,6 +325,11 @@ export function ParcelDetailPage() {
           )}
         </Card>
       </div>
+
+      <Card className="p-5">
+        <h2 className="font-semibold text-slate-900 dark:text-white mb-4">Pièces jointes</h2>
+        <AttachmentManager entityType="parcel" entityId={parcel.id} />
+      </Card>
 
       {/* Status Change Modal */}
       <Modal open={statusModalOpen} onClose={() => setStatusModalOpen(false)} title="Changer le statut" size="sm">

@@ -1,8 +1,8 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Parcel, Payment } from './types';
+import type { Parcel, Payment, TripExpense } from './types';
 import { PARCEL_STATUS_LABELS, PAYMENT_METHOD_LABELS } from './types';
-import { formatCurrency, formatDateTime } from './format';
+import { formatCurrency, formatDate, formatDateTime } from './format';
 
 type LastAutoTableInfo = { lastAutoTable: { finalY: number } };
 
@@ -151,4 +151,71 @@ export function generateReportPDF(
   });
 
   doc.save(`rapport-${title.toLowerCase().replace(/\s+/g, '-')}.pdf`);
+}
+
+export function generateTripExpensePDF(
+  parcel: Parcel,
+  expenses: TripExpense[],
+  total: number
+): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 20;
+
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SARAH-GROUPE', pageWidth / 2, y, { align: 'center' });
+  y += 8;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Détail des dépenses du voyage', pageWidth / 2, y, { align: 'center' });
+  y += 8;
+
+  autoTable(doc, {
+    startY: y,
+    theme: 'grid',
+    headStyles: { fillColor: [37, 99, 235] },
+    bodyStyles: { fontSize: 9 },
+    head: [['Numéro voyage', 'Camion', 'Chauffeur', 'Agence départ', 'Agence arrivée', 'Départ', 'Arrivée']],
+    body: [[
+      parcel.tracking_number,
+      parcel.vehicle || '—',
+      parcel.agent_name || '—',
+      parcel.departure_branch || '—',
+      parcel.arrival_branch || '—',
+      formatDate(parcel.received_date),
+      parcel.delivery_date ? formatDate(parcel.delivery_date) : '—',
+    ]],
+  });
+
+  y = (doc.internal as unknown as LastAutoTableInfo).lastAutoTable.finalY + 6;
+
+  autoTable(doc, {
+    startY: y,
+    theme: 'striped',
+    headStyles: { fillColor: [22, 163, 74] },
+    bodyStyles: { fontSize: 9 },
+    head: [['Date', 'Catégorie', 'Libellé', 'Lieu', 'Montant', 'Observation']],
+    body: expenses.map((expense) => [
+      formatDate(expense.expense_date),
+      expense.category_name,
+      expense.label,
+      expense.location,
+      formatCurrency(expense.amount),
+      expense.notes || '—',
+    ]),
+  });
+
+  y = (doc.internal as unknown as LastAutoTableInfo).lastAutoTable.finalY + 8;
+
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total général: ${formatCurrency(total)}`, 14, y);
+  y += 14;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Signature:', 14, y);
+  doc.line(30, y + 2, 100, y + 2);
+
+  doc.save(`depenses-${parcel.tracking_number}.pdf`);
 }

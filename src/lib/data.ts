@@ -6,11 +6,15 @@ import type {
   Parcel,
   ParcelItem,
   Payment,
+  ExpenseCategory,
+  TripExpense,
   StatusHistory,
   ActivityLog,
   AppSettings,
   DashboardStats,
   ParcelStatus,
+  Attachment,
+  AttachmentEntityType,
 } from './types';
 import { generateId, generateTrackingNumber, isToday, toISO } from './format';
 
@@ -93,6 +97,99 @@ export async function updateClient(id: string, data: Partial<Client>): Promise<v
 export async function deleteClient(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('clients', id);
+}
+
+// ============================================================
+// EXPENSES
+// ============================================================
+const DEFAULT_EXPENSE_CATEGORIES = [
+  'Douane',
+  'Carburant',
+  'Police',
+  'Gendarmerie',
+  'Péage',
+  'Réparation',
+  'Manutention',
+  'Déchargement',
+  'Chargement',
+  'Parking',
+  'Hébergement',
+  'Nourriture',
+  'Communication',
+  'Divers',
+];
+
+export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
+  const db = await getDB();
+  const all = await db.getAll('expense_categories');
+  if (all.length === 0) {
+    const categories = DEFAULT_EXPENSE_CATEGORIES.map((name) => ({
+      id: name,
+      name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
+    for (const category of categories) {
+      await db.put('expense_categories', category);
+    }
+    return categories;
+  }
+  return all.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function createExpenseCategory(
+  data: Omit<ExpenseCategory, 'id' | 'created_at' | 'updated_at'>
+): Promise<ExpenseCategory> {
+  const db = await getDB();
+  const now = toISO();
+  const category: ExpenseCategory = { ...data, id: generateId(), created_at: now, updated_at: now };
+  await db.put('expense_categories', category);
+  return category;
+}
+
+export async function getTripExpenses(): Promise<TripExpense[]> {
+  const db = await getDB();
+  const all = await db.getAll('trip_expenses');
+  return all.sort((a, b) => (b.expense_date || '').localeCompare(a.expense_date || ''));
+}
+
+export async function getExpensesByParcelId(parcelId: string): Promise<TripExpense[]> {
+  const db = await getDB();
+  const items = await db.getAllFromIndex('trip_expenses', 'by-parcel', parcelId);
+  return items.sort((a, b) => (b.expense_date || '').localeCompare(a.expense_date || ''));
+}
+
+export async function getTripExpenseById(id: string): Promise<TripExpense | undefined> {
+  const db = await getDB();
+  return db.get('trip_expenses', id);
+}
+
+export async function createTripExpense(
+  data: Omit<TripExpense, 'id' | 'created_at' | 'updated_at'>
+): Promise<TripExpense | undefined> {
+  const db = await getDB();
+  const now = toISO();
+  const expense: TripExpense = { ...data, id: generateId(), created_at: now, updated_at: now };
+  await db.put('trip_expenses', expense);
+  return expense;
+}
+
+export async function updateTripExpense(id: string, data: Partial<TripExpense>): Promise<TripExpense | undefined> {
+  const db = await getDB();
+  const existing = await db.get('trip_expenses', id);
+  if (!existing) return undefined;
+  const updatedExpense: TripExpense = { ...existing, ...data, id, updated_at: toISO() } as TripExpense;
+  await db.put('trip_expenses', updatedExpense);
+  return updatedExpense;
+}
+
+export async function deleteTripExpense(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('trip_expenses', id);
+  const attachments = await getAttachmentsByEntity('expense', id);
+  for (const attachment of attachments) {
+    await db.delete('attachments', attachment.id);
+  }
 }
 
 // ============================================================
@@ -187,6 +284,8 @@ export async function deleteParcel(id: string): Promise<void> {
   for (const p of payments) await db.delete('payments', p.id);
   const history = await db.getAllFromIndex('status_history', 'by-parcel', id);
   for (const h of history) await db.delete('status_history', h.id);
+  const attachments = await getAttachmentsByEntity('parcel', id);
+  for (const attachment of attachments) await db.delete('attachments', attachment.id);
 }
 
 export async function updateParcelStatus(
@@ -204,9 +303,15 @@ export async function updateParcelStatus(
 
   const now = toISO();
   const updates: Partial<Parcel> = { status: newStatus, updated_at: now };
-  if (newStatus === 'in_transit' && !parcel.departure_date) updates.departure_date = now;
-  if (newStatus === 'arrived' && !parcel.arrival_date) updates.arrival_date = now;
-  if (newStatus === 'delivered' && !parcel.delivery_date) updates.delivery_date = now;
+  if ((newStatus === 'in_transit' || newStatus === 'arrived' || newStatus === 'delivered') && !parcel.departure_date) {
+    updates.departure_date = now;
+  }
+  if ((newStatus === 'arrived' || newStatus === 'delivered') && !parcel.arrival_date) {
+    updates.arrival_date = now;
+  }
+  if (newStatus === 'delivered' && !parcel.delivery_date) {
+    updates.delivery_date = now;
+  }
 
   await updateParcel(parcelId, updates);
 
@@ -303,6 +408,8 @@ export async function deletePayment(id: string): Promise<void> {
     const newAmountPaid = Math.max((parcel.amount_paid || 0) - payment.amount, 0);
     await updateParcel(parcel.id, { amount_paid: newAmountPaid });
   }
+  const attachments = await getAttachmentsByEntity('payment', id);
+  for (const attachment of attachments) await db.delete('attachments', attachment.id);
 }
 
 // ============================================================
@@ -400,4 +507,61 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     total_revenue: totalRevenue,
     total_outstanding: totalOutstanding,
   };
+}
+
+export async function getAttachmentsByEntity(
+  entity_type: AttachmentEntityType,
+  entity_id: string
+): Promise<Attachment[]> {
+  const db = await getDB();
+  const attachments = await db.getAllFromIndex('attachments', 'by-entity', [entity_type, entity_id]);
+  return attachments.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function createAttachment(
+  data: Omit<Attachment, 'id' | 'created_at' | 'updated_at'>
+): Promise<Attachment> {
+  const db = await getDB();
+  const now = toISO();
+  const attachment: Attachment = {
+    ...data,
+    id: generateId(),
+    created_at: now,
+    updated_at: now,
+  };
+  await db.put('attachments', attachment);
+  return attachment;
+}
+
+export async function saveAttachmentsForEntity(
+  entity_type: AttachmentEntityType,
+  entity_id: string,
+  attachments: Attachment[]
+): Promise<Attachment[]> {
+  const saved = await Promise.all(
+    attachments.map(async (attachment) => {
+      if (attachment.entity_id === entity_id && attachment.id) {
+        return attachment;
+      }
+      if (!attachment.blob) {
+        return null;
+      }
+
+      return createAttachment({
+        entity_type,
+        entity_id,
+        filename: attachment.filename,
+        mime_type: attachment.mime_type,
+        size: attachment.size,
+        blob: attachment.blob,
+      });
+    })
+  );
+
+  return saved.filter((item): item is Attachment => item !== null);
+}
+
+export async function deleteAttachment(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('attachments', id);
 }

@@ -7,10 +7,11 @@ import type {
   StatusHistory,
   ActivityLog,
   AppSettings,
+  Attachment,
 } from './types';
 
 const DB_NAME = 'sarah-groupe-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 interface TransitDB extends DBSchema {
   users: { key: string; value: User };
@@ -35,6 +36,21 @@ interface TransitDB extends DBSchema {
     key: string;
     value: Payment;
     indexes: { 'by-parcel': string; 'by-client': string; 'by-date': string };
+  };
+  attachments: {
+    key: string;
+    value: Attachment;
+    indexes: { 'by-entity': [string, string]; 'by-entity-type': string };
+  };
+  expense_categories: {
+    key: string;
+    value: import('./types').ExpenseCategory;
+    indexes: { 'by-name': string };
+  };
+  trip_expenses: {
+    key: string;
+    value: import('./types').TripExpense;
+    indexes: { 'by-parcel': string; 'by-date': string };
   };
   status_history: {
     key: string;
@@ -84,6 +100,11 @@ export async function getDB(): Promise<IDBPDatabase<TransitDB>> {
         store.createIndex('by-client', 'client_id');
         store.createIndex('by-date', 'payment_date');
       }
+      if (!db.objectStoreNames.contains('attachments')) {
+        const store = db.createObjectStore('attachments', { keyPath: 'id' });
+        store.createIndex('by-entity', ['entity_type', 'entity_id']);
+        store.createIndex('by-entity-type', 'entity_type');
+      }
       if (!db.objectStoreNames.contains('status_history')) {
         const store = db.createObjectStore('status_history', { keyPath: 'id' });
         store.createIndex('by-parcel', 'parcel_id');
@@ -93,6 +114,15 @@ export async function getDB(): Promise<IDBPDatabase<TransitDB>> {
         const store = db.createObjectStore('activity_logs', { keyPath: 'id' });
         store.createIndex('by-date', 'created_at');
         store.createIndex('by-user', 'user_id');
+      }
+      if (!db.objectStoreNames.contains('expense_categories')) {
+        const store = db.createObjectStore('expense_categories', { keyPath: 'id' });
+        store.createIndex('by-name', 'name');
+      }
+      if (!db.objectStoreNames.contains('trip_expenses')) {
+        const store = db.createObjectStore('trip_expenses', { keyPath: 'id' });
+        store.createIndex('by-parcel', 'parcel_id');
+        store.createIndex('by-date', 'expense_date');
       }
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'id' });

@@ -112,6 +112,29 @@ export interface Payment {
   created_at: string;
 }
 
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TripExpense {
+  id: string;
+  parcel_id: string;
+  category_id?: string;
+  category_name: string;
+  label: string;
+  amount: number;
+  expense_date: string;
+  location: string;
+  notes: string;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface StatusHistory {
   id: string;
   parcel_id: string;
@@ -146,6 +169,22 @@ export interface AppSettings {
   currency: string;
   default_origin?: string;
   default_destination?: string;
+}
+
+export type AttachmentEntityType = 'parcel' | 'expense' | 'payment';
+
+export interface Attachment {
+  id: string;
+  entity_type: AttachmentEntityType;
+  entity_id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+  created_at: string;
+  updated_at: string;
+  storage_path?: string;
+  url?: string;
+  blob?: Blob;
 }
 
 export interface DashboardStats {

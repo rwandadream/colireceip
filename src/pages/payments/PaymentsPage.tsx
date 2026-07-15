@@ -14,15 +14,17 @@ import {
   getParcels,
   getParcelById,
   createPayment,
+  saveAttachmentsForEntity,
   logActivity,
 } from '../../lib/data';
-import type { Payment, Parcel, PaymentMethod } from '../../lib/types';
+import type { Attachment, Payment, Parcel, PaymentMethod } from '../../lib/types';
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_COLORS } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card, StatCard } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { AttachmentManager } from '../../components/ui/AttachmentManager';
 import { formatCurrency, formatDateTime, isToday } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
 
@@ -147,6 +149,7 @@ export function PaymentNewPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [form, setForm] = useState({
     parcel_id: parcelIdParam || '',
     amount: '' as string | number,
@@ -191,7 +194,12 @@ export function PaymentNewPage() {
       recorded_by_name: user?.full_name || '',
       note: form.note,
     });
-    await logActivity(
+
+    const attachmentsPromise = attachments.length > 0
+      ? saveAttachmentsForEntity('payment', payment.id, attachments)
+      : Promise.resolve([]);
+
+    const activityPromise = logActivity(
       user?.id || '',
       user?.full_name || '',
       `a enregistré un paiement de ${formatCurrency(amountNum)} pour le colis ${selectedParcel.tracking_number}`,
@@ -199,6 +207,8 @@ export function PaymentNewPage() {
       payment.id,
       `Mode: ${PAYMENT_METHOD_LABELS[form.payment_method]}`
     );
+
+    await Promise.all([attachmentsPromise, activityPromise]);
     generateReceiptPDF(selectedParcel, [payment]);
     window.location.href = '/payments';
   };
@@ -279,6 +289,15 @@ export function PaymentNewPage() {
             label="Note (optionnel)"
             value={form.note}
             onChange={(e) => setForm({ ...form, note: e.target.value })}
+          />
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold text-slate-900 dark:text-white mb-4">Pièces jointes</h2>
+          <AttachmentManager
+            entityType="payment"
+            initialAttachments={attachments}
+            onChange={setAttachments}
           />
         </Card>
 

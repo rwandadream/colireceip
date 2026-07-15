@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   X,
+  DollarSign,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LogoBrand } from '../ui/Logo';
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { to: '/parcels', label: 'Colis', icon: <Package size={20} /> },
   { to: '/clients', label: 'Clients', icon: <Users size={20} /> },
   { to: '/payments', label: 'Paiements', icon: <CreditCard size={20} /> },
+  { to: '/expenses', label: 'Dépenses', icon: <DollarSign size={20} /> },
   { to: '/agents', label: 'Agents', icon: <UserCog size={20} />, adminOnly: true },
   { to: '/reports', label: 'Rapports', icon: <FileText size={20} />, adminOnly: true },
   { to: '/logs', label: 'Journal', icon: <ScrollText size={20} />, adminOnly: true },
