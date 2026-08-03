@@ -20,6 +20,8 @@ export function ParcelsListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'outstanding' | 'paid' | 'paid_origin'>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'balance' | 'amount'>('recent');
 
   useEffect(() => {
     (async () => {
@@ -30,17 +32,42 @@ export function ParcelsListPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    return parcels.filter((p) => {
-      const matchesSearch =
-        !search ||
-        p.tracking_number.toLowerCase().includes(search.toLowerCase()) ||
-        p.client_name.toLowerCase().includes(search.toLowerCase()) ||
-        p.client_phone?.includes(search) ||
-        p.description?.toLowerCase().includes(search.toLowerCase());
+    const normalizedSearch = search.trim().toLowerCase();
+    const result = parcels.filter((p) => {
+      const haystack = [
+        p.tracking_number,
+        p.client_name,
+        p.client_phone,
+        p.recipient_name,
+        p.recipient_phone,
+        p.recipient_address,
+        p.merchandise_type,
+        p.description,
+        p.origin,
+        p.destination,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch = !normalizedSearch || haystack.includes(normalizedSearch);
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const effectiveBalance = p.payment_condition === 'paid_origin' ? 0 : p.balance;
+      const matchesPayment =
+        paymentFilter === 'all' ||
+        (paymentFilter === 'outstanding' && effectiveBalance > 0 && p.status !== 'cancelled') ||
+        (paymentFilter === 'paid' && effectiveBalance <= 0 && p.status !== 'cancelled') ||
+        (paymentFilter === 'paid_origin' && p.payment_condition === 'paid_origin');
+
+      return matchesSearch && matchesStatus && matchesPayment;
     });
-  }, [parcels, search, statusFilter]);
+
+    return [...result].sort((a, b) => {
+      if (sortBy === 'balance') return b.balance - a.balance;
+      if (sortBy === 'amount') return b.total_amount - a.total_amount;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [parcels, search, statusFilter, paymentFilter, sortBy]);
 
   return (
     <div className="space-y-6">
@@ -48,7 +75,7 @@ export function ParcelsListPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Colis</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            {parcels.length} colis au total
+            {parcels.length} colis au total · suivi opérationnel centralisé
           </p>
         </div>
         <Link to="/parcels/new" className="btn-primary w-full sm:w-auto">
@@ -58,27 +85,36 @@ export function ParcelsListPage() {
       </div>
 
       <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row">
           <div className="flex-1">
             <Input
-              placeholder="Rechercher par numéro, client, téléphone..."
+              placeholder="Rechercher par numéro, client, téléphone, destinataire..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               icon={<Search size={18} />}
             />
           </div>
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="sm:w-48"
-          >
-            <option value="all">Tous les statuts</option>
-            {PARCEL_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {PARCEL_STATUS_LABELS[s]}
-              </option>
-            ))}
-          </Select>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:w-48">
+              <option value="all">Tous les statuts</option>
+              {PARCEL_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {PARCEL_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </Select>
+            <Select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as 'all' | 'outstanding' | 'paid' | 'paid_origin')} className="sm:w-56">
+              <option value="all">Tous les paiements</option>
+              <option value="outstanding">Solde ouvert</option>
+              <option value="paid">Payé</option>
+              <option value="paid_origin">Payé au départ</option>
+            </Select>
+            <Select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'recent' | 'balance' | 'amount')} className="sm:w-48">
+              <option value="recent">Plus récents</option>
+              <option value="balance">Plus de solde</option>
+              <option value="amount">Plus de montant</option>
+            </Select>
+          </div>
         </div>
       </Card>
 
@@ -105,57 +141,49 @@ export function ParcelsListPage() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((parcel) => (
-            <Link key={parcel.id} to={`/parcels/${parcel.id}`}>
-              <Card hover className="p-4 h-full">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-white">{parcel.tracking_number}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {formatDate(parcel.received_date)}
-                    </p>
-                  </div>
-                  <Badge className={PARCEL_STATUS_COLORS[parcel.status]}>
-                    {PARCEL_STATUS_LABELS[parcel.status]}
-                  </Badge>
-                </div>
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                    <UserIcon size={14} className="text-slate-400" />
-                    <span className="truncate">{parcel.client_name}</span>
-                  </div>
-                  {parcel.client_phone && (
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                      <Phone size={14} className="text-slate-400" />
-                      <span>{parcel.client_phone}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                    <Package size={14} className="text-slate-400" />
-                    <span className="truncate">{parcel.merchandise_type || 'Marchandise'} · {parcel.quantity} colis</span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Total</p>
-                    <p className="font-bold text-slate-900 dark:text-white">{formatCurrency(parcel.total_amount)}</p>
-                  </div>
-                  {parcel.balance > 0 && parcel.status !== 'cancelled' ? (
-                    <div className="text-right">
-                      <p className="text-xs text-error-500">Reste à payer</p>
-                      <p className="font-semibold text-error-600 dark:text-error-400">{formatCurrency(parcel.balance)}</p>
-                    </div>
-                  ) : parcel.status !== 'cancelled' ? (
-                    <Badge className="bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-300">
-                      Payé
-                    </Badge>
-                  ) : null}
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800/70">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">N° colis</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Client</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Trajet</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Statut</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Solde</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((parcel) => (
+                  <tr key={parcel.id} className="border-t border-slate-100 dark:border-slate-700/60">
+                    <td className="px-4 py-3">
+                      <Link to={`/parcels/${parcel.id}`} className="font-semibold text-brand-600 hover:underline">
+                        {parcel.tracking_number}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                        <UserIcon size={14} className="text-slate-400" />
+                        <span>{parcel.client_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{parcel.origin} → {parcel.destination}</td>
+                    <td className="px-4 py-3"><Badge className={PARCEL_STATUS_COLORS[parcel.status]}>{PARCEL_STATUS_LABELS[parcel.status]}</Badge></td>
+                    <td className="px-4 py-3">
+                      {parcel.payment_condition === 'paid_origin' ? (
+                        <Badge className="bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-300">Payé au départ</Badge>
+                      ) : parcel.balance > 0 && parcel.status !== 'cancelled' ? (
+                        <span className="font-semibold text-error-600 dark:text-error-400">{formatCurrency(parcel.balance)}</span>
+                      ) : parcel.status !== 'cancelled' ? (
+                        <Badge className="bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-300">Payé</Badge>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );

@@ -114,7 +114,7 @@ export function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8">
-          © 2025 Sarah-Groupe. Tous droits réservés.
+          © 2025 Groupe-Gaff. Tous droits réservés.
         </p>
       </div>
     </div>

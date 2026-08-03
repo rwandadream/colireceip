@@ -127,7 +127,6 @@ export function ClientDetailPage() {
               </div>
             </div>
           )}
-          {/* WhatsApp removed from display */}
           {client.city && (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-accent-50 dark:bg-accent-900/30 flex items-center justify-center text-accent-600 dark:text-accent-400">
@@ -139,24 +138,7 @@ export function ClientDetailPage() {
               </div>
             </div>
           )}
-          {client.address && (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
-                <MapPin size={18} />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">Adresse</p>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{client.address}</p>
-              </div>
-            </div>
-          )}
         </div>
-        {client.notes && (
-          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-            <p className="text-xs text-slate-400 mb-1">Notes</p>
-            <p className="text-sm text-slate-600 dark:text-slate-300">{client.notes}</p>
-          </div>
-        )}
       </Card>
 
       {/* Stats */}
@@ -238,30 +220,18 @@ export function ClientDetailPage() {
               value={editForm.full_name}
               onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
                 label="Téléphone"
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
               />
-              {/* WhatsApp removed from edit form */}
+              <Input
+                label="Ville"
+                value={editForm.city}
+                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+              />
             </div>
-            <Input
-              label="Ville"
-              value={editForm.city}
-              onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-            />
-            <Input
-              label="Adresse"
-              value={editForm.address}
-              onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-            />
-            <Textarea
-              label="Notes"
-              rows={2}
-              value={editForm.notes}
-              onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-            />
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setEditOpen(false)} className="btn-secondary">Annuler</button>
               <button onClick={handleSaveEdit} className="btn-primary">

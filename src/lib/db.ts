@@ -138,9 +138,9 @@ export async function seedDefaultData(): Promise<void> {
   if (!settings) {
     await db.put('settings', {
       id: '1',
-      company_name: 'Sarah-Groupe',
+      company_name: 'Groupe-Gaff',
       company_phone: '+223 76 00 00 00',
-      company_email: 'contact@sarah-groupe.com',
+      company_email: 'contact@groupe-gaff.com',
       bamako_address: 'Bamako, Mali',
       abidjan_address: 'Abidjan, Côte d\'Ivoire',
       default_transport_price: 5000,

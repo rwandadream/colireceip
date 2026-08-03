@@ -46,7 +46,7 @@ export function OfflinePage() {
 
         <div className="flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 mt-10 uppercase tracking-widest">
           <LogoIcon size={16} />
-          <span>Sarah-Groupe</span>
+          <span>Groupe-Gaff</span>
         </div>
       </div>
     </div>

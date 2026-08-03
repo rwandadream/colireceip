@@ -251,12 +251,14 @@ export async function createParcel(
   const tracking = generateTrackingNumber(all.map((p) => p.tracking_number));
   const now = toISO();
   const total_amount = (data.sub_total || 0) + (data.transport_price || 0) + (data.additional_fees || 0);
+  const amountPaid = data.amount_paid || 0;
+  const effectiveBalance = data.payment_condition === 'paid_origin' ? 0 : Math.max(total_amount - amountPaid, 0);
   const parcel: Parcel = {
     ...data,
     id: generateId(),
     tracking_number: tracking,
     total_amount,
-    balance: total_amount - (data.amount_paid || 0),
+    balance: effectiveBalance,
     created_at: now,
     updated_at: now,
   };
@@ -271,7 +273,9 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
   const updated = { ...existing, ...data, id, updated_at: toISO() };
   updated.sub_total = updated.sub_total ?? existing.sub_total ?? 0;
   updated.total_amount = (updated.sub_total || 0) + (updated.transport_price || 0) + (updated.additional_fees || 0);
-  updated.balance = updated.total_amount - (updated.amount_paid || 0);
+  const amountPaid = updated.amount_paid || 0;
+  const condition = updated.payment_condition || existing.payment_condition;
+  updated.balance = condition === 'paid_origin' ? 0 : Math.max(updated.total_amount - amountPaid, 0);
   await db.put('parcels', updated);
 }
 
@@ -482,11 +486,20 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     db.getAll('payments'),
   ]);
 
+  const paymentsByParcel = new Map<string, number>();
+  for (const payment of payments) {
+    paymentsByParcel.set(payment.parcel_id, (paymentsByParcel.get(payment.parcel_id) || 0) + payment.amount);
+  }
+
   const collectedToday = payments
     .filter((p) => isToday(p.payment_date))
-    .reduce((sum, p) => sum + p.amount, 0);
+    .reduce((sum, p) => sum + p.amount, 0) + parcels
+      .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0 && isToday(p.received_date || p.created_at))
+      .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
 
-  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0) + parcels
+    .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0)
+    .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
   const totalOutstanding = parcels
     .filter((p) => p.status !== 'cancelled')
     .reduce((sum, p) => sum + (p.balance || 0), 0);

@@ -67,6 +67,8 @@ export function DashboardPage() {
   const pctTransit = Math.round((stats.in_transit / totalParcelsCount) * 100);
   const pctArrived = Math.round((stats.arrived / totalParcelsCount) * 100);
   const pctDelivered = Math.round((stats.delivered / totalParcelsCount) * 100);
+  const paymentCoverage = totalParcelsCount > 0 ? Math.round(((stats.total_parcels - stats.pending_payments) / totalParcelsCount) * 100) : 0;
+  const deliveryRate = totalParcelsCount > 0 ? Math.round((stats.delivered / totalParcelsCount) * 100) : 0;
 
   // Helper to render inline visual markers for parcel status
   const getStatusIcon = (status: string) => {
@@ -206,6 +208,30 @@ export function DashboardPage() {
         </div>
       </Card>
 
+      <Card className="p-5 border-slate-200/70 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-300">Vue direction</p>
+            <h2 className="mt-2 text-xl font-bold">Suivi de gestion · performance du jour</h2>
+            <p className="mt-2 text-sm text-slate-300">Pilotage rapide des colis, des paiements ouverts et de la livraison.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-[320px]">
+            <div className="rounded-2xl bg-white/10 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-300">Couverture paiement</p>
+              <p className="mt-1 text-lg font-semibold">{paymentCoverage}%</p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-300">Taux livraison</p>
+              <p className="mt-1 text-lg font-semibold">{deliveryRate}%</p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-300">À encaisser</p>
+              <p className="mt-1 text-lg font-semibold">{formatCurrency(stats.total_outstanding)}</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Financial Summary with glowing card overlays */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-6 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 text-white border-0 shadow-lg shadow-emerald-500/10 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
@@ -236,9 +262,8 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Parcels */}
-      <div className="w-full">
-        {/* Colis récents */}
+      {/* Operational Quick View */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
         <Card className="p-5 flex flex-col">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div>
@@ -314,6 +339,42 @@ export function DashboardPage() {
               })}
             </div>
           )}
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-bold text-slate-900 dark:text-white">Actions rapides</h2>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Priorités du jour</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <Link to="/parcels/new" className="flex items-center justify-between rounded-2xl border border-brand-100 bg-brand-50 p-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 dark:border-brand-900/40 dark:bg-brand-950/20 dark:text-brand-300">
+              <span className="flex items-center gap-2">
+                <Plus size={16} />
+                Nouveau colis
+              </span>
+              <ArrowRight size={14} />
+            </Link>
+            <Link to="/clients/new" className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+              <span className="flex items-center gap-2">
+                <Users size={16} />
+                Nouveau client
+              </span>
+              <ArrowRight size={14} />
+            </Link>
+            <Link to="/payments/new" className="flex items-center justify-between rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+              <span className="flex items-center gap-2">
+                <Wallet size={16} />
+                Enregistrer paiement
+              </span>
+              <ArrowRight size={14} />
+            </Link>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/20">
+              <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{stats.total_outstanding} FCFA à encaisser</p>
+              <p className="text-xs text-rose-600 dark:text-rose-400">Paiements encore ouverts</p>
+            </div>
+          </div>
         </Card>
       </div>
     </div>

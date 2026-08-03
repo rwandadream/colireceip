@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useToast } from '../../context/ToastContext';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -40,6 +41,7 @@ export function ParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [parcel, setParcel] = useState<Parcel | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [history, setHistory] = useState<StatusHistory[]>([]);
@@ -75,12 +77,18 @@ export function ParcelDetailPage() {
     setParcel(p || null);
     setHistory(hist);
     setStatusModalOpen(false);
+    addToast({
+      type: 'success',
+      title: 'Statut mis à jour',
+      description: `Le colis a été déplacé vers ${PARCEL_STATUS_LABELS[newStatus]}.`,
+    });
   };
 
   const handleDelete = async () => {
     if (!parcel || !user) return;
     await deleteParcel(parcel.id);
     await logActivity(user.id, user.full_name, `a supprimé le colis ${parcel.tracking_number}`, 'parcel', parcel.id, '');
+    addToast({ type: 'success', title: 'Colis supprimé', description: 'Le colis a bien été supprimé.' });
     navigate('/parcels');
   };
 
@@ -141,6 +149,12 @@ export function ParcelDetailPage() {
           <CreditCard size={16} />
           Enregistrer paiement
         </Link>
+        {parcel.balance > 0 && (
+          <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-primary text-sm">
+            <CreditCard size={16} />
+            Payer le reste
+          </Link>
+        )}
         {isAdmin && (
           <Button variant="danger" size="sm" onClick={() => setDeleteModalOpen(true)}>
             <Trash2 size={16} />
@@ -246,12 +260,19 @@ export function ParcelDetailPage() {
               <span className="text-slate-500 dark:text-slate-400">Montant payé</span>
               <span className="font-bold text-success-600 dark:text-success-400">{formatCurrency(parcel.amount_paid)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500 dark:text-slate-400">Reste à payer</span>
-              <span className={`font-bold ${parcel.balance > 0 ? 'text-error-600 dark:text-error-400' : 'text-success-600 dark:text-success-400'}`}>
-                {formatCurrency(parcel.balance)}
-              </span>
-            </div>
+            {parcel.payment_condition === 'paid_origin' ? (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">État</span>
+                <span className="font-bold text-success-600 dark:text-success-400">Payé au départ</span>
+              </div>
+            ) : (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Reste à payer</span>
+                <span className={`font-bold ${parcel.balance > 0 ? 'text-error-600 dark:text-error-400' : 'text-success-600 dark:text-success-400'}`}>
+                  {formatCurrency(parcel.balance)}
+                </span>
+              </div>
+            )}
           </div>
           {payments.length > 0 && (
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 space-y-2">

@@ -26,8 +26,12 @@ export interface Client {
   id: string;
   full_name: string;
   phone: string;
+  company_name?: string;
+  email?: string;
   city: string;
+  neighborhood?: string;
   address: string;
+  reference?: string;
   notes: string;
   created_by: string;
   created_by_name: string;
@@ -212,12 +216,12 @@ export const PARCEL_STATUS_LABELS: Record<ParcelStatus, string> = {
 };
 
 export const PARCEL_STATUS_COLORS: Record<ParcelStatus, string> = {
-  received: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  in_transit: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-  arrived: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
-  delivered: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  received: 'border border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300',
+  pending: 'border border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300',
+  in_transit: 'border border-violet-200 bg-violet-100 text-violet-800 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-300',
+  arrived: 'border border-cyan-200 bg-cyan-100 text-cyan-800 dark:border-cyan-900/50 dark:bg-cyan-950/40 dark:text-cyan-300',
+  delivered: 'border border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300',
+  cancelled: 'border border-rose-200 bg-rose-100 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300',
 };
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

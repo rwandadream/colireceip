@@ -47,12 +47,14 @@ export function generateId(): string {
 }
 
 export function generateTrackingNumber(existing: string[] = []): string {
-  let num: string;
-  do {
-    const seq = String(Math.floor(Math.random() * 900000) + 100000);
-    num = `COL-${seq}`;
-  } while (existing.includes(num));
-  return num;
+  const numericValues = existing
+    .map((value) => value.match(/(\d+)/)?.[1])
+    .filter((value): value is string => Boolean(value))
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+
+  const nextValue = numericValues.length > 0 ? Math.max(...numericValues) + 1 : 100001;
+  return `COL-${String(nextValue)}`;
 }
 
 export function isToday(date: string | Date | null): boolean {

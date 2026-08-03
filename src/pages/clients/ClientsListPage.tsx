@@ -5,7 +5,7 @@ import { getClients, getParcels } from '../../lib/data';
 import type { Client, Parcel } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { EmptyState, Skeleton } from '../../components/ui/Badge';
-import { Input } from '../../components/ui/Input';
+import { Input, Select } from '../../components/ui/Input';
 import { formatCurrency, formatDate } from '../../lib/format';
 
 export function ClientsListPage() {
@@ -13,6 +13,7 @@ export function ClientsListPage() {
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'with_balance' | 'paid_up'>('all');
 
   useEffect(() => {
     (async () => {
@@ -24,19 +25,38 @@ export function ClientsListPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    return clients.filter(
-      (c) =>
-        !search ||
-        c.full_name.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone?.includes(search) ||
-        c.city?.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [clients, search]);
+    const normalizedSearch = search.trim().toLowerCase();
+    return clients.filter((c) => {
+      const haystack = [
+        c.full_name,
+        c.phone,
+        c.city,
+        c.address,
+        c.neighborhood,
+        c.notes,
+        c.company_name,
+        c.email,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch = !normalizedSearch || haystack.includes(normalizedSearch);
+      const stats = getClientStats(c.id);
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'with_balance' && stats.outstanding > 0) ||
+        (statusFilter === 'paid_up' && stats.outstanding === 0);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [clients, parcels, search, statusFilter]);
 
   const getClientStats = (clientId: string) => {
     const clientParcels = parcels.filter((p) => p.client_id === clientId);
     const totalAmount = clientParcels.reduce((sum, p) => sum + p.total_amount, 0);
-    return { count: clientParcels.length, totalAmount };
+    const outstanding = clientParcels.reduce((sum, p) => sum + (p.status !== 'cancelled' ? p.balance : 0), 0);
+    return { count: clientParcels.length, totalAmount, outstanding };
   };
 
   return (
@@ -53,12 +73,21 @@ export function ClientsListPage() {
       </div>
 
       <Card className="p-4">
-        <Input
-          placeholder="Rechercher par nom, téléphone, ville..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          icon={<Search size={18} />}
-        />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex-1">
+            <Input
+              placeholder="Rechercher par nom, téléphone, ville, adresse..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              icon={<Search size={18} />}
+            />
+          </div>
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | 'with_balance' | 'paid_up')} className="sm:w-56">
+            <option value="all">Tous les clients</option>
+            <option value="with_balance">Avec solde impayé</option>
+            <option value="paid_up">À jour</option>
+          </Select>
+        </div>
       </Card>
 
       {loading ? (
@@ -108,7 +137,6 @@ export function ClientsListPage() {
                         <span>{client.phone}</span>
                       </div>
                     )}
-                    {/* WhatsApp removed from list view */}
                     {client.city && (
                       <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                         <MapPin size={14} className="text-slate-400" />

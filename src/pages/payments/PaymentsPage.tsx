@@ -16,8 +16,9 @@ import {
   createPayment,
   saveAttachmentsForEntity,
   logActivity,
+  getClients,
 } from '../../lib/data';
-import type { Attachment, Payment, Parcel, PaymentMethod } from '../../lib/types';
+import type { Attachment, Payment, Parcel, PaymentMethod, Client } from '../../lib/types';
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_COLORS } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card, StatCard } from '../../components/ui/Card';
@@ -33,6 +34,7 @@ export function PaymentsListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   useEffect(() => {
     (async () => {
@@ -43,18 +45,35 @@ export function PaymentsListPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfDay);
+    startOfWeek.setDate(startOfDay.getDate() - 6);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     return payments.filter((p) => {
+      const paymentDate = new Date(p.payment_date);
       const matchesSearch =
-        !search ||
-        p.parcel_tracking?.toLowerCase().includes(search.toLowerCase()) ||
-        p.client_name?.toLowerCase().includes(search.toLowerCase());
+        !normalizedSearch ||
+        p.parcel_tracking?.toLowerCase().includes(normalizedSearch) ||
+        p.client_name?.toLowerCase().includes(normalizedSearch) ||
+        p.note?.toLowerCase().includes(normalizedSearch) ||
+        p.recorded_by_name?.toLowerCase().includes(normalizedSearch);
       const matchesMethod = methodFilter === 'all' || p.payment_method === methodFilter;
-      return matchesSearch && matchesMethod;
+      const matchesDate =
+        dateFilter === 'all' ||
+        (dateFilter === 'today' && paymentDate >= startOfDay) ||
+        (dateFilter === 'week' && paymentDate >= startOfWeek) ||
+        (dateFilter === 'month' && paymentDate >= startOfMonth);
+
+      return matchesSearch && matchesMethod && matchesDate;
     });
-  }, [payments, search, methodFilter]);
+  }, [payments, search, methodFilter, dateFilter]);
 
   const totalToday = payments.filter((p) => isToday(p.payment_date)).reduce((s, p) => s + p.amount, 0);
   const totalAll = payments.reduce((s, p) => s + p.amount, 0);
+  const filteredTotal = filtered.reduce((s, p) => s + p.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -75,21 +94,29 @@ export function PaymentsListPage() {
       </div>
 
       <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row">
           <div className="flex-1">
             <Input
-              placeholder="Rechercher par colis, client..."
+              placeholder="Rechercher par colis, client, note, agent..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               icon={<Search size={18} />}
             />
           </div>
-          <Select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="sm:w-48">
-            <option value="all">Tous les modes</option>
-            {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((m) => (
-              <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>
-            ))}
-          </Select>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="sm:w-48">
+              <option value="all">Tous les modes</option>
+              {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((m) => (
+                <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>
+              ))}
+            </Select>
+            <Select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as 'all' | 'today' | 'week' | 'month')} className="sm:w-48">
+              <option value="all">Toutes les dates</option>
+              <option value="today">Aujourd’hui</option>
+              <option value="week">7 derniers jours</option>
+              <option value="month">Ce mois</option>
+            </Select>
+          </div>
         </div>
       </Card>
 
@@ -111,31 +138,42 @@ export function PaymentsListPage() {
           />
         </Card>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((p) => (
-            <Card key={p.id} className="p-4 flex items-center gap-4 card-hover">
-              <div className="w-11 h-11 rounded-xl bg-success-100 dark:bg-success-900/40 flex items-center justify-center text-success-700 dark:text-success-300 flex-shrink-0">
-                <Wallet size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Link to={`/parcels/${p.parcel_id}`} className="text-sm font-semibold text-slate-900 dark:text-white hover:underline">
-                    {p.parcel_tracking}
-                  </Link>
-                  <Badge className={PAYMENT_METHOD_COLORS[p.payment_method]}>
-                    {PAYMENT_METHOD_LABELS[p.payment_method]}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {p.client_name} · {formatDateTime(p.payment_date)} · {p.recorded_by_name}
-                </p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="font-bold text-success-600 dark:text-success-400">{formatCurrency(p.amount)}</p>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <Card className="overflow-hidden">
+          <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+            <span>{filtered.length} résultats dans la vue filtrée</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-200">Total filtré : {formatCurrency(filteredTotal)}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800/70">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Client</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Colis</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Montant</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Mode</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <tr key={p.id} className="border-t border-slate-100 dark:border-slate-700/60">
+                    <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">{p.client_name}</td>
+                    <td className="px-4 py-3">
+                      <Link to={`/parcels/${p.parcel_id}`} className="font-semibold text-brand-600 hover:underline">
+                        {p.parcel_tracking}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-success-700 dark:text-success-400">{formatCurrency(p.amount)}</td>
+                    <td className="px-4 py-3">
+                      <Badge className={PAYMENT_METHOD_COLORS[p.payment_method]}>{PAYMENT_METHOD_LABELS[p.payment_method]}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDateTime(p.payment_date)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );
@@ -146,11 +184,14 @@ export function PaymentNewPage() {
   const [searchParams] = useSearchParams();
   const parcelIdParam = searchParams.get('parcel');
   const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [form, setForm] = useState({
+    client_id: '',
     parcel_id: parcelIdParam || '',
     amount: '' as string | number,
     payment_method: 'cash' as PaymentMethod,
@@ -159,17 +200,26 @@ export function PaymentNewPage() {
 
   useEffect(() => {
     (async () => {
-      const data = await getParcels();
-      const active = data.filter((p) => p.status !== 'cancelled' && p.balance > 0);
+      const [parcelsData, clientsData] = await Promise.all([getParcels(), getClients()]);
+      const active = parcelsData.filter((p) => p.status !== 'cancelled' && p.balance > 0);
       setParcels(active);
+      setClients(clientsData);
       if (parcelIdParam) {
         const p = await getParcelById(parcelIdParam);
         setSelectedParcel(p || null);
-        if (p) setForm((f) => ({ ...f, parcel_id: parcelIdParam, amount: p.balance }));
+        if (p) setForm((f) => ({ ...f, client_id: p.client_id, parcel_id: parcelIdParam, amount: p.balance }));
       }
       setLoading(false);
     })();
   }, [parcelIdParam]);
+
+  const handleClientSelect = async (clientId: string) => {
+    const clientParcels = parcels.filter((p) => p.client_id === clientId && p.balance > 0);
+    const firstParcel = clientParcels[0];
+    const parcel = firstParcel ? await getParcelById(firstParcel.id) : null;
+    setSelectedParcel(parcel ?? null);
+    setForm((f) => ({ ...f, client_id: clientId, parcel_id: parcel?.id || '', amount: parcel?.balance || '' }));
+  };
 
   const handleParcelSelect = async (id: string) => {
     const p = await getParcelById(id);
@@ -177,41 +227,73 @@ export function PaymentNewPage() {
     if (p) setForm((f) => ({ ...f, parcel_id: id, amount: p.balance }));
   };
 
+  const applyQuickAmount = (mode: 'full' | 'half') => {
+    if (!selectedParcel) return;
+    const balance = Number(selectedParcel.balance) || 0;
+    const amount = mode === 'full' ? balance : Math.round(balance / 2);
+    setForm((prev) => ({ ...prev, amount: amount > 0 ? amount : '' }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountNum = Number(form.amount);
     if (!form.parcel_id || amountNum <= 0 || !selectedParcel) return;
     setSaving(true);
-    const payment = await createPayment({
-      parcel_id: form.parcel_id,
-      parcel_tracking: selectedParcel.tracking_number,
-      client_id: selectedParcel.client_id,
-      client_name: selectedParcel.client_name,
-      amount: amountNum,
-      payment_method: form.payment_method,
-      payment_date: new Date().toISOString(),
-      recorded_by: user?.id || '',
-      recorded_by_name: user?.full_name || '',
-      note: form.note,
-    });
 
-    const attachmentsPromise = attachments.length > 0
-      ? saveAttachmentsForEntity('payment', payment.id, attachments)
-      : Promise.resolve([]);
+    try {
+      const payment = await createPayment({
+        parcel_id: form.parcel_id,
+        parcel_tracking: selectedParcel.tracking_number,
+        client_id: selectedParcel.client_id,
+        client_name: selectedParcel.client_name,
+        amount: amountNum,
+        payment_method: form.payment_method,
+        payment_date: new Date().toISOString(),
+        recorded_by: user?.id || '',
+        recorded_by_name: user?.full_name || '',
+        note: form.note,
+      });
 
-    const activityPromise = logActivity(
-      user?.id || '',
-      user?.full_name || '',
-      `a enregistré un paiement de ${formatCurrency(amountNum)} pour le colis ${selectedParcel.tracking_number}`,
-      'payment',
-      payment.id,
-      `Mode: ${PAYMENT_METHOD_LABELS[form.payment_method]}`
-    );
+      setSaving(false);
+      setSaved(true);
+      setAttachments([]);
+      setForm({ client_id: selectedParcel.client_id, parcel_id: selectedParcel.id, amount: selectedParcel.balance, payment_method: form.payment_method, note: '' });
+      setSelectedParcel(selectedParcel);
 
-    await Promise.all([attachmentsPromise, activityPromise]);
-    generateReceiptPDF(selectedParcel, [payment]);
-    window.location.href = '/payments';
+      void (async () => {
+        try {
+          if (attachments.length > 0) {
+            await saveAttachmentsForEntity('payment', payment.id, attachments);
+          }
+          await logActivity(
+            user?.id || '',
+            user?.full_name || '',
+            `a enregistré un paiement de ${formatCurrency(amountNum)} pour le colis ${selectedParcel.tracking_number}`,
+            'payment',
+            payment.id,
+            `Mode: ${PAYMENT_METHOD_LABELS[form.payment_method]}`
+          );
+        } catch (error) {
+          console.error('Erreur d’enregistrement du paiement en arrière-plan', error);
+        }
+      })();
+
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(() => {
+          generateReceiptPDF(selectedParcel, [payment]);
+        });
+      } else {
+        window.setTimeout(() => {
+          generateReceiptPDF(selectedParcel, [payment]);
+        }, 0);
+      }
+    } catch (error) {
+      console.error('Erreur d’enregistrement du paiement', error);
+      setSaving(false);
+    }
   };
+
+  const selectedClientParcels = form.client_id ? parcels.filter((p) => p.client_id === form.client_id && p.balance > 0) : [];
 
   if (loading) return <Skeleton className="h-96" />;
 
@@ -228,17 +310,38 @@ export function PaymentNewPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {saved && (
+          <Card className="border-success-200 bg-success-50 p-4 text-sm text-success-700 dark:border-success-900/40 dark:bg-success-950/20 dark:text-success-300">
+            Paiement enregistré instantanément. Le client et le colis sont maintenant mis à jour.
+          </Card>
+        )}
+
+        <Card className="p-5">
+          <Select
+            label="Client *"
+            value={form.client_id}
+            onChange={(e) => handleClientSelect(e.target.value)}
+            required
+          >
+            <option value="">— Sélectionner un client —</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>{client.full_name} · {client.phone || client.city}</option>
+            ))}
+          </Select>
+        </Card>
+
         <Card className="p-5">
           <Select
             label="Colis *"
             value={form.parcel_id}
             onChange={(e) => handleParcelSelect(e.target.value)}
             required
+            disabled={!form.client_id}
           >
             <option value="">— Sélectionner un colis —</option>
-            {parcels.map((p) => (
+            {selectedClientParcels.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.tracking_number} · {p.client_name} · Reste: {formatCurrency(p.balance)}
+                {p.tracking_number} · Reste: {formatCurrency(p.balance)}
               </option>
             ))}
           </Select>
@@ -268,14 +371,34 @@ export function PaymentNewPage() {
         )}
 
         <Card className="p-5 space-y-4">
-          <Input
-            label="Montant (FCFA) *"
-            type="number"
-            min={1}
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: e.target.value === '' ? '' : Number(e.target.value) })}
-            required
-          />
+          <div className="space-y-2">
+            <Input
+              label="Montant (FCFA) *"
+              type="number"
+              min={1}
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value === '' ? '' : Number(e.target.value) })}
+              required
+            />
+            {selectedParcel && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => applyQuickAmount('full')}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
+                >
+                  Payer le reste
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyQuickAmount('half')}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  Paiement partiel (50%)
+                </button>
+              </div>
+            )}
+          </div>
           <Select
             label="Mode de paiement *"
             value={form.payment_method}
@@ -305,7 +428,7 @@ export function PaymentNewPage() {
           <Link to="/payments" className="btn-secondary">Annuler</Link>
           <Button type="submit" loading={saving}>
             <Save size={18} />
-            Enregistrer & Imprimer
+            Enregistrer maintenant
           </Button>
         </div>
       </form>

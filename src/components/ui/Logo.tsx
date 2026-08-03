@@ -93,8 +93,8 @@ export function LogoBrand({
       <LogoIcon size={size} className="flex-shrink-0" />
       <div className="min-w-0 flex flex-col justify-center text-left">
         <div className="flex items-baseline font-extrabold tracking-wide text-lg sm:text-xl">
-          <span className="text-slate-900 dark:text-white">Sarah</span>
-          <span className="text-[#2563EB] ml-0.5">-Groupe</span>
+          <span className="text-slate-900 dark:text-white">Groupe</span>
+          <span className="text-[#2563EB] ml-0.5">-Gaff</span>
         </div>
         {showSubtitle && (
           <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold tracking-wide mt-0.5">

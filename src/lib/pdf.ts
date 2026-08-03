@@ -20,7 +20,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   doc.setFont('helvetica', 'normal');
   doc.text('Logistique & Transit Bamako - Abidjan', pageWidth / 2, y, { align: 'center' });
   y += 5;
-  doc.text('Tél: +223 76 00 00 00 | Email: contact@sarah-groupe.com', pageWidth / 2, y, { align: 'center' });
+  doc.text('Tél: +223 76 00 00 00 | Email: contact@groupe-gaff.com', pageWidth / 2, y, { align: 'center' });
   y += 8;
 
   doc.setLineWidth(0.3);
@@ -104,7 +104,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
   doc.text(
-    `Reçu généré le ${formatDateTime(new Date().toISOString())} - Sarah-Groupe`,
+    `Reçu généré le ${formatDateTime(new Date().toISOString())} - Groupe-Gaff`,
     pageWidth / 2,
     doc.internal.pageSize.getHeight() - 10,
     { align: 'center' }
