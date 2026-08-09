@@ -15,11 +15,84 @@ import type {
   ParcelStatus,
   Attachment,
   AttachmentEntityType,
+  Trip,
+  TripVehicle,
+  TripStatus,
 } from './types';
 import { generateId, generateTrackingNumber, isToday, toISO } from './format';
 
 export async function ensureSeed(): Promise<void> {
   await seedDefaultData();
+}
+
+// ============================================================
+// TRIPS
+// ============================================================
+export async function getTrips(): Promise<Trip[]> {
+  const db = await getDB();
+  const trips = await db.getAll('trips');
+  return trips.sort((a, b) => b.trip_date.localeCompare(a.trip_date));
+}
+
+export async function getTripById(id: string): Promise<Trip | undefined> {
+  const db = await getDB();
+  return db.get('trips', id);
+}
+
+export async function createTrip(data: Omit<Trip, 'id' | 'created_at' | 'updated_at'>): Promise<Trip> {
+  const db = await getDB();
+  const now = toISO();
+  const trip: Trip = { ...data, id: generateId(), created_at: now, updated_at: now };
+  await db.put('trips', trip);
+  return trip;
+}
+
+export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip | undefined> {
+  const db = await getDB();
+  const existing = await db.get('trips', id);
+  if (!existing) return undefined;
+  const trip = { ...existing, ...data, id, updated_at: toISO() };
+  await db.put('trips', trip);
+  return trip;
+}
+
+export async function deleteTrip(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('trips', id);
+  const vehicles = await getTripVehicles(id);
+  for (const vehicle of vehicles) await db.delete('trip_vehicles', vehicle.id);
+}
+
+export async function getTripVehicles(tripId: string): Promise<TripVehicle[]> {
+  const db = await getDB();
+  const vehicles = await db.getAllFromIndex('trip_vehicles', 'by-trip', tripId);
+  return vehicles.sort((a, b) => a.vehicle_number - b.vehicle_number);
+}
+
+export async function createTripVehicle(
+  data: Omit<TripVehicle, 'id' | 'vehicle_number' | 'created_at' | 'updated_at'>
+): Promise<TripVehicle> {
+  const db = await getDB();
+  const existing = await getTripVehicles(data.trip_id);
+  const vehicle_number = existing.reduce((max, vehicle) => Math.max(max, vehicle.vehicle_number), 0) + 1;
+  const now = toISO();
+  const vehicle: TripVehicle = { ...data, id: generateId(), vehicle_number, created_at: now, updated_at: now };
+  await db.put('trip_vehicles', vehicle);
+  return vehicle;
+}
+
+export async function deleteTripVehicle(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('trip_vehicles', id);
+}
+
+export async function getParcelsByTripId(tripId: string): Promise<Parcel[]> {
+  const parcels = await getParcels();
+  return parcels.filter((parcel) => parcel.trip_id === tripId);
+}
+
+export function getTripStatusLabel(status: TripStatus): string {
+  return { planned: 'Planifié', in_transit: 'En route', arrived: 'Arrivé', closed: 'Clôturé', cancelled: 'Annulé' }[status];
 }
 
 // ============================================================

@@ -11,8 +11,10 @@ import {
   logActivity,
   getSettings,
   createClient,
+  getTrips,
+  getTripVehicles,
 } from '../../lib/data';
-import type { Client, Product, PaymentCondition } from '../../lib/types';
+import type { Client, Product, PaymentCondition, Trip, TripVehicle } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Input, Select, Textarea } from '../../components/ui/Input';
@@ -32,6 +34,8 @@ export function ParcelNewPage() {
   const [showNewClient, setShowNewClient] = useState(false);
   const [step, setStep] = useState(1);
   const [activeSuggestionItemId, setActiveSuggestionItemId] = useState<string | null>(null);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [tripVehicles, setTripVehicles] = useState<TripVehicle[]>([]);
 
   const [form, setForm] = useState({
     client_id: '',
@@ -49,6 +53,9 @@ export function ParcelNewPage() {
     payment_condition: 'unpaid' as PaymentCondition,
     origin: '',
     destination: '',
+    trip_id: '',
+    trip_vehicle_id: '',
+    vehicle: '',
   });
 
   const [newClient, setNewClient] = useState({
@@ -91,13 +98,15 @@ export function ParcelNewPage() {
 
   useEffect(() => {
     (async () => {
-      const [clientsData, productsData, appSettings] = await Promise.all([
+      const [clientsData, productsData, appSettings, tripsData] = await Promise.all([
         getClients(),
         getProducts(),
         getSettings(),
+        getTrips(),
       ]);
       setClients(clientsData);
       setProducts(productsData);
+      setTrips(tripsData);
       if (appSettings) {
         setForm((prev) => ({
           ...prev,
@@ -118,6 +127,14 @@ export function ParcelNewPage() {
       setLoading(false);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!form.trip_id) {
+      setTripVehicles([]);
+      return;
+    }
+    void getTripVehicles(form.trip_id).then(setTripVehicles);
+  }, [form.trip_id]);
 
   useEffect(() => {
     const search = normalizeText(newClient.full_name || newClient.phone || '');
@@ -220,6 +237,9 @@ export function ParcelNewPage() {
         client_id: form.client_id,
         client_name: client?.full_name || '',
         client_phone: client?.phone || '',
+        vehicle: form.vehicle,
+        trip_id: form.trip_id || undefined,
+        trip_vehicle_id: form.trip_vehicle_id || undefined,
         recipient_name: form.recipient_name,
         recipient_phone: form.recipient_phone,
         recipient_address: form.recipient_address,
@@ -412,6 +432,14 @@ export function ParcelNewPage() {
             <Card className="p-5">
               <h2 className="font-bold text-slate-900 dark:text-white mb-4">Destinataire</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select label="Voyage (optionnel)" value={form.trip_id} onChange={(e) => setForm({ ...form, trip_id: e.target.value, trip_vehicle_id: '', vehicle: '' })}>
+                  <option value="">— Aucun voyage —</option>
+                  {trips.map((trip) => <option key={trip.id} value={trip.id}>Voyage {trip.trip_number} · {trip.origin} → {trip.destination}</option>)}
+                </Select>
+                <Select label="Véhicule du voyage" value={form.trip_vehicle_id} disabled={!form.trip_id} onChange={(e) => { const selected = tripVehicles.find((vehicle) => vehicle.id === e.target.value); setForm({ ...form, trip_vehicle_id: e.target.value, vehicle: selected?.registration || '' }); }}>
+                  <option value="">— Aucun véhicule —</option>
+                  {tripVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>Véhicule {vehicle.vehicle_number} · {vehicle.registration}</option>)}
+                </Select>
                 <Input
                   label="Nom du destinataire"
                   value={form.recipient_name}

@@ -8,10 +8,12 @@ import type {
   ActivityLog,
   AppSettings,
   Attachment,
+  Trip,
+  TripVehicle,
 } from './types';
 
 const DB_NAME = 'sarah-groupe-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 interface TransitDB extends DBSchema {
   users: { key: string; value: User };
@@ -63,6 +65,8 @@ interface TransitDB extends DBSchema {
     indexes: { 'by-date': string; 'by-user': string };
   };
   settings: { key: string; value: AppSettings };
+  trips: { key: string; value: Trip; indexes: { 'by-date': string; 'by-status': string } };
+  trip_vehicles: { key: string; value: TripVehicle; indexes: { 'by-trip': string; 'by-registration': string } };
 }
 
 let dbInstance: IDBPDatabase<TransitDB> | null = null;
@@ -126,6 +130,16 @@ export async function getDB(): Promise<IDBPDatabase<TransitDB>> {
       }
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('trips')) {
+        const store = db.createObjectStore('trips', { keyPath: 'id' });
+        store.createIndex('by-date', 'trip_date');
+        store.createIndex('by-status', 'status');
+      }
+      if (!db.objectStoreNames.contains('trip_vehicles')) {
+        const store = db.createObjectStore('trip_vehicles', { keyPath: 'id' });
+        store.createIndex('by-trip', 'trip_id');
+        store.createIndex('by-registration', 'registration');
       }
     },
   });

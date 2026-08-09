@@ -8,6 +8,40 @@ export type ParcelStatus =
   | 'delivered'
   | 'cancelled';
 
+export type TripStatus = 'planned' | 'in_transit' | 'arrived' | 'closed' | 'cancelled';
+
+export interface Trip {
+  id: string;
+  trip_number: string;
+  trip_date: string;
+  origin: string;
+  destination: string;
+  status: TripStatus;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TripVehicle {
+  id: string;
+  trip_id: string;
+  vehicle_number: number;
+  registration: string;
+  road_bamako_frontier: number;
+  customs_fee: number;
+  frontier_formalities: number;
+  road_frontier_bouake: number;
+  road_bouake_abidjan: number;
+  road_abidjan: number;
+  loading_fee: number;
+  unloading_fee: number;
+  truck_quota: number;
+  monthly_fee: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type PaymentMethod = 'cash' | 'orange_money' | 'wave' | 'bank_transfer';
 
 export interface User {
@@ -76,6 +110,8 @@ export interface Parcel {
   quantity: number;
   weight: number;
   vehicle: string;
+  trip_id?: string;
+  trip_vehicle_id?: string;
   origin: string;
   destination: string;
   departure_branch: string;
@@ -126,6 +162,8 @@ export interface ExpenseCategory {
 export interface TripExpense {
   id: string;
   parcel_id: string;
+  trip_id?: string;
+  trip_vehicle_id?: string;
   category_id?: string;
   category_name: string;
   label: string;

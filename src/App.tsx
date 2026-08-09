@@ -21,6 +21,9 @@ import { ReportsPage } from './pages/ReportsPage';
 import { LogsPage } from './pages/LogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { OfflinePage } from './pages/OfflinePage';
+import { TripsListPage } from './pages/trips/TripsListPage';
+import { TripNewPage } from './pages/trips/TripNewPage';
+import { TripDetailPage } from './pages/trips/TripDetailPage';
 import type { ReactNode } from 'react';
 
 const queryClient = new QueryClient({
@@ -87,6 +90,9 @@ function AppRoutes() {
         <Route path="/payments/new" element={<ProtectedRoute><PaymentNewPage /></ProtectedRoute>} />
         <Route path="/expenses" element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
         <Route path="/expenses/trip/:id" element={<ProtectedRoute><ExpenseTripDetailPage /></ProtectedRoute>} />
+        <Route path="/trips" element={<ProtectedRoute><TripsListPage /></ProtectedRoute>} />
+        <Route path="/trips/new" element={<ProtectedRoute><TripNewPage /></ProtectedRoute>} />
+        <Route path="/trips/:id" element={<ProtectedRoute><TripDetailPage /></ProtectedRoute>} />
         <Route path="/agents" element={<ProtectedRoute adminOnly><AgentsPage /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute adminOnly><ReportsPage /></ProtectedRoute>} />
         <Route path="/logs" element={<ProtectedRoute adminOnly><LogsPage /></ProtectedRoute>} />

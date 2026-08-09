@@ -205,8 +205,11 @@ export function ExpensesPage() {
     setSaving(true);
 
     const category = categories.find((cat) => cat.id === form.category_id);
+    const selectedParcel = parcelMap.get(form.parcel_id);
     const payload = {
       parcel_id: form.parcel_id,
+      trip_id: selectedParcel?.trip_id,
+      trip_vehicle_id: selectedParcel?.trip_vehicle_id,
       category_id: category?.id,
       category_name: category?.name || form.category_name,
       label: form.label,
