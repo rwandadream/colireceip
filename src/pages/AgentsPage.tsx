@@ -45,7 +45,7 @@ export function AgentsPage() {
   const [form, setForm] = useState({
     full_name: '',
     phone: '',
-    role: 'agent' as UserRole,
+    role: '' as UserRole | '',
     password: '',
     active: true,
   });
@@ -69,7 +69,7 @@ export function AgentsPage() {
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ full_name: '', phone: '', role: 'agent', password: '', active: true });
+    setForm({ full_name: '', phone: '', role: '', password: '', active: true });
     setModalOpen(true);
   };
 
@@ -80,7 +80,7 @@ export function AgentsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.full_name || !form.phone || (!editUser && !form.password)) return;
+    if (!form.full_name || !form.phone || !form.role || (!editUser && !form.password)) return;
     setSaving(true);
     if (editUser) {
       const updates: Partial<User> = {
@@ -233,10 +233,11 @@ export function AgentsPage() {
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
           <Select
-            label="Rôle"
+            label="Rôle *"
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
           >
+            <option value="">— Choisir un rôle —</option>
             <option value="agent">Agent</option>
             <option value="admin">Directeur</option>
           </Select>
