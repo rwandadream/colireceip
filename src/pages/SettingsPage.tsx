@@ -159,8 +159,8 @@ export function SettingsPage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{user?.full_name}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{user?.role === 'admin' ? 'Administrateur' : 'Agent'}</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">{user?.email}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{user?.role === 'admin' ? 'Directeur' : 'Agent'}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">{user?.phone}</p>
             </div>
           </div>
 

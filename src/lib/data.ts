@@ -106,7 +106,20 @@ export async function getUsers(): Promise<User[]> {
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   const db = await getDB();
   const all = await db.getAll('users');
-  return all.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const normalized = email.trim().toLowerCase();
+  return all.find((u) => u.email?.toLowerCase() === normalized || u.phone.trim().toLowerCase() === normalized);
+}
+
+function requireDirectorAccess(): void {
+  const stored = localStorage.getItem('sarah-groupe-auth');
+  if (!stored) throw new Error('Accès refusé. Connexion Directeur requise.');
+  try {
+    const user = JSON.parse(stored) as User;
+    if (user.role !== 'admin') throw new Error('Accès refusé. Les dépenses sont réservées au Directeur.');
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Accès refusé')) throw error;
+    throw new Error('Accès refusé. Connexion Directeur requise.');
+  }
 }
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -118,6 +131,13 @@ export async function createUser(
   data: Omit<User, 'id' | 'created_at' | 'updated_at'>
 ): Promise<User> {
   const db = await getDB();
+  if (!data.full_name.trim() || !data.phone.trim() || !data.password?.trim()) {
+    throw new Error('Le nom complet, le téléphone et le mot de passe sont obligatoires.');
+  }
+  const users = await db.getAll('users');
+  if (users.some((user) => user.phone.trim() === data.phone.trim())) {
+    throw new Error('Ce numéro de téléphone est déjà utilisé.');
+  }
   const now = toISO();
   const user: User = { ...data, id: generateId(), created_at: now, updated_at: now };
   await db.put('users', user);
@@ -193,6 +213,7 @@ const DEFAULT_EXPENSE_CATEGORIES = [
 ];
 
 export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
+  requireDirectorAccess();
   const db = await getDB();
   const all = await db.getAll('expense_categories');
   if (all.length === 0) {
@@ -213,6 +234,7 @@ export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
 export async function createExpenseCategory(
   data: Omit<ExpenseCategory, 'id' | 'created_at' | 'updated_at'>
 ): Promise<ExpenseCategory> {
+  requireDirectorAccess();
   const db = await getDB();
   const now = toISO();
   const category: ExpenseCategory = { ...data, id: generateId(), created_at: now, updated_at: now };
@@ -221,18 +243,21 @@ export async function createExpenseCategory(
 }
 
 export async function getTripExpenses(): Promise<TripExpense[]> {
+  requireDirectorAccess();
   const db = await getDB();
   const all = await db.getAll('trip_expenses');
   return all.sort((a, b) => (b.expense_date || '').localeCompare(a.expense_date || ''));
 }
 
 export async function getExpensesByParcelId(parcelId: string): Promise<TripExpense[]> {
+  requireDirectorAccess();
   const db = await getDB();
   const items = await db.getAllFromIndex('trip_expenses', 'by-parcel', parcelId);
   return items.sort((a, b) => (b.expense_date || '').localeCompare(a.expense_date || ''));
 }
 
 export async function getTripExpenseById(id: string): Promise<TripExpense | undefined> {
+  requireDirectorAccess();
   const db = await getDB();
   return db.get('trip_expenses', id);
 }
@@ -240,6 +265,7 @@ export async function getTripExpenseById(id: string): Promise<TripExpense | unde
 export async function createTripExpense(
   data: Omit<TripExpense, 'id' | 'created_at' | 'updated_at'>
 ): Promise<TripExpense | undefined> {
+  requireDirectorAccess();
   const db = await getDB();
   const now = toISO();
   const expense: TripExpense = { ...data, id: generateId(), created_at: now, updated_at: now };
@@ -248,6 +274,7 @@ export async function createTripExpense(
 }
 
 export async function updateTripExpense(id: string, data: Partial<TripExpense>): Promise<TripExpense | undefined> {
+  requireDirectorAccess();
   const db = await getDB();
   const existing = await db.get('trip_expenses', id);
   if (!existing) return undefined;
@@ -257,6 +284,7 @@ export async function updateTripExpense(id: string, data: Partial<TripExpense>):
 }
 
 export async function deleteTripExpense(id: string): Promise<void> {
+  requireDirectorAccess();
   const db = await getDB();
   await db.delete('trip_expenses', id);
   const attachments = await getAttachmentsByEntity('expense', id);
@@ -599,6 +627,7 @@ export async function getAttachmentsByEntity(
   entity_type: AttachmentEntityType,
   entity_id: string
 ): Promise<Attachment[]> {
+  if (entity_type === 'expense') requireDirectorAccess();
   const db = await getDB();
   const attachments = await db.getAllFromIndex('attachments', 'by-entity', [entity_type, entity_id]);
   return attachments.sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -607,6 +636,7 @@ export async function getAttachmentsByEntity(
 export async function createAttachment(
   data: Omit<Attachment, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Attachment> {
+  if (data.entity_type === 'expense') requireDirectorAccess();
   const db = await getDB();
   const now = toISO();
   const attachment: Attachment = {
@@ -624,6 +654,7 @@ export async function saveAttachmentsForEntity(
   entity_id: string,
   attachments: Attachment[]
 ): Promise<Attachment[]> {
+  if (entity_type === 'expense') requireDirectorAccess();
   const saved = await Promise.all(
     attachments.map(async (attachment) => {
       if (attachment.entity_id === entity_id && attachment.id) {
@@ -649,5 +680,7 @@ export async function saveAttachmentsForEntity(
 
 export async function deleteAttachment(id: string): Promise<void> {
   const db = await getDB();
+  const attachment = await db.get('attachments', id);
+  if (attachment?.entity_type === 'expense') requireDirectorAccess();
   await db.delete('attachments', id);
 }

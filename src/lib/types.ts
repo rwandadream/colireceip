@@ -46,7 +46,7 @@ export type PaymentMethod = 'cash' | 'orange_money' | 'wave' | 'bank_transfer';
 
 export interface User {
   id: string;
-  email: string;
+  email?: string;
   full_name: string;
   phone: string;
   role: UserRole;

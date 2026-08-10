@@ -89,11 +89,11 @@ export function ExpensesPage() {
         const categoriesList = categoryData.length
           ? categoryData
           : DEFAULT_CATEGORY_NAMES.map((name) => ({
-              id: name,
-              name,
-              created_at: today,
-              updated_at: today,
-            }));
+            id: name,
+            name,
+            created_at: today,
+            updated_at: today,
+          }));
         setCategories(categoriesList);
       } catch (err) {
         console.error('Failed to load expenses page data', err);

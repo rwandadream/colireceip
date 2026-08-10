@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, LogIn } from 'lucide-react';
+import { Phone, Lock, Eye, EyeOff, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -7,7 +7,7 @@ import { LogoBrand } from '../components/ui/Logo';
 
 export function LoginPage() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -17,7 +17,7 @@ export function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const result = await login(email, password);
+    const result = await login(identifier, password);
     if (!result.ok) {
       setError(result.error || 'Erreur de connexion');
       setLoading(false);
@@ -56,14 +56,14 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Adresse e-mail"
-              type="email"
-              placeholder="exemple@mail.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              icon={<Mail size={18} />}
+              label="Téléphone ou e-mail"
+              type="text"
+              placeholder="+223 70 00 00 00"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              icon={<Phone size={18} />}
               required
-              autoComplete="email"
+              autoComplete="username"
             />
 
             <div className="relative">

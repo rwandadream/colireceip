@@ -11,7 +11,7 @@ import { getUserByEmail, logActivity, ensureSeed } from '../lib/data';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  login: (identifier: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -37,8 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const u = await getUserByEmail(email);
+  const login = async (identifier: string, password: string) => {
+    const u = await getUserByEmail(identifier);
     if (!u) return { ok: false, error: 'Utilisateur introuvable' };
     if (!u.active) return { ok: false, error: 'Compte désactivé. Contactez l\'administrateur.' };
     if (u.password !== password) return { ok: false, error: 'Mot de passe incorrect' };

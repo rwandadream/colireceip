@@ -88,8 +88,8 @@ function AppRoutes() {
         <Route path="/clients/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsListPage /></ProtectedRoute>} />
         <Route path="/payments/new" element={<ProtectedRoute><PaymentNewPage /></ProtectedRoute>} />
-        <Route path="/expenses" element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
-        <Route path="/expenses/trip/:id" element={<ProtectedRoute><ExpenseTripDetailPage /></ProtectedRoute>} />
+        <Route path="/expenses" element={<ProtectedRoute adminOnly><ExpensesPage /></ProtectedRoute>} />
+        <Route path="/expenses/trip/:id" element={<ProtectedRoute adminOnly><ExpenseTripDetailPage /></ProtectedRoute>} />
         <Route path="/trips" element={<ProtectedRoute><TripsListPage /></ProtectedRoute>} />
         <Route path="/trips/new" element={<ProtectedRoute><TripNewPage /></ProtectedRoute>} />
         <Route path="/trips/:id" element={<ProtectedRoute><TripDetailPage /></ProtectedRoute>} />

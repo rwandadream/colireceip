@@ -7,7 +7,6 @@ import {
   Trash2,
   Power,
   KeyRound,
-  Mail,
   Phone,
   Shield,
   CheckCircle2,
@@ -45,7 +44,6 @@ export function AgentsPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     full_name: '',
-    email: '',
     phone: '',
     role: 'agent' as UserRole,
     password: '',
@@ -66,28 +64,27 @@ export function AgentsPage() {
     (u) =>
       !search ||
       u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+      u.phone.toLowerCase().includes(search.toLowerCase())
   );
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ full_name: '', email: '', phone: '', role: 'agent', password: '', active: true });
+    setForm({ full_name: '', phone: '', role: 'agent', password: '', active: true });
     setModalOpen(true);
   };
 
   const openEdit = (u: User) => {
     setEditUser(u);
-    setForm({ full_name: u.full_name, email: u.email, phone: u.phone || '', role: u.role, password: '', active: u.active });
+    setForm({ full_name: u.full_name, phone: u.phone || '', role: u.role, password: '', active: u.active });
     setModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.full_name || !form.email) return;
+    if (!form.full_name || !form.phone || (!editUser && !form.password)) return;
     setSaving(true);
     if (editUser) {
       const updates: Partial<User> = {
         full_name: form.full_name,
-        email: form.email,
         phone: form.phone,
         role: form.role,
         active: form.active,
@@ -100,7 +97,7 @@ export function AgentsPage() {
         ...form,
         active: true,
       });
-      await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a créé l'agent ${form.full_name}`, 'user', newUser.id, '');
+      await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a créé le compte ${form.full_name}`, 'user', newUser.id, '');
     }
     setSaving(false);
     setModalOpen(false);
@@ -134,7 +131,7 @@ export function AgentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Agents</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{users.length} utilisateurs</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{users.length} comptes</p>
         </div>
         <Button onClick={openCreate} className="w-full sm:w-auto">
           <Plus size={18} />
@@ -144,7 +141,7 @@ export function AgentsPage() {
 
       <Card className="p-4">
         <Input
-          placeholder="Rechercher par nom, email..."
+          placeholder="Rechercher par nom ou téléphone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           icon={<Search size={18} />}
@@ -176,12 +173,11 @@ export function AgentsPage() {
                     <p className="font-bold text-slate-900 dark:text-white truncate">{u.full_name}</p>
                     {u.role === 'admin' && (
                       <Badge className="bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
-                        <Shield size={12} /> Admin
+                        <Shield size={12} /> Directeur
                       </Badge>
                     )}
                   </div>
                   <div className="mt-1 space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    <p className="flex items-center gap-1.5"><Mail size={12} /> {u.email}</p>
                     {u.phone && <p className="flex items-center gap-1.5"><Phone size={12} /> {u.phone}</p>}
                     <p>Créé le {formatDate(u.created_at)}</p>
                   </div>
@@ -224,7 +220,7 @@ export function AgentsPage() {
       )}
 
       {/* Create/Edit Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editUser ? 'Modifier l\'agent' : 'Nouvel agent'} size="md">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editUser ? 'Modifier le compte' : 'Nouveau compte'} size="md">
         <div className="space-y-4">
           <Input
             label="Nom complet *"
@@ -232,13 +228,7 @@ export function AgentsPage() {
             onChange={(e) => setForm({ ...form, full_name: e.target.value })}
           />
           <Input
-            label="Email *"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <Input
-            label="Téléphone"
+            label="Téléphone *"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
@@ -248,7 +238,7 @@ export function AgentsPage() {
             onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
           >
             <option value="agent">Agent</option>
-            <option value="admin">Administrateur</option>
+            <option value="admin">Directeur</option>
           </Select>
           <Input
             label={editUser ? 'Nouveau mot de passe (laisser vide pour ne pas changer)' : 'Mot de passe *'}
