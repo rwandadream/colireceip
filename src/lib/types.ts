@@ -242,6 +242,8 @@ export interface DashboardStats {
   pending_payments: number;
   total_revenue: number;
   total_outstanding: number;
+  total_trips: number;
+  total_payments: number;
 }
 
 export const PARCEL_STATUS_LABELS: Record<ParcelStatus, string> = {

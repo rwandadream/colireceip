@@ -24,6 +24,38 @@ import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS } from '../lib/types';
 import { formatCurrency } from '../lib/format';
 import { useAuth } from '../context/AuthContext';
 
+function AgentDashboard({ stats, user }: { stats: DashboardStats; user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
+  return (
+    <div className="space-y-6">
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200/50 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6 sm:p-8">
+        <div className="relative z-10 space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 text-xs font-semibold">
+            Activité personnelle
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            Bonjour, {user.full_name.split(' ')[0]}
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+            Voici uniquement les enregistrements associés à votre compte.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Mes colis" value={stats.total_parcels} icon={<Package size={20} />} color="brand" />
+        <StatCard label="Mes clients" value={stats.total_clients} icon={<Users size={20} />} color="accent" />
+        <StatCard label="Mes voyages" value={stats.total_trips} icon={<Truck size={20} />} color="cyan" />
+        <StatCard label="Mes paiements" value={stats.total_payments} icon={<Wallet size={20} />} color="success" />
+      </div>
+
+      <Card className="p-6 bg-emerald-500 text-white border-0 shadow-lg">
+        <p className="text-xs font-bold uppercase tracking-wider opacity-90">Montant de mes paiements enregistrés</p>
+        <p className="mt-2 text-3xl font-extrabold tracking-tight tabular-nums">{formatCurrency(stats.total_revenue)}</p>
+      </Card>
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -59,6 +91,10 @@ export function DashboardPage() {
         <Skeleton className="h-96 w-full" />
       </div>
     );
+  }
+
+  if (user?.role === 'agent') {
+    return <AgentDashboard stats={stats} user={user} />;
   }
 
   // Calculate percentages for status distribution bar

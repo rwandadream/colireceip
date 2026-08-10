@@ -30,19 +30,29 @@ export async function ensureSeed(): Promise<void> {
 // ============================================================
 export async function getTrips(): Promise<Trip[]> {
   const db = await getDB();
-  const trips = await db.getAll('trips');
+  const user = getAuthenticatedUser();
+  const trips = (await db.getAll('trips')).filter((trip) => canAccessOwnedRecord(user, trip.created_by));
   return trips.sort((a, b) => b.trip_date.localeCompare(a.trip_date));
 }
 
 export async function getTripById(id: string): Promise<Trip | undefined> {
   const db = await getDB();
-  return db.get('trips', id);
+  const trip = await db.get('trips', id);
+  return trip && canAccessOwnedRecord(getAuthenticatedUser(), trip.created_by) ? trip : undefined;
 }
 
 export async function createTrip(data: Omit<Trip, 'id' | 'created_at' | 'updated_at'>): Promise<Trip> {
   const db = await getDB();
   const now = toISO();
-  const trip: Trip = { ...data, id: generateId(), created_at: now, updated_at: now };
+  const user = getAuthenticatedUser();
+  const trip: Trip = {
+    ...data,
+    created_by: user?.role === 'agent' ? user.id : data.created_by,
+    created_by_name: user?.role === 'agent' ? user.full_name : data.created_by_name,
+    id: generateId(),
+    created_at: now,
+    updated_at: now,
+  };
   await db.put('trips', trip);
   return trip;
 }
@@ -51,6 +61,7 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
   const db = await getDB();
   const existing = await db.get('trips', id);
   if (!existing) return undefined;
+  requireOwnedAccess(existing.created_by);
   const trip = { ...existing, ...data, id, updated_at: toISO() };
   await db.put('trips', trip);
   return trip;
@@ -58,6 +69,9 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
 
 export async function deleteTrip(id: string): Promise<void> {
   const db = await getDB();
+  const existing = await db.get('trips', id);
+  if (!existing) return;
+  requireOwnedAccess(existing.created_by);
   await db.delete('trips', id);
   const vehicles = await getTripVehicles(id);
   for (const vehicle of vehicles) await db.delete('trip_vehicles', vehicle.id);
@@ -65,6 +79,7 @@ export async function deleteTrip(id: string): Promise<void> {
 
 export async function getTripVehicles(tripId: string): Promise<TripVehicle[]> {
   const db = await getDB();
+  if (!(await getTripById(tripId))) return [];
   const vehicles = await db.getAllFromIndex('trip_vehicles', 'by-trip', tripId);
   return vehicles.sort((a, b) => a.vehicle_number - b.vehicle_number);
 }
@@ -122,6 +137,30 @@ function requireDirectorAccess(): void {
   }
 }
 
+function getAuthenticatedUser(): User | null {
+  const stored = localStorage.getItem('sarah-groupe-auth');
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as User;
+  } catch {
+    return null;
+  }
+}
+
+function canSeeAllData(user: User | null): boolean {
+  return user?.role === 'admin';
+}
+
+function canAccessOwnedRecord(user: User | null, ownerId: string | undefined): boolean {
+  return canSeeAllData(user) || Boolean(user && ownerId === user.id);
+}
+
+function requireOwnedAccess(ownerId: string | undefined): void {
+  if (!canAccessOwnedRecord(getAuthenticatedUser(), ownerId)) {
+    throw new Error('Accès refusé. Cet enregistrement appartient à un autre utilisateur.');
+  }
+}
+
 export async function getUserById(id: string): Promise<User | undefined> {
   const db = await getDB();
   return db.get('users', id);
@@ -161,13 +200,15 @@ export async function deleteUser(id: string): Promise<void> {
 // ============================================================
 export async function getClients(): Promise<Client[]> {
   const db = await getDB();
-  const all = await db.getAll('clients');
+  const user = getAuthenticatedUser();
+  const all = (await db.getAll('clients')).filter((client) => canAccessOwnedRecord(user, client.created_by));
   return all.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export async function getClientById(id: string): Promise<Client | undefined> {
   const db = await getDB();
-  return db.get('clients', id);
+  const client = await db.get('clients', id);
+  return client && canAccessOwnedRecord(getAuthenticatedUser(), client.created_by) ? client : undefined;
 }
 
 export async function createClient(
@@ -175,7 +216,15 @@ export async function createClient(
 ): Promise<Client> {
   const db = await getDB();
   const now = toISO();
-  const client: Client = { ...data, id: generateId(), created_at: now, updated_at: now };
+  const user = getAuthenticatedUser();
+  const client: Client = {
+    ...data,
+    created_by: user?.role === 'agent' ? user.id : data.created_by,
+    created_by_name: user?.role === 'agent' ? user.full_name : data.created_by_name,
+    id: generateId(),
+    created_at: now,
+    updated_at: now,
+  };
   await db.put('clients', client);
   return client;
 }
@@ -184,11 +233,15 @@ export async function updateClient(id: string, data: Partial<Client>): Promise<v
   const db = await getDB();
   const existing = await db.get('clients', id);
   if (!existing) return;
+  requireOwnedAccess(existing.created_by);
   await db.put('clients', { ...existing, ...data, id, updated_at: toISO() });
 }
 
 export async function deleteClient(id: string): Promise<void> {
   const db = await getDB();
+  const existing = await db.get('clients', id);
+  if (!existing) return;
+  requireOwnedAccess(existing.created_by);
   await db.delete('clients', id);
 }
 
@@ -298,18 +351,29 @@ export async function deleteTripExpense(id: string): Promise<void> {
 // ============================================================
 export async function getParcels(): Promise<Parcel[]> {
   const db = await getDB();
-  const all = await db.getAll('parcels');
+  const user = getAuthenticatedUser();
+  const all = (await db.getAll('parcels')).filter((parcel) =>
+    canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id,
+  );
   return all.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export async function getParcelById(id: string): Promise<Parcel | undefined> {
   const db = await getDB();
-  return db.get('parcels', id);
+  const parcel = await db.get('parcels', id);
+  const user = getAuthenticatedUser();
+  return parcel && (canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id)
+    ? parcel
+    : undefined;
 }
 
 export async function getParcelByTracking(tracking: string): Promise<Parcel | undefined> {
   const db = await getDB();
-  return db.getFromIndex('parcels', 'by-tracking', tracking);
+  const parcel = await db.getFromIndex('parcels', 'by-tracking', tracking);
+  const user = getAuthenticatedUser();
+  return parcel && (canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id)
+    ? parcel
+    : undefined;
 }
 
 export async function getParcelItems(parcelId: string): Promise<ParcelItem[]> {
@@ -354,8 +418,13 @@ export async function createParcel(
   const total_amount = (data.sub_total || 0) + (data.transport_price || 0) + (data.additional_fees || 0);
   const amountPaid = data.amount_paid || 0;
   const effectiveBalance = data.payment_condition === 'paid_origin' ? 0 : Math.max(total_amount - amountPaid, 0);
+  const user = getAuthenticatedUser();
   const parcel: Parcel = {
     ...data,
+    registered_by: user?.role === 'agent' ? user.id : data.registered_by,
+    registered_by_name: user?.role === 'agent' ? user.full_name : data.registered_by_name,
+    agent_id: user?.role === 'agent' ? user.id : data.agent_id,
+    agent_name: user?.role === 'agent' ? user.full_name : data.agent_name,
     id: generateId(),
     tracking_number: tracking,
     total_amount,
@@ -371,6 +440,7 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
   const db = await getDB();
   const existing = await db.get('parcels', id);
   if (!existing) return;
+  requireOwnedAccess(existing.registered_by === getAuthenticatedUser()?.id ? existing.registered_by : existing.agent_id);
   const updated = { ...existing, ...data, id, updated_at: toISO() };
   updated.sub_total = updated.sub_total ?? existing.sub_total ?? 0;
   updated.total_amount = (updated.sub_total || 0) + (updated.transport_price || 0) + (updated.additional_fees || 0);
@@ -382,6 +452,9 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
 
 export async function deleteParcel(id: string): Promise<void> {
   const db = await getDB();
+  const existing = await db.get('parcels', id);
+  if (!existing) return;
+  requireOwnedAccess(existing.registered_by === getAuthenticatedUser()?.id ? existing.registered_by : existing.agent_id);
   await db.delete('parcels', id);
   const items = await db.getAllFromIndex('parcel_items', 'by-parcel', id);
   for (const item of items) await db.delete('parcel_items', item.id);
@@ -403,6 +476,7 @@ export async function updateParcelStatus(
   const db = await getDB();
   const parcel = await db.get('parcels', parcelId);
   if (!parcel) return;
+  requireOwnedAccess(parcel.registered_by === userId ? parcel.registered_by : parcel.agent_id);
   const oldStatus = parcel.status;
   if (oldStatus === newStatus) return;
 
@@ -473,29 +547,45 @@ export async function deleteParcelItem(id: string): Promise<void> {
 // ============================================================
 export async function getPayments(): Promise<Payment[]> {
   const db = await getDB();
-  const all = await db.getAll('payments');
+  const user = getAuthenticatedUser();
+  const all = (await db.getAll('payments')).filter((payment) => canAccessOwnedRecord(user, payment.recorded_by));
   return all.sort((a, b) => b.payment_date.localeCompare(a.payment_date));
 }
 
 export async function getPaymentsByParcel(parcelId: string): Promise<Payment[]> {
   const db = await getDB();
+  if (!(await getParcelById(parcelId))) return [];
+  const user = getAuthenticatedUser();
   const all = await db.getAllFromIndex('payments', 'by-parcel', parcelId);
-  return all.sort((a, b) => b.payment_date.localeCompare(a.payment_date));
+  return all.filter((payment) => canAccessOwnedRecord(user, payment.recorded_by))
+    .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
 }
 
 export async function getPaymentsByClient(clientId: string): Promise<Payment[]> {
   const db = await getDB();
-  return db.getAllFromIndex('payments', 'by-client', clientId);
+  if (!(await getClientById(clientId))) return [];
+  const user = getAuthenticatedUser();
+  const payments = await db.getAllFromIndex('payments', 'by-client', clientId);
+  return payments.filter((payment) => canAccessOwnedRecord(user, payment.recorded_by));
 }
 
 export async function createPayment(
   data: Omit<Payment, 'id' | 'created_at'>
 ): Promise<Payment> {
   const db = await getDB();
-  const payment: Payment = { ...data, id: generateId(), created_at: toISO() };
+  const user = getAuthenticatedUser();
+  const payment: Payment = {
+    ...data,
+    recorded_by: user?.role === 'agent' ? user.id : data.recorded_by,
+    recorded_by_name: user?.role === 'agent' ? user.full_name : data.recorded_by_name,
+    id: generateId(),
+    created_at: toISO(),
+  };
+  const parcel = await db.get('parcels', data.parcel_id);
+  if (!parcel) throw new Error('Colis introuvable.');
+  requireOwnedAccess(parcel.registered_by === user?.id ? parcel.registered_by : parcel.agent_id);
   await db.put('payments', payment);
 
-  const parcel = await db.get('parcels', data.parcel_id);
   if (parcel) {
     const newAmountPaid = (parcel.amount_paid || 0) + data.amount;
     await updateParcel(parcel.id, { amount_paid: newAmountPaid });
@@ -507,6 +597,7 @@ export async function deletePayment(id: string): Promise<void> {
   const db = await getDB();
   const payment = await db.get('payments', id);
   if (!payment) return;
+  requireOwnedAccess(payment.recorded_by);
   await db.delete('payments', id);
   const parcel = await db.get('parcels', payment.parcel_id);
   if (parcel) {
@@ -581,11 +672,19 @@ export async function updateSettings(data: Partial<AppSettings>): Promise<void> 
 // ============================================================
 export async function getDashboardStats(): Promise<DashboardStats> {
   const db = await getDB();
-  const [parcels, clients, payments] = await Promise.all([
+  const user = getAuthenticatedUser();
+  const [allParcels, allClients, allPayments, allTrips] = await Promise.all([
     db.getAll('parcels'),
     db.getAll('clients'),
     db.getAll('payments'),
+    db.getAll('trips'),
   ]);
+  const parcels = allParcels.filter((parcel) =>
+    canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id,
+  );
+  const clients = allClients.filter((client) => canAccessOwnedRecord(user, client.created_by));
+  const payments = allPayments.filter((payment) => canAccessOwnedRecord(user, payment.recorded_by));
+  const trips = allTrips.filter((trip) => canAccessOwnedRecord(user, trip.created_by));
 
   const paymentsByParcel = new Map<string, number>();
   for (const payment of payments) {
@@ -594,13 +693,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   const collectedToday = payments
     .filter((p) => isToday(p.payment_date))
-    .reduce((sum, p) => sum + p.amount, 0) + parcels
+    .reduce((sum, p) => sum + p.amount, 0) + (canSeeAllData(user) ? parcels
       .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0 && isToday(p.received_date || p.created_at))
-      .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
+      .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0) : 0);
 
-  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0) + parcels
+  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0) + (canSeeAllData(user) ? parcels
     .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0)
-    .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
+    .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0) : 0);
   const totalOutstanding = parcels
     .filter((p) => p.status !== 'cancelled')
     .reduce((sum, p) => sum + (p.balance || 0), 0);
@@ -620,6 +719,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     ).length,
     total_revenue: totalRevenue,
     total_outstanding: totalOutstanding,
+    total_trips: trips.length,
+    total_payments: payments.length,
   };
 }
 
