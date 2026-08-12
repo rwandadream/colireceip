@@ -126,7 +126,7 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 }
 
 function requireDirectorAccess(): void {
-  const stored = localStorage.getItem('sarah-groupe-auth');
+  const stored = localStorage.getItem('groupe-gaff-auth') || localStorage.getItem('sarah-groupe-auth');
   if (!stored) throw new Error('Accès refusé. Connexion Directeur requise.');
   try {
     const user = JSON.parse(stored) as User;
@@ -138,7 +138,7 @@ function requireDirectorAccess(): void {
 }
 
 function getAuthenticatedUser(): User | null {
-  const stored = localStorage.getItem('sarah-groupe-auth');
+  const stored = localStorage.getItem('groupe-gaff-auth') || localStorage.getItem('sarah-groupe-auth');
   if (!stored) return null;
   try {
     return JSON.parse(stored) as User;

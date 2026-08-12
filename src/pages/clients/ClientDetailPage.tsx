@@ -44,15 +44,15 @@ export function ClientDetailPage() {
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [c, allParcels, pays] = await Promise.all([
+      const [clientData, allParcelsData, paymentsData] = await Promise.all([
         getClientById(id),
         getParcels(),
         getPaymentsByClient(id),
       ]);
-      setClient(c || null);
-      setParcels(allParcels.filter((p) => p.client_id === id));
-      setPayments(pays);
-      if (c) setEditForm(c);
+      setClient(clientData || null);
+      setParcels(allParcelsData.filter((item) => item.client_id === id));
+      setPayments(paymentsData);
+      if (clientData) setEditForm(clientData);
       setLoading(false);
     })();
   }, [id]);

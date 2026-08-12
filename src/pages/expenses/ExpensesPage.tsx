@@ -45,10 +45,9 @@ const DEFAULT_CATEGORY_NAMES = [
   'Divers',
 ];
 
-const today = new Date().toISOString().slice(0, 10);
-
 export function ExpensesPage() {
   const { user } = useAuth();
+  const today = new Date().toISOString().slice(0, 10);
   const [expenses, setExpenses] = useState<TripExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);

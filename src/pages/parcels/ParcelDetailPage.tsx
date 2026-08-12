@@ -53,15 +53,15 @@ export function ParcelDetailPage() {
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [p, pays, hist] = await Promise.all([
+      const [parcelData, paymentsData, historyData] = await Promise.all([
         getParcelById(id),
         getPaymentsByParcel(id),
         getStatusHistory(id),
       ]);
-      setParcel(p || null);
-      setPayments(pays);
-      setHistory(hist);
-      if (p) setNewStatus(p.status);
+      setParcel(parcelData || null);
+      setPayments(paymentsData);
+      setHistory(historyData);
+      if (parcelData) setNewStatus(parcelData.status);
       setLoading(false);
     })();
   }, [id]);

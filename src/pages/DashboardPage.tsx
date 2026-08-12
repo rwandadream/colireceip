@@ -64,12 +64,12 @@ export function DashboardPage() {
 
   useEffect(() => {
     (async () => {
-      const [s, p] = await Promise.all([
+      const [statsData, parcelsData] = await Promise.all([
         getDashboardStats(),
         getParcels(),
       ]);
-      setStats(s);
-      setRecentParcels(p.slice(0, 5));
+      setStats(statsData);
+      setRecentParcels(parcelsData.slice(0, 5));
       setLoading(false);
     })();
   }, []);

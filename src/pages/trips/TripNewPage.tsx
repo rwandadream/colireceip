@@ -10,7 +10,9 @@ import { Button } from '../../components/ui/Button';
 const feeFields = ['road_bamako_frontier', 'customs_fee', 'frontier_formalities', 'road_frontier_bouake', 'road_bouake_abidjan', 'road_abidjan', 'loading_fee', 'unloading_fee', 'truck_quota', 'monthly_fee'] as const;
 const feeLabels: Record<typeof feeFields[number], string> = { road_bamako_frontier: 'Route Bamako → frontière', customs_fee: 'Dédouanement', frontier_formalities: 'Formalités frontière', road_frontier_bouake: 'Frontière → Bouaké', road_bouake_abidjan: 'Bouaké → Abidjan', road_abidjan: 'Frais à Abidjan', loading_fee: 'Chargement', unloading_fee: 'Déchargement', truck_quota: 'Quota camion', monthly_fee: 'Frais mensuels' };
 type VehicleForm = { registration: string } & Record<typeof feeFields[number], string>;
-const emptyVehicle = (): VehicleForm => ({ registration: '', ...Object.fromEntries(feeFields.map((field) => [field, ''])) } as VehicleForm);
+function emptyVehicle(): VehicleForm {
+  return { registration: '', ...Object.fromEntries(feeFields.map((field) => [field, ''])) } as VehicleForm;
+}
 
 export function TripNewPage() {
     const navigate = useNavigate(); const { user } = useAuth();
