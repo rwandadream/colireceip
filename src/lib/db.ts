@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { generateId } from './format';
 import type {
   User,
   Client,
@@ -156,30 +157,45 @@ export async function seedDefaultData(): Promise<void> {
       company_phone: '+223 76 00 00 00',
       company_email: 'contact@groupe-gaff.com',
       bamako_address: 'Bamako, Mali',
-      abidjan_address: 'Abidjan, Côte d\'Ivoire',
+      abidjan_address: "Abidjan, Côte d'Ivoire",
       default_transport_price: 5000,
       currency: 'FCFA',
       default_origin: 'Bamako',
       default_destination: 'Abidjan',
     });
-  }
-  const adminEmail = 'admin@sarah-groupe.com';
-  const allUsers = await db.getAll('users');
-  const existingAdmin = allUsers.find((u) => u.email === adminEmail);
-  if (!existingAdmin) {
-    const adminId = crypto.randomUUID();
-    const now = new Date().toISOString();
-    await db.put('users', {
-      id: adminId,
-      email: adminEmail,
-      full_name: 'Administrateur Principal',
-      phone: '+223 76 00 00 00',
-      role: 'admin',
-      active: true,
-      password: 'admin123',
-      created_at: now,
-      updated_at: now,
+  } else if (settings.company_name === 'Sarah-Groupe') {
+    await db.put('settings', {
+      ...settings,
+      company_name: 'Groupe-Gaff',
+      company_email: 'contact@groupe-gaff.com',
     });
+  }
+  const adminEmail = 'admin@groupe-gaff.com';
+  const allUsers = await db.getAll('users');
+  const legacyAdmin = allUsers.find((u) => u.email === 'admin@sarah-groupe.com');
+  if (legacyAdmin) {
+    await db.put('users', {
+      ...legacyAdmin,
+      email: adminEmail,
+      updated_at: new Date().toISOString(),
+    });
+  } else {
+    const existingAdmin = allUsers.find((u) => u.email === adminEmail);
+    if (!existingAdmin) {
+      const adminId = generateId();
+      const now = new Date().toISOString();
+      await db.put('users', {
+        id: adminId,
+        email: adminEmail,
+        full_name: 'Administrateur Principal',
+        phone: '+223 76 00 00 00',
+        role: 'admin',
+        active: true,
+        password: 'admin123',
+        created_at: now,
+        updated_at: now,
+      });
+    }
   }
 
   const products = await db.getAll('products');
@@ -202,7 +218,7 @@ export async function seedDefaultData(): Promise<void> {
 
     for (const product of defaultProducts) {
       await db.put('products', {
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: product.name,
         category: product.category,
         default_price: product.default_price,

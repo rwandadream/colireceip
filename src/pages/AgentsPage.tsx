@@ -95,6 +95,7 @@ export function AgentsPage() {
     } else {
       const newUser = await createUser({
         ...form,
+        role: form.role as UserRole,
         active: true,
       });
       await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a créé le compte ${form.full_name}`, 'user', newUser.id, '');

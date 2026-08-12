@@ -14,7 +14,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   // Header
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('SARAH-GROUPE', pageWidth / 2, y, { align: 'center' });
+  doc.text('GROUPE-GAFF', pageWidth / 2, y, { align: 'center' });
   y += 6;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -125,7 +125,7 @@ export function generateReportPDF(
 
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('SARAH-GROUPE', pageWidth / 2, y, { align: 'center' });
+  doc.text('GROUPE-GAFF', pageWidth / 2, y, { align: 'center' });
   y += 8;
   doc.setFontSize(12);
   doc.text(title, pageWidth / 2, y, { align: 'center' });
@@ -164,7 +164,7 @@ export function generateTripExpensePDF(
 
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('SARAH-GROUPE', pageWidth / 2, y, { align: 'center' });
+  doc.text('GROUPE-GAFF', pageWidth / 2, y, { align: 'center' });
   y += 8;
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');

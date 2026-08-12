@@ -25,7 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Badge, Skeleton } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Input, Textarea } from '../../components/ui/Input';
+import { Input } from '../../components/ui/Input';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { formatCurrency, formatDate, formatDateTime } from '../../lib/format';
 

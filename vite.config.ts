@@ -7,8 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'logo.svg'],
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
@@ -32,9 +35,9 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'Sarah-Groupe',
-        short_name: 'Sarah-Groupe',
-        description: 'Sarah-Groupe - Logistique & Transit',
+        name: 'Groupe-Gaff',
+        short_name: 'Groupe-Gaff',
+        description: 'Groupe-Gaff - Logistique & Transit',
         theme_color: '#2563eb',
         background_color: '#f8fafc',
         display: 'standalone',
@@ -45,8 +48,20 @@ export default defineConfig({
         categories: ['business', 'productivity'],
         icons: [
           {
+            src: '/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any maskable',
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable',
+          },
+          {
             src: '/favicon.svg',
-            sizes: '100x100',
+            sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any',
           },

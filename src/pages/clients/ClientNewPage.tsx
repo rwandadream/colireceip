@@ -12,6 +12,8 @@ const INITIAL_FORM = {
   full_name: '',
   phone: '',
   city: '',
+  address: '',
+  notes: '',
 };
 
 function normalizeText(value: string) {
@@ -53,6 +55,8 @@ export function ClientNewPage() {
       full_name: client.full_name,
       phone: client.phone || '',
       city: client.city || '',
+      address: client.address || '',
+      notes: client.notes || '',
     });
     setSuggestions([]);
   };

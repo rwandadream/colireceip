@@ -1,6 +1,6 @@
-# Sarah-Groupe Colireceip
+# Groupe-Gaff Colireceip
 
-Application web de gestion logistique et de suivi des colis pour **Sarah-Groupe**.
+Application web de gestion logistique et de suivi des colis pour **Groupe-Gaff**.
 
 ## Fonctionnalités
 

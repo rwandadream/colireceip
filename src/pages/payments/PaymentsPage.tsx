@@ -278,15 +278,9 @@ export function PaymentNewPage() {
         }
       })();
 
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        window.requestIdleCallback(() => {
-          generateReceiptPDF(selectedParcel, [payment]);
-        });
-      } else {
-        window.setTimeout(() => {
-          generateReceiptPDF(selectedParcel, [payment]);
-        }, 0);
-      }
+      setTimeout(() => {
+        generateReceiptPDF(selectedParcel, [payment]);
+      }, 0);
     } catch (error) {
       console.error('Erreur d’enregistrement du paiement', error);
       setSaving(false);

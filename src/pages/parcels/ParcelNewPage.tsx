@@ -20,7 +20,7 @@ import { Card } from '../../components/ui/Card';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { formatCurrency } from '../../lib/format';
+import { formatCurrency, generateId } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 export function ParcelNewPage() {
@@ -72,7 +72,7 @@ export function ParcelNewPage() {
     unit_price: string | number;
     amount: number;
   }[]>([
-    { id: crypto.randomUUID(), designation: '', quantity: '', unit_price: '', amount: 0 },
+    { id: generateId(), designation: '', quantity: '', unit_price: '', amount: 0 },
   ]);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -184,7 +184,7 @@ export function ParcelNewPage() {
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), designation: '', quantity: '', unit_price: '', amount: 0 },
+      { id: generateId(), designation: '', quantity: '', unit_price: '', amount: 0 },
     ]);
   };
 
@@ -196,7 +196,7 @@ export function ParcelNewPage() {
         ...prev,
         {
           ...source,
-          id: crypto.randomUUID(),
+          id: generateId(),
         },
       ];
     });

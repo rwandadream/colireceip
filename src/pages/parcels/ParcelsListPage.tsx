@@ -4,7 +4,6 @@ import {
   Package,
   Plus,
   Search,
-  Phone,
   User as UserIcon,
 } from 'lucide-react';
 import { getParcels } from '../../lib/data';
@@ -13,7 +12,7 @@ import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS, PARCEL_STATUSES } from '../
 import { Card } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
-import { formatCurrency, formatDate } from '../../lib/format';
+import { formatCurrency } from '../../lib/format';
 
 export function ParcelsListPage() {
   const [parcels, setParcels] = useState<Parcel[]>([]);

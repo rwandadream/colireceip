@@ -16,7 +16,8 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const STORAGE_KEY = 'sarah-groupe-auth';
+const STORAGE_KEY = 'groupe-gaff-auth';
+const LEGACY_STORAGE_KEY = 'sarah-groupe-auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -24,13 +25,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      await ensureSeed();
-      const stored = localStorage.getItem(STORAGE_KEY);
+      try {
+        await ensureSeed();
+      } catch (err) {
+        console.error('Database initialization error:', err);
+      }
+      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (stored) {
         try {
-          setUser(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          setUser(parsed);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         } catch {
           localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
         }
       }
       setLoading(false);
@@ -55,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   };
 
   return (

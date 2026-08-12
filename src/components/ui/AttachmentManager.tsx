@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download, Eye, FileText, Image, Trash2, UploadCloud } from 'lucide-react';
 import type { Attachment, AttachmentEntityType } from '../../lib/types';
 import { createAttachment, deleteAttachment, getAttachmentsByEntity } from '../../lib/data';
+import { generateId } from '../../lib/format';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
@@ -77,7 +78,7 @@ export function AttachmentManager({
     if (validFiles.length === 0) return;
 
     const draftAttachments: Attachment[] = validFiles.map((file) => ({
-      id: crypto.randomUUID(),
+      id: generateId(),
       entity_type: entityType,
       entity_id: entityId ?? '',
       filename: file.name,

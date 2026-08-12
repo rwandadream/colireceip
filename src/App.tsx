@@ -24,6 +24,7 @@ import { OfflinePage } from './pages/OfflinePage';
 import { TripsListPage } from './pages/trips/TripsListPage';
 import { TripNewPage } from './pages/trips/TripNewPage';
 import { TripDetailPage } from './pages/trips/TripDetailPage';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import type { ReactNode } from 'react';
 
 const queryClient = new QueryClient({
@@ -105,16 +106,18 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </ToastProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
