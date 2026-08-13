@@ -48,6 +48,19 @@ export default defineConfig({
         categories: ['business', 'productivity'],
         icons: [
           {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+          {
+            src: '/logo.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+          // keep PNG fallbacks for platforms that require raster icons
+          {
             src: '/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
@@ -58,12 +71,6 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable',
-          },
-          {
-            src: '/favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any',
           },
         ],
       },
