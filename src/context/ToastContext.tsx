@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -40,14 +41,28 @@ function getToastIcon(type: ToastType) {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timersRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const timers = timersRef.current;
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
 
   const addToast = (toast: Omit<ToastItem, 'id'>) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const nextToast = { ...toast, id };
     setToasts((prev) => [...prev, nextToast]);
-    window.setTimeout(() => {
+
+    const timer = window.setTimeout(() => {
       setToasts((prev) => prev.filter((item) => item.id !== id));
+      timersRef.current.delete(id);
     }, 3500);
+
+    timersRef.current.set(id, timer);
   };
 
   const value = useMemo(() => ({ addToast }), []);

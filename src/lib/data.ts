@@ -20,6 +20,7 @@ import type {
   TripStatus,
 } from './types';
 import { generateId, generateTrackingNumber, isToday, toISO } from './format';
+import { AUTH_STORAGE_KEYS, readStorageJson } from './storage';
 
 export async function ensureSeed(): Promise<void> {
   await seedDefaultData();
@@ -126,25 +127,13 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 }
 
 function requireDirectorAccess(): void {
-  const stored = localStorage.getItem('groupe-gaff-auth') || localStorage.getItem('sarah-groupe-auth');
-  if (!stored) throw new Error('Accès refusé. Connexion Directeur requise.');
-  try {
-    const user = JSON.parse(stored) as User;
-    if (user.role !== 'admin') throw new Error('Accès refusé. Les dépenses sont réservées au Directeur.');
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Accès refusé')) throw error;
-    throw new Error('Accès refusé. Connexion Directeur requise.');
-  }
+  const user = readStorageJson<User>(AUTH_STORAGE_KEYS);
+  if (!user) throw new Error('Accès refusé. Connexion Directeur requise.');
+  if (user.role !== 'admin') throw new Error('Accès refusé. Les dépenses sont réservées au Directeur.');
 }
 
 function getAuthenticatedUser(): User | null {
-  const stored = localStorage.getItem('groupe-gaff-auth') || localStorage.getItem('sarah-groupe-auth');
-  if (!stored) return null;
-  try {
-    return JSON.parse(stored) as User;
-  } catch {
-    return null;
-  }
+  return readStorageJson<User>(AUTH_STORAGE_KEYS);
 }
 
 function canSeeAllData(user: User | null): boolean {

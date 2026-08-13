@@ -63,15 +63,23 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       const [statsData, parcelsData] = await Promise.all([
         getDashboardStats(),
         getParcels(),
       ]);
+
+      if (!active) return;
       setStats(statsData);
       setRecentParcels(parcelsData.slice(0, 5));
       setLoading(false);
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (loading || !stats) {

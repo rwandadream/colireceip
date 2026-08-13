@@ -47,7 +47,7 @@ const DEFAULT_CATEGORY_NAMES = [
 
 export function ExpensesPage() {
   const { user } = useAuth();
-  const today = new Date().toISOString().slice(0, 10);
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [expenses, setExpenses] = useState<TripExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);
@@ -101,17 +101,20 @@ export function ExpensesPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [today]);
 
   useEffect(() => {
-    if (!form.category_id && categories.length > 0) {
-      setForm((prev) => ({
-        ...prev,
-        category_id: categories[0].id,
-        category_name: categories[0].name,
-      }));
+    if (categories.length > 0) {
+      setForm((prev) => {
+        if (prev.category_id) return prev;
+        return {
+          ...prev,
+          category_id: categories[0].id,
+          category_name: categories[0].name,
+        };
+      });
     }
-  }, [categories]);
+  }, [categories, today]);
 
   const parcelMap = useMemo(
     () => new Map(parcels.map((parcel) => [parcel.id, parcel])),

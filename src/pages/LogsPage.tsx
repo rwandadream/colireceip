@@ -15,12 +15,19 @@ export function LogsPage() {
   const [userFilter, setUserFilter] = useState('all');
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       const [l, u] = await Promise.all([getActivityLogs(), getUsers()]);
+      if (!active) return;
       setLogs(l);
       setUsers(u);
       setLoading(false);
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const filtered = useMemo(() => {

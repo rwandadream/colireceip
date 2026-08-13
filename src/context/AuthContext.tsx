@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
   useContext,
@@ -7,6 +8,7 @@ import {
 } from 'react';
 import type { User } from '../lib/types';
 import { getUserByEmail, logActivity, ensureSeed } from '../lib/data';
+import { AUTH_STORAGE_KEYS, clearStorageKeys, readStorageJson, writeStorageJson } from '../lib/storage';
 
 interface AuthContextValue {
   user: User | null;
@@ -16,33 +18,37 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const STORAGE_KEY = 'groupe-gaff-auth';
-const LEGACY_STORAGE_KEY = 'sarah-groupe-auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       try {
         await ensureSeed();
       } catch (err) {
         console.error('Database initialization error:', err);
       }
-      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          setUser(parsed);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-        } catch {
-          localStorage.removeItem(STORAGE_KEY);
-          localStorage.removeItem(LEGACY_STORAGE_KEY);
-        }
+
+      if (!active) return;
+
+      const parsedUser = readStorageJson<User>(AUTH_STORAGE_KEYS);
+      if (parsedUser && active) {
+        setUser(parsedUser);
+        writeStorageJson('groupe-gaff-auth', parsedUser);
+      } else if (!parsedUser && active) {
+        clearStorageKeys(AUTH_STORAGE_KEYS);
       }
-      setLoading(false);
+
+      if (active) setLoading(false);
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const login = async (identifier: string, password: string) => {
@@ -52,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (u.password !== password) return { ok: false, error: 'Mot de passe incorrect' };
 
     setUser(u);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    writeStorageJson('groupe-gaff-auth', u);
     await logActivity(u.id, u.full_name, 'Connexion', 'user', u.id, `Connexion de ${u.full_name}`);
     return { ok: true };
   };
@@ -62,8 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logActivity(user.id, user.full_name, 'Déconnexion', 'user', user.id, '');
     }
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    clearStorageKeys(AUTH_STORAGE_KEYS);
   };
 
   return (

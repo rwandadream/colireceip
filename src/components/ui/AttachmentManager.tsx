@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, Eye, FileText, Image, Trash2, UploadCloud } from 'lucide-react';
 import type { Attachment, AttachmentEntityType } from '../../lib/types';
 import { createAttachment, deleteAttachment, getAttachmentsByEntity } from '../../lib/data';
@@ -40,8 +40,10 @@ export function AttachmentManager({
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [preview, setPreview] = useState<{ url: string; filename: string } | null>(null);
+  const intervalsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
+    const intervals = intervalsRef.current;
     let active = true;
 
     if (entityId) {
@@ -56,6 +58,8 @@ export function AttachmentManager({
 
     return () => {
       active = false;
+      intervals.forEach((timer) => window.clearInterval(timer));
+      intervals.clear();
     };
   }, [entityId, entityType, initialAttachments, onChange]);
 
@@ -106,11 +110,14 @@ export function AttachmentManager({
             const nextProgress = Math.min((current[draft.id] ?? 0) + 20, 100);
             if (nextProgress >= 100) {
               window.clearInterval(timer);
+              intervalsRef.current.delete(draft.id);
               resolve();
             }
             return { ...current, [draft.id]: nextProgress };
           });
         }, 80);
+
+        intervalsRef.current.set(draft.id, timer);
       });
 
       const stored = await createAttachment({

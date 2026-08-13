@@ -48,9 +48,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 flex-shrink-0 flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 sticky top-0 h-screen">
+      <aside className="hidden lg:flex w-72 xl:w-80 flex-shrink-0 flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 sticky top-0 h-screen">
         <div className="flex items-center px-5 py-5 border-b border-slate-100 dark:border-slate-700/50 bg-gradient-to-b from-brand-50/20 to-transparent dark:from-brand-900/5">
           <LogoBrand size={32} />
         </div>
@@ -81,7 +81,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={closeSidebar} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-white dark:bg-slate-800 shadow-2xl animate-slide-down flex flex-col">
+          <aside className="absolute left-0 top-0 bottom-0 w-[82vw] max-w-xs bg-white dark:bg-slate-800 shadow-2xl animate-slide-down flex flex-col">
             <div className="flex items-center justify-between px-5 py-5 border-b border-slate-100 dark:border-slate-700/50">
               <LogoBrand size={32} />
               <button onClick={closeSidebar} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -128,8 +128,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto scrollbar-thin">
-          <div key={location.pathname} className="page-enter p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+          <div key={location.pathname} className="page-enter p-3 sm:p-5 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
             {children}
           </div>
         </main>

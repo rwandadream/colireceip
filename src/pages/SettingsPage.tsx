@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Save,
   Building2,
@@ -35,17 +35,29 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const savedTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       const [s, l] = await Promise.all([
         getSettings(),
         getActivityLogs(10),
       ]);
+
+      if (!active) return;
       setSettings(s);
       setRecentLogs(l);
       setLoading(false);
     })();
+
+    return () => {
+      active = false;
+      if (savedTimeoutRef.current) {
+        window.clearTimeout(savedTimeoutRef.current);
+      }
+    };
   }, []);
 
   const handleSave = async () => {
@@ -55,7 +67,10 @@ export function SettingsPage() {
     await logActivity(user?.id || '', user?.full_name || '', 'a modifié les paramètres de l\'application', 'settings', '', '');
     setSaving(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (savedTimeoutRef.current) {
+      window.clearTimeout(savedTimeoutRef.current);
+    }
+    savedTimeoutRef.current = window.setTimeout(() => setSaved(false), 2000);
   };
 
   // Function to return activity timeline icon and color

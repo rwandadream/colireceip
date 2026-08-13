@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, ClipboardList, Package, Route, Trash2, Truck } from 'lucide-react';
 import { deleteTripVehicle, getParcelsByTripId, getTripById, getTripStatusLabel, getTripVehicles, updateTrip } from '../../lib/data';
@@ -35,14 +35,14 @@ export function TripDetailPage() {
     const [view, setView] = useState<ViewMode>('overview');
     const [vehicleFilter, setVehicleFilter] = useState('all');
 
-    const load = async () => {
+    const load = useCallback(async () => {
         const [tripData, vehicleData, parcelData] = await Promise.all([getTripById(id), getTripVehicles(id), getParcelsByTripId(id)]);
         setTrip(tripData || null);
         setVehicles(vehicleData);
         setParcels(parcelData);
-    };
+    }, [id]);
 
-    useEffect(() => { void load(); }, [id]);
+    useEffect(() => { void load(); }, [load]);
 
     const totalFees = useMemo(() => vehicles.reduce((sum, vehicle) => sum + getVehicleFees(vehicle), 0), [vehicles]);
     const filteredParcels = useMemo(() => vehicleFilter === 'all' ? parcels : parcels.filter((parcel) => parcel.trip_vehicle_id === vehicleFilter), [parcels, vehicleFilter]);
@@ -63,7 +63,7 @@ export function TripDetailPage() {
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex items-start gap-3">
                         <Link to="/trips" className="rounded-xl p-2 text-white/80 transition hover:bg-white/15 hover:text-white" aria-label="Retour aux voyages"><ArrowLeft size={20} /></Link>
-                        <div><p className="text-sm font-medium text-white/70">Voyage {trip.trip_number}</p><h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{trip.origin} <span className="text-white/50">→</span> {trip.destination}</h1><p className="mt-3 text-sm text-white/75">Depart le {formatDate(trip.trip_date)} · {getTripStatusLabel(trip.status)}</p></div>
+                        <div><p className="text-sm font-medium text-white/70">Voyage {trip.trip_number || 'sans numéro'}</p><h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{trip.origin || 'Départ non renseigné'} <span className="text-white/50">→</span> {trip.destination || 'Destination non renseignée'}</h1><p className="mt-3 text-sm text-white/75">Depart le {formatDate(trip.trip_date)} · {getTripStatusLabel(trip.status)}</p></div>
                     </div>
                     <select className="input w-full border-white/20 bg-white/10 text-white shadow-none lg:w-auto" value={trip.status} onChange={(event) => void setStatus(event.target.value as Trip['status'])}>
                         <option className="text-slate-900" value="planned">Planifie</option><option className="text-slate-900" value="in_transit">En route</option><option className="text-slate-900" value="arrived">Arrive</option><option className="text-slate-900" value="closed">Cloture</option><option className="text-slate-900" value="cancelled">Annule</option>

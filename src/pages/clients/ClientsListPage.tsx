@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Search, Plus, Phone, MapPin } from 'lucide-react';
 import { getClients, getParcels } from '../../lib/data';
@@ -16,13 +16,27 @@ export function ClientsListPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'with_balance' | 'paid_up'>('all');
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       const [c, p] = await Promise.all([getClients(), getParcels()]);
+      if (!active) return;
       setClients(c);
       setParcels(p);
       setLoading(false);
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const getClientStats = useCallback((clientId: string) => {
+    const clientParcels = parcels.filter((p) => p.client_id === clientId);
+    const totalAmount = clientParcels.reduce((sum, p) => sum + p.total_amount, 0);
+    const outstanding = clientParcels.reduce((sum, p) => sum + (p.status !== 'cancelled' ? p.balance : 0), 0);
+    return { count: clientParcels.length, totalAmount, outstanding };
+  }, [parcels]);
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -50,14 +64,7 @@ export function ClientsListPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [clients, parcels, search, statusFilter]);
-
-  const getClientStats = (clientId: string) => {
-    const clientParcels = parcels.filter((p) => p.client_id === clientId);
-    const totalAmount = clientParcels.reduce((sum, p) => sum + p.total_amount, 0);
-    const outstanding = clientParcels.reduce((sum, p) => sum + (p.status !== 'cancelled' ? p.balance : 0), 0);
-    return { count: clientParcels.length, totalAmount, outstanding };
-  };
+  }, [clients, getClientStats, search, statusFilter]);
 
   return (
     <div className="space-y-6">

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
   useContext,
@@ -5,6 +6,7 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
+import { THEME_STORAGE_KEYS, readStorageValue, writeStorageJson } from '../lib/storage';
 
 type Theme = 'light' | 'dark';
 
@@ -14,19 +16,17 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
-const STORAGE_KEY = 'groupe-gaff-theme';
-const LEGACY_STORAGE_KEY = 'sarah-groupe-theme';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const stored = (localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY)) as Theme | null;
-    if (stored) return stored;
+    const stored = readStorageValue(THEME_STORAGE_KEYS) as Theme | null;
+    if (stored === 'light' || stored === 'dark') return stored;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem(STORAGE_KEY, theme);
+    writeStorageJson('groupe-gaff-theme', theme);
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
