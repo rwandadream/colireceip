@@ -21,6 +21,9 @@ import type {
 } from './types';
 import { generateId, generateTrackingNumber, isToday, toISO } from './format';
 import { AUTH_STORAGE_KEYS, readStorageJson } from './storage';
+import { canUseClientApi, createOnlineClient, deleteOnlineClient, isApiUnavailable, listOnlineClients, updateOnlineClient } from './clientPersistence';
+import { canUseProductApi, createOnlineProduct, isProductApiUnavailable, listOnlineProducts, updateOnlineProduct } from './productPersistence';
+import { canUseTripApi, createOnlineTrip, createOnlineTripVehicle, deleteOnlineTrip, deleteOnlineTripVehicle, isTripApiUnavailable, listOnlineTrips, listOnlineTripVehicles, updateOnlineTrip } from './tripPersistence';
 
 export async function ensureSeed(): Promise<void> {
   await seedDefaultData();
@@ -30,6 +33,9 @@ export async function ensureSeed(): Promise<void> {
 // TRIPS
 // ============================================================
 export async function getTrips(): Promise<Trip[]> {
+  if (canUseTripApi()) {
+    try { return await listOnlineTrips(); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const user = getAuthenticatedUser();
   const trips = (await db.getAll('trips')).filter((trip) => canAccessOwnedRecord(user, trip.created_by));
@@ -37,12 +43,18 @@ export async function getTrips(): Promise<Trip[]> {
 }
 
 export async function getTripById(id: string): Promise<Trip | undefined> {
+  if (canUseTripApi()) {
+    try { return (await listOnlineTrips()).find((trip) => trip.id === id); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const trip = await db.get('trips', id);
   return trip && canAccessOwnedRecord(getAuthenticatedUser(), trip.created_by) ? trip : undefined;
 }
 
 export async function createTrip(data: Omit<Trip, 'id' | 'created_at' | 'updated_at'>): Promise<Trip> {
+  if (canUseTripApi()) {
+    try { return await createOnlineTrip(data); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const now = toISO();
   const user = getAuthenticatedUser();
@@ -59,6 +71,9 @@ export async function createTrip(data: Omit<Trip, 'id' | 'created_at' | 'updated
 }
 
 export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip | undefined> {
+  if (canUseTripApi()) {
+    try { return await updateOnlineTrip(id, data); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const existing = await db.get('trips', id);
   if (!existing) return undefined;
@@ -69,6 +84,9 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
 }
 
 export async function deleteTrip(id: string): Promise<void> {
+  if (canUseTripApi()) {
+    try { await deleteOnlineTrip(id); return; } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const existing = await db.get('trips', id);
   if (!existing) return;
@@ -79,6 +97,9 @@ export async function deleteTrip(id: string): Promise<void> {
 }
 
 export async function getTripVehicles(tripId: string): Promise<TripVehicle[]> {
+  if (canUseTripApi()) {
+    try { return await listOnlineTripVehicles(tripId); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   if (!(await getTripById(tripId))) return [];
   const vehicles = await db.getAllFromIndex('trip_vehicles', 'by-trip', tripId);
@@ -88,6 +109,9 @@ export async function getTripVehicles(tripId: string): Promise<TripVehicle[]> {
 export async function createTripVehicle(
   data: Omit<TripVehicle, 'id' | 'vehicle_number' | 'created_at' | 'updated_at'>
 ): Promise<TripVehicle> {
+  if (canUseTripApi()) {
+    try { return await createOnlineTripVehicle(data); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const existing = await getTripVehicles(data.trip_id);
   const vehicle_number = existing.reduce((max, vehicle) => Math.max(max, vehicle.vehicle_number), 0) + 1;
@@ -98,6 +122,9 @@ export async function createTripVehicle(
 }
 
 export async function deleteTripVehicle(id: string): Promise<void> {
+  if (canUseTripApi()) {
+    try { await deleteOnlineTripVehicle(id); return; } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   await db.delete('trip_vehicles', id);
 }
@@ -188,6 +215,9 @@ export async function deleteUser(id: string): Promise<void> {
 // CLIENTS
 // ============================================================
 export async function getClients(): Promise<Client[]> {
+  if (canUseClientApi()) {
+    try { return await listOnlineClients(); } catch (error) { if (!isApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const user = getAuthenticatedUser();
   const all = (await db.getAll('clients')).filter((client) => canAccessOwnedRecord(user, client.created_by));
@@ -195,6 +225,9 @@ export async function getClients(): Promise<Client[]> {
 }
 
 export async function getClientById(id: string): Promise<Client | undefined> {
+  if (canUseClientApi()) {
+    try { return (await listOnlineClients()).find((client) => client.id === id); } catch (error) { if (!isApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const client = await db.get('clients', id);
   return client && canAccessOwnedRecord(getAuthenticatedUser(), client.created_by) ? client : undefined;
@@ -203,6 +236,9 @@ export async function getClientById(id: string): Promise<Client | undefined> {
 export async function createClient(
   data: Omit<Client, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Client> {
+  if (canUseClientApi()) {
+    try { return await createOnlineClient(data); } catch (error) { if (!isApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const now = toISO();
   const user = getAuthenticatedUser();
@@ -219,6 +255,9 @@ export async function createClient(
 }
 
 export async function updateClient(id: string, data: Partial<Client>): Promise<void> {
+  if (canUseClientApi()) {
+    try { await updateOnlineClient(id, data); return; } catch (error) { if (!isApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const existing = await db.get('clients', id);
   if (!existing) return;
@@ -227,6 +266,9 @@ export async function updateClient(id: string, data: Partial<Client>): Promise<v
 }
 
 export async function deleteClient(id: string): Promise<void> {
+  if (canUseClientApi()) {
+    try { await deleteOnlineClient(id); return; } catch (error) { if (!isApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const existing = await db.get('clients', id);
   if (!existing) return;
@@ -372,17 +414,26 @@ export async function getParcelItems(parcelId: string): Promise<ParcelItem[]> {
 }
 
 export async function getProducts(): Promise<Product[]> {
+  if (canUseProductApi()) {
+    try { return await listOnlineProducts(); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const all = await db.getAll('products');
   return all.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getProductById(id: string): Promise<Product | undefined> {
+  if (canUseProductApi()) {
+    try { return (await listOnlineProducts()).find((product) => product.id === id); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   return db.get('products', id);
 }
 
 export async function getProductByName(name: string): Promise<Product | undefined> {
+  if (canUseProductApi()) {
+    try { return (await listOnlineProducts()).find((product) => product.name === name); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   return db.getFromIndex('products', 'by-name', name);
 }
@@ -390,9 +441,24 @@ export async function getProductByName(name: string): Promise<Product | undefine
 export async function createProduct(
   data: Omit<Product, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Product> {
+  if (canUseProductApi()) {
+    try { return await createOnlineProduct(data); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const now = toISO();
   const product: Product = { ...data, id: generateId(), created_at: now, updated_at: now };
+  await db.put('products', product);
+  return product;
+}
+
+export async function updateProduct(id: string, data: Partial<Product>): Promise<Product | undefined> {
+  if (canUseProductApi()) {
+    try { return await updateOnlineProduct(id, data); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
+  }
+  const db = await getDB();
+  const existing = await db.get('products', id);
+  if (!existing) return undefined;
+  const product = { ...existing, ...data, id, updated_at: toISO() };
   await db.put('products', product);
   return product;
 }

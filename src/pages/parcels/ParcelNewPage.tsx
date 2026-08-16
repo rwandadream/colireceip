@@ -21,6 +21,8 @@ import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { formatCurrency, generateId } from '../../lib/format';
+import { createParcelOnline } from '../../lib/parcelPersistence';
+import { isApiUnavailable } from '../../lib/clientPersistence';
 import { useToast } from '../../context/ToastContext';
 
 export function ParcelNewPage() {
@@ -233,7 +235,7 @@ export function ParcelNewPage() {
 
     try {
       const client = clients.find((c) => c.id === form.client_id);
-      const parcel = await createParcel({
+      const parcelInput = {
         client_id: form.client_id,
         client_name: client?.full_name || '',
         client_phone: client?.phone || '',
@@ -259,18 +261,28 @@ export function ParcelNewPage() {
         payment_condition: form.payment_condition,
         origin: form.origin,
         destination: form.destination,
-        status: 'received',
+        status: 'received' as const,
         received_date: new Date().toISOString(),
         departure_date: null,
         arrival_date: null,
         delivery_date: null,
         registered_by: user?.id || '',
         registered_by_name: user?.full_name || '',
-      });
+      };
+      const online = navigator.onLine;
+      let onlineResult = null;
+      if (online) {
+        try {
+          onlineResult = await createParcelOnline(parcelInput, items.map((item) => ({ product_id: item.product_id, designation: item.designation.trim(), quantity: Number(item.quantity), unit_price: Number(item.unit_price) })));
+        } catch (error) {
+          if (!isApiUnavailable(error)) throw error;
+        }
+      }
+      const parcel = onlineResult?.parcel ?? await createParcel(parcelInput);
 
       setSaving(false);
 
-      void (async () => {
+      if (!onlineResult) void (async () => {
         try {
           await Promise.all(
             items.map(async (item) => {

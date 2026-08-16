@@ -1,0 +1,490 @@
+// Groupe-Gaff Application - PostgreSQL/Neon Schema
+// This schema maps the existing IndexedDB model to relational PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  admin
+  agent
+
+  @@map("user_role")
+}
+
+enum ParcelStatus {
+  received
+  pending
+  in_transit
+  arrived
+  delivered
+  cancelled
+
+  @@map("parcel_status")
+}
+
+enum TripStatus {
+  planned
+  in_transit
+  arrived
+  closed
+  cancelled
+
+  @@map("trip_status")
+}
+
+enum PaymentMethod {
+  cash
+  orange_money
+  wave
+  bank_transfer
+
+  @@map("payment_method")
+}
+
+enum PaymentCondition {
+  paid_origin
+  paid_destination
+  partial
+  unpaid
+
+  @@map("payment_condition")
+}
+
+// ============================================================================
+// USERS & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id            String    @id @default(uuid())
+  phone         String    @unique
+  email         String?
+  fullName      String    @map("full_name")
+  role          UserRole
+  active        Boolean   @default(true)
+  passwordHash  String    @map("password_hash")
+
+  // Relations - created by this user
+  createdClients      Client[]         @relation("ClientCreatedBy")
+  createdParcels      Parcel[]         @relation("ParcelRegisteredBy")
+  managedParcels      Parcel[]         @relation("ParcelAgent")
+  createdPayments     Payment[]        @relation("PaymentRecordedBy")
+  createdTrips        Trip[]           @relation("TripCreatedBy")
+  createdExpenses     TripExpense[]    @relation("ExpenseCreatedBy")
+  statusChanges       StatusHistory[]  @relation("StatusChangedBy")
+  activityLogs        ActivityLog[]    @relation("ActivityUser")
+  settingsUpdatedBy   AppSettings?     @relation("SettingsUpdatedBy")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([phone])
+  @@index([email])
+  @@index([active])
+  @@map("users")
+}
+
+// ============================================================================
+// CLIENTS
+// ============================================================================
+
+model Client {
+  id            String   @id @default(uuid())
+  fullName      String   @map("full_name")
+  phone         String
+  companyName   String?  @map("company_name")
+  email         String?
+  city          String
+  neighborhood  String?
+  address       String
+  reference     String?
+  notes         String   @default("")
+
+  createdById   String   @map("created_by")
+  createdBy     User     @relation("ClientCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdByName String   @map("created_by_name")
+
+  // Relations
+  parcels       Parcel[]
+  payments      Payment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdById])
+  @@index([phone])
+  @@index([city])
+  @@map("clients")
+}
+
+// ============================================================================
+// PRODUCTS
+// ============================================================================
+
+model Product {
+  id             String  @id @default(uuid())
+  name           String  @unique
+  category       String
+  defaultPrice   Decimal @map("default_price") @db.Decimal(10, 2)
+
+  // Relations
+  parcelItems    ParcelItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@map("products")
+}
+
+// ============================================================================
+// PARCELS & ITEMS
+// ============================================================================
+
+model Parcel {
+  id                 String        @id @default(uuid())
+  trackingNumber     String        @unique @map("tracking_number")
+  
+  clientId           String        @map("client_id")
+  client             Client        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  clientName         String        @map("client_name")
+  clientPhone        String        @map("client_phone")
+
+  recipientName      String        @map("recipient_name")
+  recipientPhone     String        @map("recipient_phone")
+  recipientAddress   String        @map("recipient_address")
+
+  merchandiseType    String        @map("merchandise_type")
+  description        String        @default("")
+  quantity           Int           @default(1)
+  weight             Decimal       @db.Decimal(10, 2)
+  vehicle            String
+
+  origin             String
+  destination        String
+  departureBranch    String        @map("departure_branch")
+  arrivalBranch      String        @map("arrival_branch")
+
+  packageType        String        @map("package_type") // 'Petit colis' | 'Gros colis'
+  paymentCondition   PaymentCondition @map("payment_condition")
+
+  subTotal           Decimal       @map("sub_total") @db.Decimal(10, 2)
+  transportPrice     Decimal       @map("transport_price") @db.Decimal(10, 2)
+  additionalFees     Decimal       @map("additional_fees") @db.Decimal(10, 2)
+  totalAmount        Decimal       @map("total_amount") @db.Decimal(10, 2)
+  amountPaid         Decimal       @map("amount_paid") @db.Decimal(10, 2) @default(0)
+  balance            Decimal       @db.Decimal(10, 2)
+
+  registeredById     String        @map("registered_by")
+  registeredBy       User          @relation("ParcelRegisteredBy", fields: [registeredById], references: [id], onDelete: Restrict)
+  registeredByName   String        @map("registered_by_name")
+
+  agentId            String        @map("agent_id")
+  agent              User          @relation("ParcelAgent", fields: [agentId], references: [id], onDelete: Restrict)
+  agentName          String        @map("agent_name")
+
+  status             ParcelStatus  @default(received)
+
+  receivedDate       DateTime      @map("received_date")
+  departureDate      DateTime?     @map("departure_date")
+  arrivalDate        DateTime?     @map("arrival_date")
+  deliveryDate       DateTime?     @map("delivery_date")
+
+  tripId             String?       @map("trip_id")
+  trip               Trip?         @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  tripVehicleId      String?       @map("trip_vehicle_id")
+  tripVehicle        TripVehicle?  @relation("ParcelTripVehicle", fields: [tripVehicleId], references: [id], onDelete: SetNull)
+
+  // Relations
+  items              ParcelItem[]
+  payments           Payment[]
+  statusHistory      StatusHistory[]
+  expenses           TripExpense[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([trackingNumber])
+  @@index([clientId])
+  @@index([registeredById])
+  @@index([agentId])
+  @@index([status])
+  @@index([tripId])
+  @@index([tripVehicleId])
+  @@index([receivedDate])
+  @@map("parcels")
+}
+
+model ParcelItem {
+  id          String   @id @default(uuid())
+  parcelId    String   @map("parcel_id")
+  parcel      Parcel   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  productId   String?  @map("product_id")
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  designation String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  amount      Decimal  @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([parcelId])
+  @@map("parcel_items")
+}
+
+// ============================================================================
+// PAYMENTS
+// ============================================================================
+
+model Payment {
+  id             String   @id @default(uuid())
+  
+  parcelId       String   @map("parcel_id")
+  parcel         Parcel   @relation(fields: [parcelId], references: [id], onDelete: Restrict)
+  parcelTracking String   @map("parcel_tracking")
+
+  clientId       String   @map("client_id")
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  clientName     String   @map("client_name")
+
+  amount         Decimal  @db.Decimal(10, 2)
+  paymentMethod  PaymentMethod @map("payment_method")
+  paymentDate    DateTime @map("payment_date") @db.Date
+
+  recordedById   String   @map("recorded_by")
+  recordedBy     User     @relation("PaymentRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
+  recordedByName String   @map("recorded_by_name")
+
+  note           String   @default("")
+  idempotencyKey String?  @unique @map("idempotency_key")
+  idempotencyFingerprint String? @map("idempotency_fingerprint")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([parcelId])
+  @@index([clientId])
+  @@index([recordedById])
+  @@index([paymentDate])
+  @@map("payments")
+}
+
+// ============================================================================
+// TRIPS & VEHICLES
+// ============================================================================
+
+model Trip {
+  id            String     @id @default(uuid())
+  tripNumber    String     @unique @map("trip_number")
+  tripDate      DateTime   @map("trip_date") @db.Date
+  origin        String
+  destination   String
+  status        TripStatus @default(planned)
+
+  createdById   String     @map("created_by")
+  createdBy     User       @relation("TripCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdByName String     @map("created_by_name")
+
+  // Relations
+  vehicles      TripVehicle[]
+  parcels       Parcel[]
+  expenses      TripExpense[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdById])
+  @@index([tripDate])
+  @@index([status])
+  @@map("trips")
+}
+
+model TripVehicle {
+  id                  String   @id @default(uuid())
+  tripId              String   @map("trip_id")
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  parcels             Parcel[] @relation("ParcelTripVehicle")
+  expenses            TripExpense[] @relation("ExpenseTripVehicle")
+
+  vehicleNumber       Int      @map("vehicle_number")
+  registration        String
+
+  roadBamakoFrontier  Decimal  @map("road_bamako_frontier") @db.Decimal(10, 2) @default(0)
+  customsFee          Decimal  @map("customs_fee") @db.Decimal(10, 2) @default(0)
+  frontierFormalities Decimal  @map("frontier_formalities") @db.Decimal(10, 2) @default(0)
+  roadFrontierBouake  Decimal  @map("road_frontier_bouake") @db.Decimal(10, 2) @default(0)
+  roadBouakeAbidjan   Decimal  @map("road_bouake_abidjan") @db.Decimal(10, 2) @default(0)
+  roadAbidjan         Decimal  @map("road_abidjan") @db.Decimal(10, 2) @default(0)
+  loadingFee          Decimal  @map("loading_fee") @db.Decimal(10, 2) @default(0)
+  unloadingFee        Decimal  @map("unloading_fee") @db.Decimal(10, 2) @default(0)
+  truckQuota          Decimal  @map("truck_quota") @db.Decimal(10, 2) @default(0)
+  monthlyFee          Decimal  @map("monthly_fee") @db.Decimal(10, 2) @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tripId, vehicleNumber])
+  @@index([tripId])
+  @@index([registration])
+  @@map("trip_vehicles")
+}
+
+// ============================================================================
+// EXPENSES (Admin Only)
+// ============================================================================
+
+model ExpenseCategory {
+  id   String  @id @default(uuid())
+  name String  @unique
+
+  // Relations
+  expenses TripExpense[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@map("expense_categories")
+}
+
+model TripExpense {
+  id            String   @id @default(uuid())
+
+  parcelId      String   @map("parcel_id")
+  parcel        Parcel   @relation(fields: [parcelId], references: [id], onDelete: Restrict)
+
+  tripId        String?  @map("trip_id")
+  trip          Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  tripVehicleId String?  @map("trip_vehicle_id")
+  tripVehicle   TripVehicle? @relation("ExpenseTripVehicle", fields: [tripVehicleId], references: [id], onDelete: SetNull)
+
+  categoryId    String?  @map("category_id")
+  category      ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryName  String   @map("category_name")
+
+  label         String
+  amount        Decimal  @db.Decimal(10, 2)
+  expenseDate   DateTime @map("expense_date") @db.Date
+  location      String   @default("")
+  notes         String   @default("")
+
+  createdById   String   @map("created_by")
+  createdBy     User     @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdByName String   @map("created_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([tripId])
+  @@index([parcelId])
+  @@index([tripVehicleId])
+  @@index([createdById])
+  @@index([expenseDate])
+  @@map("trip_expenses")
+}
+
+// ============================================================================
+// AUDIT & TRACKING
+// ============================================================================
+
+model StatusHistory {
+  id              String        @id @default(uuid())
+  parcelId        String        @map("parcel_id")
+  parcel          Parcel        @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  parcelTracking  String        @map("parcel_tracking")
+
+  previousStatus  ParcelStatus? @map("previous_status")
+  newStatus       ParcelStatus  @map("new_status")
+
+  changedById     String        @map("changed_by")
+  changedBy       User          @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  changedByName   String        @map("changed_by_name")
+
+  note            String        @default("")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([parcelId])
+  @@index([createdAt])
+  @@map("status_history")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       User     @relation("ActivityUser", fields: [userId], references: [id], onDelete: Restrict)
+  userName   String   @map("user_name")
+
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    String   @default("")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ============================================================================
+// FILES & ATTACHMENTS
+// ============================================================================
+
+model Attachment {
+  id          String   @id @default(uuid())
+
+  // IndexedDB retains the binary blob for offline use. PostgreSQL stores only
+  // attachment metadata until a separate sync/storage layer is implemented.
+  entityType  String   @map("entity_type") // 'parcel' | 'payment' | 'expense'
+  entityId    String   @map("entity_id")
+
+  filename    String
+  mimeType    String   @map("mime_type")
+  size        Int
+
+  storagePath String?  @map("storage_path") // null until a future sync/storage layer uploads the blob
+  url         String?  // null until a future sync/storage layer provides a retrievable URL
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([entityType, entityId])
+  @@map("attachments")
+}
+
+// ============================================================================
+// SETTINGS
+// ============================================================================
+
+model AppSettings {
+  id                    String   @id @default("1")
+  companyName           String   @map("company_name")
+  companyPhone          String   @map("company_phone")
+  companyEmail          String   @map("company_email")
+  bamakoAddress         String   @map("bamako_address")
+  abidjanAddress        String   @map("abidjan_address")
+  defaultTransportPrice Decimal  @map("default_transport_price") @db.Decimal(10, 2)
+  currency              String   @default("FCFA")
+  defaultOrigin         String?  @map("default_origin")
+  defaultDestination    String?  @map("default_destination")
+
+  updatedById           String?  @unique @map("updated_by")
+  updatedBy             User?    @relation("SettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}

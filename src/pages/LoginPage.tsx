@@ -56,7 +56,7 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Téléphone ou e-mail"
+              label="E-mail ou téléphone"
               type="text"
               placeholder="+223 70 00 00 00"
               value={identifier}
