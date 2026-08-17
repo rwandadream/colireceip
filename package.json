@@ -13,7 +13,8 @@
     "bootstrap-admin": "node scripts/bootstrap-admin.mjs",
     "test-admin-auth": "node scripts/test-admin-auth.mjs",
     "test-data-api": "node scripts/test-data-api.mjs",
-    "test-payment-idempotency": "node scripts/test-payment-idempotency.mjs"
+    "test-payment-idempotency": "node scripts/test-payment-idempotency.mjs",
+    "test-payment-persistence": "node scripts/test-payment-persistence.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

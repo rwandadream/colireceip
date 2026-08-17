@@ -188,6 +188,7 @@ export function PaymentNewPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [form, setForm] = useState({
@@ -239,6 +240,7 @@ export function PaymentNewPage() {
     const amountNum = Number(form.amount);
     if (!form.parcel_id || amountNum <= 0 || !selectedParcel) return;
     setSaving(true);
+    setSaveError('');
 
     try {
       const payment = await createPayment({
@@ -257,8 +259,7 @@ export function PaymentNewPage() {
       setSaving(false);
       setSaved(true);
       setAttachments([]);
-      setForm({ client_id: selectedParcel.client_id, parcel_id: selectedParcel.id, amount: selectedParcel.balance, payment_method: form.payment_method, note: '' });
-      setSelectedParcel(selectedParcel);
+      setForm({ client_id: selectedParcel.client_id, parcel_id: selectedParcel.id, amount: '', payment_method: form.payment_method, note: '' });
 
       void (async () => {
         try {
@@ -283,6 +284,7 @@ export function PaymentNewPage() {
       }, 0);
     } catch (error) {
       console.error('Erreur d’enregistrement du paiement', error);
+      setSaveError(error instanceof Error ? error.message : 'Unable to save the payment.');
       setSaving(false);
     }
   };
@@ -307,6 +309,11 @@ export function PaymentNewPage() {
         {saved && (
           <Card className="border-success-200 bg-success-50 p-4 text-sm text-success-700 dark:border-success-900/40 dark:bg-success-950/20 dark:text-success-300">
             Paiement enregistré instantanément. Le client et le colis sont maintenant mis à jour.
+          </Card>
+        )}
+        {saveError && (
+          <Card className="border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-900/40 dark:bg-error-950/20 dark:text-error-300">
+            {saveError}
           </Card>
         )}
 

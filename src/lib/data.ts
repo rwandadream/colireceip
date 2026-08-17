@@ -24,6 +24,7 @@ import { AUTH_STORAGE_KEYS, readStorageJson } from './storage';
 import { canUseClientApi, createOnlineClient, deleteOnlineClient, isApiUnavailable, listOnlineClients, updateOnlineClient } from './clientPersistence';
 import { canUseProductApi, createOnlineProduct, isProductApiUnavailable, listOnlineProducts, updateOnlineProduct } from './productPersistence';
 import { canUseTripApi, createOnlineTrip, createOnlineTripVehicle, deleteOnlineTrip, deleteOnlineTripVehicle, isTripApiUnavailable, listOnlineTrips, listOnlineTripVehicles, updateOnlineTrip } from './tripPersistence';
+import { canUsePaymentApi, createOnlinePayment, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
 
 export async function ensureSeed(): Promise<void> {
   await seedDefaultData();
@@ -601,6 +602,9 @@ export async function deleteParcelItem(id: string): Promise<void> {
 // PAYMENTS
 // ============================================================
 export async function getPayments(): Promise<Payment[]> {
+  if (canUsePaymentApi()) {
+    try { return await listOnlinePayments(); } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const user = getAuthenticatedUser();
   const all = (await db.getAll('payments')).filter((payment) => canAccessOwnedRecord(user, payment.recorded_by));
@@ -608,6 +612,9 @@ export async function getPayments(): Promise<Payment[]> {
 }
 
 export async function getPaymentsByParcel(parcelId: string): Promise<Payment[]> {
+  if (canUsePaymentApi()) {
+    try { return (await listOnlinePayments()).filter((payment) => payment.parcel_id === parcelId); } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   if (!(await getParcelById(parcelId))) return [];
   const user = getAuthenticatedUser();
@@ -617,6 +624,9 @@ export async function getPaymentsByParcel(parcelId: string): Promise<Payment[]> 
 }
 
 export async function getPaymentsByClient(clientId: string): Promise<Payment[]> {
+  if (canUsePaymentApi()) {
+    try { return (await listOnlinePayments()).filter((payment) => payment.client_id === clientId); } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   if (!(await getClientById(clientId))) return [];
   const user = getAuthenticatedUser();
@@ -627,6 +637,17 @@ export async function getPaymentsByClient(clientId: string): Promise<Payment[]> 
 export async function createPayment(
   data: Omit<Payment, 'id' | 'created_at'>
 ): Promise<Payment> {
+  if (canUsePaymentApi()) {
+    // A failed online request may have committed server-side; never write an
+    // IndexedDB duplicate as a fallback after attempting it.
+    return createOnlinePayment({
+      parcel_id: data.parcel_id,
+      amount: data.amount,
+      payment_method: data.payment_method,
+      payment_date: data.payment_date,
+      note: data.note,
+    });
+  }
   const db = await getDB();
   const user = getAuthenticatedUser();
   const payment: Payment = {
