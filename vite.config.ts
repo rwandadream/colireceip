@@ -1,10 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { createApiMiddleware } from './server/dev-middleware.js';
+
+const apiPlugin = {
+  name: 'dev-api-server',
+  apply: 'serve',
+  configureServer(server) {
+    // Add middleware to server
+    server.middlewares.use(createApiMiddleware());
+  },
+};
 
 export default defineConfig({
   plugins: [
     react(),
+    apiPlugin,
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'logo.svg'],

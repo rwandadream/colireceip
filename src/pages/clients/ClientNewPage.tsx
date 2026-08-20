@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Sparkles } from 'lucide-react';
 import { createClient, getClients, logActivity } from '../../lib/data';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -23,6 +24,7 @@ function normalizeText(value: string) {
 export function ClientNewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [suggestions, setSuggestions] = useState<Client[]>([]);
@@ -30,9 +32,20 @@ export function ClientNewPage() {
 
   useEffect(() => {
     (async () => {
-      setClients(await getClients());
+      try {
+        setClients(await getClients());
+      } catch (error) {
+        const message = error instanceof Error && error.message
+          ? error.message
+          : 'Impossible de charger les clients pour le moment.';
+        addToast({
+          type: 'error',
+          title: 'Erreur de chargement',
+          description: message,
+        });
+      }
     })();
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     const search = normalizeText(form.full_name || form.phone || '');
@@ -77,13 +90,26 @@ export function ClientNewPage() {
     }
 
     setSaving(true);
-    const client = await createClient({
-      ...form,
-      created_by: user?.id || '',
-      created_by_name: user?.full_name || '',
-    });
-    await logActivity(user?.id || '', user?.full_name || '', `a créé le client ${client.full_name}`, 'client', client.id, '');
-    navigate(`/clients/${client.id}`);
+    try {
+      const client = await createClient({
+        ...form,
+        created_by: user?.id || '',
+        created_by_name: user?.full_name || '',
+      });
+      await logActivity(user?.id || '', user?.full_name || '', `a créé le client ${client.full_name}`, 'client', client.id, '');
+      navigate(`/clients/${client.id}`);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de créer ce client pour le moment.';
+      addToast({
+        type: 'error',
+        title: 'Erreur de création',
+        description: message,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

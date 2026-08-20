@@ -34,6 +34,7 @@ export async function list(resource, user, query = {}) {
     case 'trips': return publicValue(await prisma.trip.findMany({ where: isAdmin(user) ? {} : { createdById: user.id }, include: { vehicles: true }, orderBy: { tripDate: 'desc' } }));
     case 'trip-vehicles': { await ownedTrip(query.tripId, user); return publicValue(await prisma.tripVehicle.findMany({ where: { tripId: query.tripId }, orderBy: { vehicleNumber: 'asc' } })); }
     case 'parcels': return publicValue(await prisma.parcel.findMany({ where: isAdmin(user) ? {} : { OR: [{ registeredById: user.id }, { agentId: user.id }] }, include: { items: true }, orderBy: { createdAt: 'desc' } }));
+    case 'status-history': { const parcel = await prisma.parcel.findUnique({ where: { id: required(query.parcelId, 'parcelId') } }); if (!parcel || !owned(user, parcel)) throw new Error('Forbidden.'); return publicValue(await prisma.statusHistory.findMany({ where: { parcelId: parcel.id }, orderBy: { createdAt: 'asc' } })); }
     case 'payments': return publicValue(await prisma.payment.findMany({ where: isAdmin(user) ? {} : { recordedById: user.id }, orderBy: { paymentDate: 'desc' } }));
     default: throw new Error('Unknown resource.');
   }
@@ -94,7 +95,37 @@ export async function update(resource, id, input, user) {
   if (resource === 'products') { if (!isAdmin(user)) throw new Error('Forbidden.'); return publicValue(await prisma.product.update({ where: { id }, data: { ...(input.name !== undefined ? { name: required(input.name, 'name') } : {}), ...(input.category !== undefined ? { category: required(input.category, 'category') } : {}), ...(input.defaultPrice !== undefined ? { defaultPrice: amount(input.defaultPrice, 'defaultPrice') } : {}) } })); }
   if (resource === 'clients') { const record = await prisma.client.findUnique({ where: { id } }); if (!record || !owned(user, record)) throw new Error('Forbidden.'); return publicValue(await prisma.client.update({ where: { id }, data: { ...(input.fullName !== undefined ? { fullName: required(input.fullName, 'fullName') } : {}), ...(input.phone !== undefined ? { phone: required(input.phone, 'phone') } : {}), ...(input.city !== undefined ? { city: required(input.city, 'city') } : {}), ...(input.address !== undefined ? { address: required(input.address, 'address') } : {}), ...(input.notes !== undefined ? { notes: clean(input.notes) || '' } : {}) } })); }
   if (resource === 'trips') { const record = await prisma.trip.findUnique({ where: { id } }); if (!record || !owned(user, record)) throw new Error('Forbidden.'); return publicValue(await prisma.trip.update({ where: { id }, data: { ...(input.status !== undefined ? { status: allowed(input.status, tripStatuses, 'status') } : {}), ...(input.origin !== undefined ? { origin: required(input.origin, 'origin') } : {}), ...(input.destination !== undefined ? { destination: required(input.destination, 'destination') } : {}) } })); }
-  if (resource === 'parcels') { const record = await prisma.parcel.findUnique({ where: { id } }); if (!record || !owned(user, record)) throw new Error('Forbidden.'); const status = input.status === undefined ? record.status : allowed(input.status, parcelStatuses, 'status'); return publicValue(await prisma.parcel.update({ where: { id }, data: { ...(input.description !== undefined ? { description: clean(input.description) || '' } : {}), ...(input.status !== undefined ? { status } : {}), ...(status === 'delivered' && !record.deliveryDate ? { deliveryDate: new Date() } : {}) } })); }
+  if (resource === 'parcels') {
+    return publicValue(await prisma.$transaction(async (tx) => {
+      const record = await tx.parcel.findUnique({ where: { id } });
+      if (!record || !owned(user, record)) throw new Error('Forbidden.');
+      const status = input.status === undefined ? record.status : allowed(input.status, parcelStatuses, 'status');
+      const statusChanged = input.status !== undefined && status !== record.status;
+      const now = new Date();
+      const parcel = await tx.parcel.update({
+        where: { id },
+        data: {
+          ...(input.description !== undefined ? { description: clean(input.description) || '' } : {}),
+          ...(input.status !== undefined ? { status } : {}),
+          ...(statusChanged && status === 'in_transit' && !record.departureDate ? { departureDate: now } : {}),
+          ...(statusChanged && status === 'arrived' && !record.arrivalDate ? { arrivalDate: now } : {}),
+          ...(statusChanged && status === 'delivered' && !record.deliveryDate ? { deliveryDate: now } : {}),
+        },
+      });
+      if (statusChanged) {
+        await tx.statusHistory.create({ data: {
+          parcelId: record.id,
+          parcelTracking: record.trackingNumber,
+          previousStatus: record.status,
+          newStatus: status,
+          changedById: user.id,
+          changedByName: user.full_name,
+          note: clean(input.note) || '',
+        } });
+      }
+      return parcel;
+    }));
+  }
   if (resource === 'payments') { const record = await prisma.payment.findUnique({ where: { id } }); if (!record || !owned(user, record)) throw new Error('Forbidden.'); return publicValue(await prisma.payment.update({ where: { id }, data: { ...(input.note !== undefined ? { note: clean(input.note) || '' } : {}), ...(input.paymentMethod !== undefined ? { paymentMethod: allowed(input.paymentMethod, paymentMethods, 'paymentMethod') } : {}) } })); }
   throw new Error('Unknown resource.');
 }

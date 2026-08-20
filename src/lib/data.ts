@@ -24,7 +24,8 @@ import { AUTH_STORAGE_KEYS, readStorageJson } from './storage';
 import { canUseClientApi, createOnlineClient, deleteOnlineClient, isApiUnavailable, listOnlineClients, updateOnlineClient } from './clientPersistence';
 import { canUseProductApi, createOnlineProduct, isProductApiUnavailable, listOnlineProducts, updateOnlineProduct } from './productPersistence';
 import { canUseTripApi, createOnlineTrip, createOnlineTripVehicle, deleteOnlineTrip, deleteOnlineTripVehicle, isTripApiUnavailable, listOnlineTrips, listOnlineTripVehicles, updateOnlineTrip } from './tripPersistence';
-import { canUsePaymentApi, createOnlinePayment, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
+import { canUsePaymentApi, createOnlinePayment, deleteOnlinePayment, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
+import { canUseParcelApi, createParcelOnline, deleteOnlineParcel, isParcelApiUnavailable, listOnlineParcels, listOnlineStatusHistory, updateOnlineParcelStatus } from './parcelPersistence';
 
 export async function ensureSeed(): Promise<void> {
   await seedDefaultData();
@@ -266,6 +267,15 @@ export async function updateClient(id: string, data: Partial<Client>): Promise<v
   await db.put('clients', { ...existing, ...data, id, updated_at: toISO() });
 }
 
+export async function getRelatedDataForClient(clientId: string): Promise<{ parcels: Parcel[]; payments: Payment[] }> {
+  const [parcels, payments] = await Promise.all([
+    getParcels().then((all) => all.filter((parcel) => parcel.client_id === clientId)),
+    getPaymentsByClient(clientId),
+  ]);
+
+  return { parcels, payments };
+}
+
 export async function deleteClient(id: string): Promise<void> {
   if (canUseClientApi()) {
     try { await deleteOnlineClient(id); return; } catch (error) { if (!isApiUnavailable(error)) throw error; }
@@ -382,6 +392,9 @@ export async function deleteTripExpense(id: string): Promise<void> {
 // PARCELS
 // ============================================================
 export async function getParcels(): Promise<Parcel[]> {
+  if (canUseParcelApi()) {
+    try { return await listOnlineParcels(); } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const user = getAuthenticatedUser();
   const all = (await db.getAll('parcels')).filter((parcel) =>
@@ -391,6 +404,9 @@ export async function getParcels(): Promise<Parcel[]> {
 }
 
 export async function getParcelById(id: string): Promise<Parcel | undefined> {
+  if (canUseParcelApi()) {
+    try { return (await listOnlineParcels()).find((parcel) => parcel.id === id); } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const parcel = await db.get('parcels', id);
   const user = getAuthenticatedUser();
@@ -465,8 +481,17 @@ export async function updateProduct(id: string, data: Partial<Product>): Promise
 }
 
 export async function createParcel(
-  data: Omit<Parcel, 'id' | 'tracking_number' | 'total_amount' | 'balance' | 'created_at' | 'updated_at'>
+  data: Omit<Parcel, 'id' | 'tracking_number' | 'total_amount' | 'balance' | 'created_at' | 'updated_at'>,
+  items: Array<{ product_id?: string; designation: string; quantity: number; unit_price: number }> = []
 ): Promise<Parcel> {
+  if (canUseParcelApi()) {
+    try {
+      const res = await createParcelOnline(data, items);
+      return res.parcel;
+    } catch (error) {
+      if (!isParcelApiUnavailable(error)) throw error;
+    }
+  }
   const db = await getDB();
   const all = await db.getAll('parcels');
   const tracking = generateTrackingNumber(all.map((p) => p.tracking_number));
@@ -506,11 +531,24 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
   await db.put('parcels', updated);
 }
 
-export async function deleteParcel(id: string): Promise<void> {
+export async function getRelatedDataForParcel(parcelId: string): Promise<{
+  items: ParcelItem[];
+  payments: Payment[];
+  history: StatusHistory[];
+  attachments: Attachment[];
+}> {
+  const [items, payments, history, attachments] = await Promise.all([
+    getParcelItems(parcelId),
+    getPaymentsByParcel(parcelId),
+    getStatusHistory(parcelId),
+    getAttachmentsByEntity('parcel', parcelId),
+  ]);
+
+  return { items, payments, history, attachments };
+}
+
+async function deleteParcelLocalCache(id: string): Promise<void> {
   const db = await getDB();
-  const existing = await db.get('parcels', id);
-  if (!existing) return;
-  requireOwnedAccess(existing.registered_by === getAuthenticatedUser()?.id ? existing.registered_by : existing.agent_id);
   await db.delete('parcels', id);
   const items = await db.getAllFromIndex('parcel_items', 'by-parcel', id);
   for (const item of items) await db.delete('parcel_items', item.id);
@@ -522,7 +560,25 @@ export async function deleteParcel(id: string): Promise<void> {
   for (const attachment of attachments) await db.delete('attachments', attachment.id);
 }
 
-export async function updateParcelStatus(
+export async function deleteParcel(id: string): Promise<void> {
+  if (canUseParcelApi()) {
+    try {
+      await deleteOnlineParcel(id);
+      await deleteParcelLocalCache(id);
+      return;
+    } catch (error) {
+      if (!isParcelApiUnavailable(error)) throw error;
+    }
+  }
+
+  const db = await getDB();
+  const existing = await db.get('parcels', id);
+  if (!existing) return;
+  requireOwnedAccess(existing.registered_by === getAuthenticatedUser()?.id ? existing.registered_by : existing.agent_id);
+  await deleteParcelLocalCache(id);
+}
+
+async function updateParcelStatusLocal(
   parcelId: string,
   newStatus: ParcelStatus,
   userId: string,
@@ -562,6 +618,25 @@ export async function updateParcelStatus(
     created_at: now,
   };
   await db.put('status_history', history);
+}
+
+export async function updateParcelStatus(
+  parcelId: string,
+  newStatus: ParcelStatus,
+  userId: string,
+  userName: string,
+  note = ''
+): Promise<void> {
+  if (canUseParcelApi()) {
+    try {
+      await updateOnlineParcelStatus(parcelId, newStatus, note);
+      return;
+    } catch (error) {
+      if (!isParcelApiUnavailable(error)) throw error;
+    }
+  }
+
+  await updateParcelStatusLocal(parcelId, newStatus, userId, userName, note);
 }
 
 // ============================================================
@@ -670,6 +745,43 @@ export async function createPayment(
 }
 
 export async function deletePayment(id: string): Promise<void> {
+  if (canUsePaymentApi()) {
+    // Online: attempt API deletion. If it fails, propagate the error and do NOT
+    // fall back to local deletion. The server may have already deleted it.
+    try {
+      await deleteOnlinePayment(id);
+      // API succeeded (204 No Content); now clean up local cache.
+      const db = await getDB();
+      const payment = await db.get('payments', id);
+      if (payment) {
+        // Clean up payment from local cache.
+        await db.delete('payments', id);
+        
+        // Recalculate parcel balance based on remaining payments.
+        const parcel = await db.get('parcels', payment.parcel_id);
+        if (parcel) {
+          const allPayments = await db.getAllFromIndex('payments', 'by-parcel', payment.parcel_id);
+          const totalPaid = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+          const condition = parcel.payment_condition || 'unpaid';
+          const newBalance = condition === 'paid_origin' ? 0 : Math.max((parcel.total_amount || 0) - totalPaid, 0);
+          await db.put('parcels', { ...parcel, amount_paid: totalPaid, balance: newBalance });
+        }
+      }
+      
+      // Clean up associated attachments.
+      const attachments = await getAttachmentsByEntity('payment', id);
+      for (const attachment of attachments) {
+        const db = await getDB();
+        await db.delete('attachments', attachment.id);
+      }
+    } catch (error) {
+      // API error: propagate it; do NOT delete locally.
+      if (!isPaymentApiUnavailable(error)) throw error;
+      // TypeError (network unavailable): fall through to local deletion.
+    }
+  }
+  
+  // Offline or API unavailable: use local deletion.
   const db = await getDB();
   const payment = await db.get('payments', id);
   if (!payment) return;
@@ -677,8 +789,11 @@ export async function deletePayment(id: string): Promise<void> {
   await db.delete('payments', id);
   const parcel = await db.get('parcels', payment.parcel_id);
   if (parcel) {
-    const newAmountPaid = Math.max((parcel.amount_paid || 0) - payment.amount, 0);
-    await updateParcel(parcel.id, { amount_paid: newAmountPaid });
+    const allPayments = await db.getAllFromIndex('payments', 'by-parcel', payment.parcel_id);
+    const totalPaid = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const condition = parcel.payment_condition || 'unpaid';
+    const newBalance = condition === 'paid_origin' ? 0 : Math.max((parcel.total_amount || 0) - totalPaid, 0);
+    await db.put('parcels', { ...parcel, amount_paid: totalPaid, balance: newBalance });
   }
   const attachments = await getAttachmentsByEntity('payment', id);
   for (const attachment of attachments) await db.delete('attachments', attachment.id);
@@ -688,6 +803,9 @@ export async function deletePayment(id: string): Promise<void> {
 // STATUS HISTORY
 // ============================================================
 export async function getStatusHistory(parcelId: string): Promise<StatusHistory[]> {
+  if (canUseParcelApi()) {
+    try { return await listOnlineStatusHistory(parcelId); } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const all = await db.getAllFromIndex('status_history', 'by-parcel', parcelId);
   return all.sort((a, b) => a.created_at.localeCompare(b.created_at));

@@ -56,9 +56,20 @@ export async function authenticate(identifier, password) {
   if (typeof identifier !== 'string' || typeof password !== 'string' || !identifier.trim() || !password) return null;
   const trimmedIdentifier = identifier.trim();
   const isEmail = trimmedIdentifier.includes('@');
-  const user = isEmail
+  let user = isEmail
     ? await prisma.user.findFirst({ where: { email: { equals: normalizeEmail(trimmedIdentifier), mode: 'insensitive' } } })
     : await prisma.user.findUnique({ where: { phone: normalizePhone(trimmedIdentifier) } });
+
+  if (!user) {
+    const userCount = await prisma.user.count();
+    if (userCount === 0) {
+      await bootstrapInitialAdmin();
+      user = isEmail
+        ? await prisma.user.findFirst({ where: { email: { equals: normalizeEmail(trimmedIdentifier), mode: 'insensitive' } } })
+        : await prisma.user.findUnique({ where: { phone: normalizePhone(trimmedIdentifier) } });
+    }
+  }
+
   if (!user || !user.active || !(await bcrypt.compare(password, user.passwordHash))) return null;
   return publicUser(user);
 }

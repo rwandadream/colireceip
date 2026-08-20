@@ -14,7 +14,10 @@ import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
 import { formatCurrency } from '../../lib/format';
 
+import { useToast } from '../../context/ToastContext';
+
 export function ParcelsListPage() {
+  const { addToast } = useToast();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -24,11 +27,17 @@ export function ParcelsListPage() {
 
   useEffect(() => {
     (async () => {
-      const data = await getParcels();
-      setParcels(data);
-      setLoading(false);
+      try {
+        const data = await getParcels();
+        setParcels(data);
+      } catch (err) {
+        const message = err instanceof Error && err.message ? err.message : 'Impossible de charger la liste des colis.';
+        addToast({ type: 'error', title: 'Erreur', description: message });
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, []);
+  }, [addToast]);
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();

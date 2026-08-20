@@ -24,6 +24,7 @@ import {
   updateParcelStatus,
   deleteParcel,
   logActivity,
+  getRelatedDataForParcel,
 } from '../../lib/data';
 import type { Parcel, Payment, StatusHistory, ParcelStatus } from '../../lib/types';
 import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS, PARCEL_STATUSES, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_COLORS } from '../../lib/types';
@@ -31,7 +32,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Badge, Skeleton } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { Modal } from '../../components/ui/Modal';
+import { ConfirmModalWithDetails, type RelatedItemSummary } from '../../components/ui/ConfirmModalWithDetails';
 import { Select } from '../../components/ui/Input';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
 import { formatCurrency, formatDateTime, formatDate } from '../../lib/format';
@@ -48,26 +50,37 @@ export function ParcelDetailPage() {
   const [loading, setLoading] = useState(true);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [deleteSummary, setDeleteSummary] = useState<RelatedItemSummary[]>([]);
   const [newStatus, setNewStatus] = useState<ParcelStatus>('received');
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [parcelData, paymentsData, historyData] = await Promise.all([
-        getParcelById(id),
-        getPaymentsByParcel(id),
-        getStatusHistory(id),
-      ]);
-      setParcel(parcelData || null);
-      setPayments(paymentsData);
-      setHistory(historyData);
-      if (parcelData) setNewStatus(parcelData.status);
-      setLoading(false);
+      try {
+        const [parcelData, paymentsData, historyData] = await Promise.all([
+          getParcelById(id),
+          getPaymentsByParcel(id),
+          getStatusHistory(id),
+        ]);
+        setParcel(parcelData || null);
+        setPayments(paymentsData);
+        setHistory(historyData);
+        if (parcelData) setNewStatus(parcelData.status);
+      } catch (err) {
+        const message = err instanceof Error && err.message ? err.message : 'Impossible de charger le colis.';
+        addToast({ type: 'error', title: 'Erreur', description: message });
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, [id]);
+  }, [id, addToast]);
 
   const handleStatusChange = async () => {
     if (!parcel || !user || parcel.status === newStatus) return;
+    setStatusLoading(true);
+    try {
     await updateParcelStatus(parcel.id, newStatus, user.id, user.full_name);
     await logActivity(user.id, user.full_name, `a changé le statut du colis ${parcel.tracking_number} à ${PARCEL_STATUS_LABELS[newStatus]}`, 'parcel', parcel.id, '');
     const [p, hist] = await Promise.all([
@@ -82,14 +95,69 @@ export function ParcelDetailPage() {
       title: 'Statut mis à jour',
       description: `Le colis a été déplacé vers ${PARCEL_STATUS_LABELS[newStatus]}.`,
     });
+    } catch (error) {
+      setNewStatus(parcel.status);
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de mettre à jour le statut du colis.';
+      addToast({ type: 'error', title: 'Erreur de mise à jour', description: message });
+    } finally {
+      setStatusLoading(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!parcel || !user) return;
-    await deleteParcel(parcel.id);
-    await logActivity(user.id, user.full_name, `a supprimé le colis ${parcel.tracking_number}`, 'parcel', parcel.id, '');
-    addToast({ type: 'success', title: 'Colis supprimé', description: 'Le colis a bien été supprimé.' });
-    navigate('/parcels');
+
+    setDeleteLoading(true);
+    try {
+      await deleteParcel(parcel.id);
+      await logActivity(user.id, user.full_name, `a supprimé le colis ${parcel.tracking_number}`, 'parcel', parcel.id, '');
+      addToast({
+        type: 'success',
+        title: 'Colis supprimé',
+        description: `Le colis ${parcel.tracking_number} a été supprimé avec succès.`,
+      });
+      setDeleteModalOpen(false);
+      navigate('/parcels');
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de supprimer ce colis pour le moment.';
+      addToast({
+        type: 'error',
+        title: 'Erreur de suppression',
+        description: message,
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const openDeleteModal = async () => {
+    if (!parcel) return;
+    setDeleteLoading(true);
+    try {
+      const summary = await getRelatedDataForParcel(parcel.id);
+      setDeleteSummary([
+        { label: 'articles', count: summary.items.length },
+        { label: 'paiements', count: summary.payments.length },
+        { label: 'historiques', count: summary.history.length },
+        { label: 'pièces jointes', count: summary.attachments.length },
+      ]);
+      setDeleteModalOpen(true);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de vérifier les données liées à ce colis.';
+      addToast({
+        type: 'error',
+        title: 'Impossible de préparer la suppression',
+        description: message,
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handlePrint = () => {
@@ -156,7 +224,7 @@ export function ParcelDetailPage() {
           </Link>
         )}
         {isAdmin && (
-          <Button variant="danger" size="sm" onClick={() => setDeleteModalOpen(true)}>
+          <Button variant="danger" size="sm" onClick={() => void openDeleteModal()} disabled={deleteLoading}>
             <Trash2 size={16} />
             Supprimer
           </Button>
@@ -359,25 +427,28 @@ export function ParcelDetailPage() {
             label="Nouveau statut"
             value={newStatus}
             onChange={(e) => setNewStatus(e.target.value as ParcelStatus)}
+            disabled={statusLoading}
           >
             {PARCEL_STATUSES.map((s) => (
               <option key={s} value={s}>{PARCEL_STATUS_LABELS[s]}</option>
             ))}
           </Select>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setStatusModalOpen(false)} className="btn-secondary">Annuler</button>
-            <button onClick={handleStatusChange} className="btn-primary">Confirmer</button>
+            <button onClick={() => setStatusModalOpen(false)} className="btn-secondary" disabled={statusLoading}>Annuler</button>
+            <button onClick={handleStatusChange} className="btn-primary" disabled={statusLoading}>{statusLoading ? 'Mise à jour...' : 'Confirmer'}</button>
           </div>
         </div>
       </Modal>
 
-      <ConfirmModal
+      <ConfirmModalWithDetails
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleDelete}
-        title="Supprimer le colis"
-        message={`Êtes-vous sûr de vouloir supprimer le colis ${parcel.tracking_number} ? Cette action est irréversible.`}
-        confirmLabel="Supprimer"
+        title="Supprimer ce colis ?"
+        message={`Êtes-vous sûr de vouloir supprimer définitivement le colis ${parcel.tracking_number} ? Cette action est irréversible.`}
+        relatedItems={deleteSummary}
+        confirmLabel="Supprimer définitivement"
+        loading={deleteLoading}
       />
     </div>
   );

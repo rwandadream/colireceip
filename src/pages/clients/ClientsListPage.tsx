@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Search, Plus, Phone, MapPin } from 'lucide-react';
 import { getClients, getParcels } from '../../lib/data';
+import { useToast } from '../../context/ToastContext';
 import type { Client, Parcel } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { EmptyState, Skeleton } from '../../components/ui/Badge';
@@ -9,9 +10,11 @@ import { Input, Select } from '../../components/ui/Input';
 import { formatCurrency, formatDate } from '../../lib/format';
 
 export function ClientsListPage() {
+  const { addToast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'with_balance' | 'paid_up'>('all');
 
@@ -19,17 +22,32 @@ export function ClientsListPage() {
     let active = true;
 
     (async () => {
-      const [c, p] = await Promise.all([getClients(), getParcels()]);
-      if (!active) return;
-      setClients(c);
-      setParcels(p);
-      setLoading(false);
+      try {
+        const [c, p] = await Promise.all([getClients(), getParcels()]);
+        if (!active) return;
+        setClients(c);
+        setParcels(p);
+        setError(null);
+      } catch (err) {
+        if (!active) return;
+        const message = err instanceof Error && err.message
+          ? err.message
+          : 'Impossible de charger les clients pour le moment.';
+        setError(message);
+        addToast({
+          type: 'error',
+          title: 'Erreur de chargement',
+          description: message,
+        });
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [addToast]);
 
   const getClientStats = useCallback((clientId: string) => {
     const clientParcels = parcels.filter((p) => p.client_id === clientId);
@@ -103,6 +121,15 @@ export function ClientsListPage() {
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
+      ) : error ? (
+        <Card>
+          <div className="p-8 text-center">
+            <p className="text-red-600 dark:text-red-400 font-semibold mb-4">{error}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Veuillez vérifier votre connexion et réessayer.
+            </p>
+          </div>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState

@@ -26,11 +26,14 @@ export function createPaymentIdempotencyKey(): string {
   return `payment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-const request = async (method: 'GET' | 'POST', body?: PaymentCreateInput, idempotencyKey?: string): Promise<unknown> => {
+const request = async (method: 'GET' | 'POST' | 'DELETE', body?: PaymentCreateInput, idempotencyKey?: string, paymentId?: string): Promise<unknown> => {
   const headers: Record<string, string> = {};
   if (body) headers['Content-Type'] = 'application/json';
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
-  const response = await fetch('/api/data?resource=payments', {
+  
+  const url = paymentId ? `/api/data?resource=payments&id=${encodeURIComponent(paymentId)}` : '/api/data?resource=payments';
+  
+  const response = await fetch(url, {
     method,
     credentials: 'same-origin',
     headers,
@@ -42,7 +45,18 @@ const request = async (method: 'GET' | 'POST', body?: PaymentCreateInput, idempo
       note: body.note,
     }) : undefined,
   });
-  if (!response.ok) throw new Error(`API_${response.status}`);
+  if (!response.ok) {
+    let message = `API_${response.status}`;
+    try {
+      const payload = await response.json() as { error?: unknown };
+      if (typeof payload.error === 'string' && payload.error) message += `: ${payload.error}`;
+    } catch {
+      // Keep the HTTP status when the error response has no JSON body.
+    }
+    throw new Error(message);
+  }
+  // 204 No Content is OK; no JSON body expected.
+  if (response.status === 204) return null;
   return (await response.json() as { data: unknown }).data;
 };
 
@@ -54,4 +68,11 @@ export async function listOnlinePayments(): Promise<Payment[]> {
 // This adapter never retries a payment automatically.
 export async function createOnlinePayment(data: PaymentCreateInput, idempotencyKey = createPaymentIdempotencyKey()): Promise<Payment> {
   return toPayment(await request('POST', data, idempotencyKey));
+}
+
+// Delete a payment by ID. This is an API-driven operation that must succeed at the
+// API level before the local cache is modified. The caller is responsible for handling
+// any local cache cleanup after this function succeeds.
+export async function deleteOnlinePayment(paymentId: string): Promise<void> {
+  await request('DELETE', undefined, undefined, paymentId);
 }

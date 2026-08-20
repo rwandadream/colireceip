@@ -4,10 +4,7 @@ import { ArrowLeft, Plus, UserPlus, Save, Copy, Trash2, ChevronRight, ChevronLef
 import {
   getClients,
   getProducts,
-  getProductByName,
   createParcel,
-  createParcelItem,
-  createProduct,
   logActivity,
   getSettings,
   createClient,
@@ -21,8 +18,6 @@ import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { formatCurrency, generateId } from '../../lib/format';
-import { createParcelOnline } from '../../lib/parcelPersistence';
-import { isApiUnavailable } from '../../lib/clientPersistence';
 import { useToast } from '../../context/ToastContext';
 
 export function ParcelNewPage() {
@@ -269,61 +264,23 @@ export function ParcelNewPage() {
         registered_by: user?.id || '',
         registered_by_name: user?.full_name || '',
       };
-      const online = navigator.onLine;
-      let onlineResult = null;
-      if (online) {
-        try {
-          onlineResult = await createParcelOnline(parcelInput, items.map((item) => ({ product_id: item.product_id, designation: item.designation.trim(), quantity: Number(item.quantity), unit_price: Number(item.unit_price) })));
-        } catch (error) {
-          if (!isApiUnavailable(error)) throw error;
-        }
-      }
-      const parcel = onlineResult?.parcel ?? await createParcel(parcelInput);
+      const formattedItems = items.map((item) => ({
+        product_id: item.product_id,
+        designation: item.designation.trim(),
+        quantity: Number(item.quantity),
+        unit_price: Number(item.unit_price),
+      }));
 
-      setSaving(false);
+      const parcel = await createParcel(parcelInput, formattedItems);
 
-      if (!onlineResult) void (async () => {
-        try {
-          await Promise.all(
-            items.map(async (item) => {
-              let product_id = item.product_id;
-              const designation = item.designation.trim();
-              if (!product_id && designation) {
-                const existingProduct = await getProductByName(designation);
-                if (existingProduct) {
-                  product_id = existingProduct.id;
-                } else {
-                  const createdProduct = await createProduct({
-                    name: designation,
-                    category: 'Historique',
-                    default_price: Number(item.unit_price) || 0,
-                  });
-                  product_id = createdProduct.id;
-                  setProducts((prev) => [createdProduct, ...prev]);
-                }
-              }
-              return createParcelItem({
-                parcel_id: parcel.id,
-                product_id,
-                designation,
-                quantity: Number(item.quantity),
-                unit_price: Number(item.unit_price),
-              });
-            })
-          );
-
-          await logActivity(
-            user?.id || '',
-            user?.full_name || '',
-            `a créé le bordereau ${parcel.tracking_number}`,
-            'parcel',
-            parcel.id,
-            `Expédition pour ${parcel.client_name}, total: ${formatCurrency(parcel.total_amount)}`
-          );
-        } catch (error) {
-          console.error('Erreur d’enregistrement en arrière-plan', error);
-        }
-      })();
+      await logActivity(
+        user?.id || '',
+        user?.full_name || '',
+        `a créé le bordereau ${parcel.tracking_number}`,
+        'parcel',
+        parcel.id,
+        `Expédition pour ${parcel.client_name}, total: ${formatCurrency(parcel.total_amount)}`
+      ).catch(() => undefined);
 
       addToast({
         type: 'success',
@@ -333,6 +290,9 @@ export function ParcelNewPage() {
       navigate(`/parcels/${parcel.id}`);
     } catch (error) {
       console.error('Erreur d’enregistrement du colis', error);
+      const message = error instanceof Error && error.message ? error.message : 'Erreur d’enregistrement du colis';
+      addToast({ type: 'error', title: 'Erreur', description: message });
+    } finally {
       setSaving(false);
     }
   };

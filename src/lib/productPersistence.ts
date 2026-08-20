@@ -23,7 +23,16 @@ const request = async (method: string, id?: string, body?: unknown) => {
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (!response.ok) throw new Error(`API_${response.status}`);
+  if (!response.ok) {
+    let message = `API_${response.status}`;
+    try {
+      const payload = await response.json() as { error?: unknown };
+      if (typeof payload.error === 'string' && payload.error) message += `: ${payload.error}`;
+    } catch {
+      // Keep the HTTP status when the error response has no JSON body.
+    }
+    throw new Error(message);
+  }
   return (await response.json() as { data: unknown }).data;
 };
 

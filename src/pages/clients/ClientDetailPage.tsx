@@ -18,58 +18,138 @@ import {
   getParcels,
   getPaymentsByClient,
   logActivity,
+  getRelatedDataForClient,
 } from '../../lib/data';
 import type { Client, Parcel, Payment } from '../../lib/types';
 import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_COLORS } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Badge, Skeleton } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { Modal } from '../../components/ui/Modal';
+import { ConfirmModalWithDetails, type RelatedItemSummary } from '../../components/ui/ConfirmModalWithDetails';
 import { formatCurrency, formatDate, formatDateTime } from '../../lib/format';
 
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [client, setClient] = useState<Client | null>(null);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteSummary, setDeleteSummary] = useState<RelatedItemSummary[]>([]);
   const [editForm, setEditForm] = useState<Client | null>(null);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [clientData, allParcelsData, paymentsData] = await Promise.all([
-        getClientById(id),
-        getParcels(),
-        getPaymentsByClient(id),
-      ]);
-      setClient(clientData || null);
-      setParcels(allParcelsData.filter((item) => item.client_id === id));
-      setPayments(paymentsData);
-      if (clientData) setEditForm(clientData);
-      setLoading(false);
+      try {
+        const [clientData, allParcelsData, paymentsData] = await Promise.all([
+          getClientById(id),
+          getParcels(),
+          getPaymentsByClient(id),
+        ]);
+        setClient(clientData || null);
+        setParcels(allParcelsData.filter((item) => item.client_id === id));
+        setPayments(paymentsData);
+        if (clientData) setEditForm(clientData);
+      } catch (error) {
+        const message = error instanceof Error && error.message
+          ? error.message
+          : 'Impossible de charger les données du client.';
+        addToast({
+          type: 'error',
+          title: 'Erreur de chargement',
+          description: message,
+        });
+        setClient(null);
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, [id]);
+  }, [id, addToast]);
 
   const handleSaveEdit = async () => {
     if (!editForm || !client) return;
-    await updateClient(client.id, editForm);
-    setClient({ ...client, ...editForm });
-    await logActivity(user?.id || '', user?.full_name || '', `a modifié le client ${client.full_name}`, 'client', client.id, '');
-    setEditOpen(false);
+    try {
+      await updateClient(client.id, editForm);
+      setClient({ ...client, ...editForm });
+      await logActivity(user?.id || '', user?.full_name || '', `a modifié le client ${client.full_name}`, 'client', client.id, '');
+      addToast({
+        type: 'success',
+        title: 'Client modifié',
+        description: `Le client ${client.full_name} a été modifié avec succès.`,
+      });
+      setEditOpen(false);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de modifier ce client pour le moment.';
+      addToast({
+        type: 'error',
+        title: 'Erreur de modification',
+        description: message,
+      });
+    }
   };
 
   const handleDelete = async () => {
     if (!client || !user) return;
-    await deleteClient(client.id);
-    await logActivity(user.id, user.full_name, `a supprimé le client ${client.full_name}`, 'client', client.id, '');
-    navigate('/clients');
+
+    setDeleteLoading(true);
+    try {
+      await deleteClient(client.id);
+      await logActivity(user.id, user.full_name, `a supprimé le client ${client.full_name}`, 'client', client.id, '');
+      addToast({
+        type: 'success',
+        title: 'Client supprimé',
+        description: `Le client ${client.full_name} a été supprimé avec succès.`,
+      });
+      setDeleteOpen(false);
+      navigate('/clients');
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de supprimer ce client pour le moment.';
+      addToast({
+        type: 'error',
+        title: 'Erreur de suppression',
+        description: message,
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const openDeleteModal = async () => {
+    if (!client) return;
+    setDeleteLoading(true);
+    try {
+      const summary = await getRelatedDataForClient(client.id);
+      setDeleteSummary([
+        { label: 'colis', count: summary.parcels.length },
+        { label: 'paiements', count: summary.payments.length },
+      ]);
+      setDeleteOpen(true);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Impossible de vérifier les données liées à ce client.';
+      addToast({
+        type: 'error',
+        title: 'Impossible de préparer la suppression',
+        description: message,
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   if (loading) return <Skeleton className="h-96" />;
@@ -104,7 +184,7 @@ export function ClientDetailPage() {
             <Edit size={16} /> Modifier
           </Button>
           {isAdmin && (
-            <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
+            <Button variant="danger" size="sm" onClick={() => void openDeleteModal()} disabled={deleteLoading}>
               <Trash2 size={16} />
             </Button>
           )}
@@ -242,13 +322,15 @@ export function ClientDetailPage() {
         )}
       </Modal>
 
-      <ConfirmModal
+      <ConfirmModalWithDetails
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDelete}
-        title="Supprimer le client"
-        message={`Êtes-vous sûr de vouloir supprimer ${client.full_name} ? Cette action est irréversible.`}
-        confirmLabel="Supprimer"
+        title="Supprimer ce client ?"
+        message={`Êtes-vous sûr de vouloir supprimer définitivement le client ${client.full_name} ? Cette action est irréversible.`}
+        relatedItems={deleteSummary}
+        confirmLabel="Supprimer définitivement"
+        loading={deleteLoading}
       />
     </div>
   );
