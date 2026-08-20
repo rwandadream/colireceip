@@ -96,7 +96,12 @@ export function ClientNewPage() {
         created_by: user?.id || '',
         created_by_name: user?.full_name || '',
       });
-      await logActivity(user?.id || '', user?.full_name || '', `a créé le client ${client.full_name}`, 'client', client.id, '');
+      await logActivity(user?.id || '', user?.full_name || '', `a créé le client ${client.full_name}`, 'client', client.id, '').catch(() => undefined);
+      addToast({
+        type: 'success',
+        title: 'Client créé',
+        description: `Le client ${client.full_name} a été créé avec succès.`,
+      });
       navigate(`/clients/${client.id}`);
     } catch (error) {
       const message = error instanceof Error && error.message
