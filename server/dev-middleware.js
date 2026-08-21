@@ -58,6 +58,30 @@ export function createApiMiddleware(handlers = {}) {
       return next();
     }
 
+    // Polyfill Express/Vercel helper methods on native Node http.ServerResponse
+    if (!res.status) {
+      res.status = function (statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      };
+    }
+    if (!res.json) {
+      res.json = function (data) {
+        this.setHeader('Content-Type', 'application/json; charset=utf-8');
+        this.end(JSON.stringify(data));
+        return this;
+      };
+    }
+    if (!res.send) {
+      res.send = function (data) {
+        if (typeof data === 'object') {
+          return this.json(data);
+        }
+        this.end(data);
+        return this;
+      };
+    }
+
     try {
       // Parse URL to extract pathname and query
       const url = new URL(`http://localhost${req.url}`);
@@ -74,10 +98,10 @@ export function createApiMiddleware(handlers = {}) {
 
       // Route to appropriate handler
       if (pathname === '/api/data') {
-        return data(req, res);
+        return await data(req, res);
       }
       if (pathname === '/api/auth') {
-        return auth(req, res);
+        return await auth(req, res);
       }
 
       // Unknown API route

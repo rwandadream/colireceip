@@ -10,14 +10,16 @@ import {
   createClient,
   getTrips,
   getTripVehicles,
+  saveAttachmentsForEntity,
 } from '../../lib/data';
-import type { Client, Product, PaymentCondition, Trip, TripVehicle } from '../../lib/types';
+import type { Attachment, Client, Product, PaymentCondition, Trip, TripVehicle } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { formatCurrency, generateId } from '../../lib/format';
+import { AttachmentManager } from '../../components/ui/AttachmentManager';
+import { formatCurrency, generateId, formatTrackingNumber } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 export function ParcelNewPage() {
@@ -33,6 +35,7 @@ export function ParcelNewPage() {
   const [activeSuggestionItemId, setActiveSuggestionItemId] = useState<string | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [tripVehicles, setTripVehicles] = useState<TripVehicle[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const [form, setForm] = useState({
     client_id: '',
@@ -95,35 +98,42 @@ export function ParcelNewPage() {
 
   useEffect(() => {
     (async () => {
-      const [clientsData, productsData, appSettings, tripsData] = await Promise.all([
-        getClients(),
-        getProducts(),
-        getSettings(),
-        getTrips(),
-      ]);
-      setClients(clientsData);
-      setProducts(productsData);
-      setTrips(tripsData);
-      if (appSettings) {
-        setForm((prev) => ({
-          ...prev,
-          origin: appSettings.default_origin || 'Bamako',
-          destination: appSettings.default_destination || 'Abidjan',
-          departure_branch: appSettings.default_origin || 'Bamako',
-          arrival_branch: appSettings.default_destination || 'Abidjan',
-        }));
-      } else {
-        setForm((prev) => ({
-          ...prev,
-          origin: 'Bamako',
-          destination: 'Abidjan',
-          departure_branch: 'Bamako',
-          arrival_branch: 'Abidjan',
-        }));
+      try {
+        const [clientsData, productsData, appSettings, tripsData] = await Promise.all([
+          getClients(),
+          getProducts(),
+          getSettings(),
+          getTrips(),
+        ]);
+        setClients(clientsData);
+        setProducts(productsData);
+        setTrips(tripsData);
+        if (appSettings) {
+          setForm((prev) => ({
+            ...prev,
+            origin: appSettings.default_origin || 'Bamako',
+            destination: appSettings.default_destination || 'Abidjan',
+            departure_branch: appSettings.default_origin || 'Bamako',
+            arrival_branch: appSettings.default_destination || 'Abidjan',
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            origin: 'Bamako',
+            destination: 'Abidjan',
+            departure_branch: 'Bamako',
+            arrival_branch: 'Abidjan',
+          }));
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des données de création de colis', err);
+        const message = err instanceof Error && err.message ? err.message : 'Impossible de charger les données.';
+        addToast({ type: 'error', title: 'Erreur de chargement', description: message });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     if (!form.trip_id) {
@@ -273,10 +283,14 @@ export function ParcelNewPage() {
 
       const parcel = await createParcel(parcelInput, formattedItems);
 
+      if (attachments.length > 0) {
+        await saveAttachmentsForEntity('parcel', parcel.id, attachments);
+      }
+
       await logActivity(
         user?.id || '',
         user?.full_name || '',
-        `a créé le bordereau ${parcel.tracking_number}`,
+        `a créé le bordereau ${formatTrackingNumber(parcel.tracking_number)}`,
         'parcel',
         parcel.id,
         `Expédition pour ${parcel.client_name}, total: ${formatCurrency(parcel.total_amount)}`
@@ -285,7 +299,7 @@ export function ParcelNewPage() {
       addToast({
         type: 'success',
         title: 'Colis enregistré',
-        description: `Le bordereau ${parcel.tracking_number} a été créé avec succès.`,
+        description: `Le bordereau ${formatTrackingNumber(parcel.tracking_number)} a été créé avec succès.`,
       });
       navigate(`/parcels/${parcel.id}`);
     } catch (error) {
@@ -298,7 +312,10 @@ export function ParcelNewPage() {
   };
 
   const handleCreateClient = async () => {
-    if (!newClient.full_name) return;
+    if (!newClient.full_name.trim()) {
+      addToast({ type: 'error', title: 'Champ requis', description: 'Le nom complet du client est obligatoire.' });
+      return;
+    }
 
     const existing = clients.find((client) => {
       const samePhone = newClient.phone && client.phone && normalizeText(client.phone) === normalizeText(newClient.phone);
@@ -310,33 +327,40 @@ export function ParcelNewPage() {
       applyClientSelection(existing.id);
       setShowNewClient(false);
       setNewClient({ full_name: '', phone: '', city: '' });
+      addToast({ type: 'info', title: 'Client existant', description: 'Le client existant a été automatiquement sélectionné.' });
       return;
     }
 
-    const client = await createClient({
-      full_name: newClient.full_name,
-      phone: newClient.phone,
-      city: newClient.city,
-      address: '',
-      notes: '',
-      created_by: user?.id || '',
-      created_by_name: user?.full_name || '',
-    });
-    setClients((prev) => [client, ...prev]);
-    setForm((prev) => ({
-      ...prev,
-      client_id: client.id,
-      recipient_name: client.full_name,
-      recipient_phone: client.phone,
-      recipient_address: client.address || client.city,
-    }));
-    addToast({
-      type: 'success',
-      title: 'Client créé',
-      description: 'Le client a été ajouté et les informations ont été préremplies.',
-    });
-    setShowNewClient(false);
-    setNewClient({ full_name: '', phone: '', city: '' });
+    try {
+      const client = await createClient({
+        full_name: newClient.full_name,
+        phone: newClient.phone,
+        city: newClient.city,
+        address: '',
+        notes: '',
+        created_by: user?.id || '',
+        created_by_name: user?.full_name || '',
+      });
+      setClients((prev) => [client, ...prev]);
+      setForm((prev) => ({
+        ...prev,
+        client_id: client.id,
+        recipient_name: client.full_name,
+        recipient_phone: client.phone,
+        recipient_address: client.address || client.city,
+      }));
+      addToast({
+        type: 'success',
+        title: 'Client créé',
+        description: 'Le client a été ajouté et les informations ont été préremplies.',
+      });
+      setShowNewClient(false);
+      setNewClient({ full_name: '', phone: '', city: '' });
+    } catch (error) {
+      console.error('Erreur lors de la création rapide de client', error);
+      const message = error instanceof Error && error.message ? error.message : 'Impossible de créer le client.';
+      addToast({ type: 'error', title: 'Erreur', description: message });
+    }
   };
 
   if (loading) return <div className="animate-pulse"><div className="skeleton h-96 rounded-xl" /></div>;
@@ -440,16 +464,24 @@ export function ParcelNewPage() {
             <Card className="p-5">
               <h2 className="font-bold text-slate-900 dark:text-white mb-4">Informations de livraison</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
+                <Select
                   label="Agence départ"
                   value={form.departure_branch}
-                  onChange={(e) => setForm({ ...form, departure_branch: e.target.value })}
-                />
-                <Input
+                  onChange={(e) => setForm({ ...form, departure_branch: e.target.value, origin: e.target.value })}
+                >
+                  <option value="Bamako">Bamako</option>
+                  <option value="Abidjan">Abidjan</option>
+                  <option value="Bouaké">Bouaké</option>
+                </Select>
+                <Select
                   label="Agence arrivée"
                   value={form.arrival_branch}
-                  onChange={(e) => setForm({ ...form, arrival_branch: e.target.value })}
-                />
+                  onChange={(e) => setForm({ ...form, arrival_branch: e.target.value, destination: e.target.value })}
+                >
+                  <option value="Bamako">Bamako</option>
+                  <option value="Abidjan">Abidjan</option>
+                  <option value="Bouaké">Bouaké</option>
+                </Select>
                 <Select
                   label="Type de colis"
                   value={form.package_type}
@@ -472,16 +504,24 @@ export function ParcelNewPage() {
                   ))}
                 </Select>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
+                  <Select
                     label="Origine"
                     value={form.origin}
                     onChange={(e) => setForm({ ...form, origin: e.target.value })}
-                  />
-                  <Input
+                  >
+                    <option value="Bamako">Bamako</option>
+                    <option value="Abidjan">Abidjan</option>
+                    <option value="Bouaké">Bouaké</option>
+                  </Select>
+                  <Select
                     label="Destination"
                     value={form.destination}
                     onChange={(e) => setForm({ ...form, destination: e.target.value })}
-                  />
+                  >
+                    <option value="Bamako">Bamako</option>
+                    <option value="Abidjan">Abidjan</option>
+                    <option value="Bouaké">Bouaké</option>
+                  </Select>
                 </div>
               </div>
               <div className="mt-4">
@@ -624,6 +664,20 @@ export function ParcelNewPage() {
                   </div>
                 </div>
               </div>
+            </Card>
+
+            <Card className="p-5 space-y-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">Pièces jointes du colis</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Ajoutez des photos de l’expédition, factures ou pièces d’identité (optionnel).
+                </p>
+              </div>
+              <AttachmentManager
+                entityType="parcel"
+                initialAttachments={attachments}
+                onChange={setAttachments}
+              />
             </Card>
 
             <div className="flex gap-3 justify-end pb-4">

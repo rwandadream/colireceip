@@ -25,7 +25,7 @@ import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
-import { formatCurrency, formatDate } from '../../lib/format';
+import { formatCurrency, formatDate, formatTrackingNumber } from '../../lib/format';
 import { generateReportPDF } from '../../lib/pdf';
 
 const DEFAULT_CATEGORY_NAMES = [
@@ -417,7 +417,7 @@ export function ExpensesPage() {
               <option value="">— Sélectionner un voyage —</option>
               {parcels.map((parcel) => (
                 <option key={parcel.id} value={parcel.id}>
-                  {parcel.tracking_number} · {parcel.vehicle || parcel.agent_name || parcel.origin} → {parcel.destination}
+                  {formatTrackingNumber(parcel.tracking_number)} · {parcel.vehicle || parcel.agent_name || parcel.origin} → {parcel.destination}
                 </option>
               ))}
             </Select>

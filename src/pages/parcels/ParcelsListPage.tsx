@@ -12,8 +12,8 @@ import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS, PARCEL_STATUSES } from '../
 import { Card } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
+import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { formatCurrency } from '../../lib/format';
-
 import { useToast } from '../../context/ToastContext';
 
 export function ParcelsListPage() {
@@ -165,8 +165,8 @@ export function ParcelsListPage() {
                 {filtered.map((parcel) => (
                   <tr key={parcel.id} className="border-t border-slate-100 dark:border-slate-700/60">
                     <td className="px-4 py-3">
-                      <Link to={`/parcels/${parcel.id}`} className="font-semibold text-brand-600 hover:underline">
-                        {parcel.tracking_number}
+                      <Link to={`/parcels/${parcel.id}`}>
+                        <TrackingBadge tracking={parcel.tracking_number} size="sm" />
                       </Link>
                     </td>
                     <td className="px-4 py-3">

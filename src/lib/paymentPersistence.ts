@@ -70,9 +70,4 @@ export async function createOnlinePayment(data: PaymentCreateInput, idempotencyK
   return toPayment(await request('POST', data, idempotencyKey));
 }
 
-// Delete a payment by ID. This is an API-driven operation that must succeed at the
-// API level before the local cache is modified. The caller is responsible for handling
-// any local cache cleanup after this function succeeds.
-export async function deleteOnlinePayment(paymentId: string): Promise<void> {
-  await request('DELETE', undefined, undefined, paymentId);
-}
+

@@ -24,7 +24,7 @@ import { AUTH_STORAGE_KEYS, readStorageJson } from './storage';
 import { canUseClientApi, createOnlineClient, deleteOnlineClient, isApiUnavailable, listOnlineClients, updateOnlineClient } from './clientPersistence';
 import { canUseProductApi, createOnlineProduct, isProductApiUnavailable, listOnlineProducts, updateOnlineProduct } from './productPersistence';
 import { canUseTripApi, createOnlineTrip, createOnlineTripVehicle, deleteOnlineTrip, deleteOnlineTripVehicle, isTripApiUnavailable, listOnlineTrips, listOnlineTripVehicles, updateOnlineTrip } from './tripPersistence';
-import { canUsePaymentApi, createOnlinePayment, deleteOnlinePayment, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
+import { canUsePaymentApi, createOnlinePayment, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
 import { canUseParcelApi, createParcelOnline, deleteOnlineParcel, isParcelApiUnavailable, listOnlineParcels, listOnlineStatusHistory, updateOnlineParcelStatus } from './parcelPersistence';
 
 export async function ensureSeed(): Promise<void> {
@@ -221,8 +221,7 @@ export async function getClients(): Promise<Client[]> {
     try { return await listOnlineClients(); } catch (error) { if (!isApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
-  const user = getAuthenticatedUser();
-  const all = (await db.getAll('clients')).filter((client) => canAccessOwnedRecord(user, client.created_by));
+  const all = await db.getAll('clients');
   return all.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
@@ -231,8 +230,7 @@ export async function getClientById(id: string): Promise<Client | undefined> {
     try { return (await listOnlineClients()).find((client) => client.id === id); } catch (error) { if (!isApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
-  const client = await db.get('clients', id);
-  return client && canAccessOwnedRecord(getAuthenticatedUser(), client.created_by) ? client : undefined;
+  return db.get('clients', id);
 }
 
 export async function createClient(
@@ -396,10 +394,7 @@ export async function getParcels(): Promise<Parcel[]> {
     try { return await listOnlineParcels(); } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
-  const user = getAuthenticatedUser();
-  const all = (await db.getAll('parcels')).filter((parcel) =>
-    canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id,
-  );
+  const all = await db.getAll('parcels');
   return all.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
@@ -408,20 +403,12 @@ export async function getParcelById(id: string): Promise<Parcel | undefined> {
     try { return (await listOnlineParcels()).find((parcel) => parcel.id === id); } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
-  const parcel = await db.get('parcels', id);
-  const user = getAuthenticatedUser();
-  return parcel && (canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id)
-    ? parcel
-    : undefined;
+  return db.get('parcels', id);
 }
 
 export async function getParcelByTracking(tracking: string): Promise<Parcel | undefined> {
   const db = await getDB();
-  const parcel = await db.getFromIndex('parcels', 'by-tracking', tracking);
-  const user = getAuthenticatedUser();
-  return parcel && (canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id)
-    ? parcel
-    : undefined;
+  return db.getFromIndex('parcels', 'by-tracking', tracking);
 }
 
 export async function getParcelItems(parcelId: string): Promise<ParcelItem[]> {
@@ -640,38 +627,7 @@ export async function updateParcelStatus(
 }
 
 // ============================================================
-// PARCEL ITEMS
-// ============================================================
-export async function createParcelItem(
-  data: Omit<ParcelItem, 'id' | 'amount' | 'created_at' | 'updated_at'>
-): Promise<ParcelItem> {
-  const db = await getDB();
-  const now = toISO();
-  const amount = (data.quantity || 0) * (data.unit_price || 0);
-  const item: ParcelItem = {
-    ...data,
-    id: generateId(),
-    amount,
-    created_at: now,
-    updated_at: now,
-  };
-  await db.put('parcel_items', item);
-  return item;
-}
 
-export async function updateParcelItem(id: string, data: Partial<ParcelItem>): Promise<void> {
-  const db = await getDB();
-  const existing = await db.get('parcel_items', id);
-  if (!existing) return;
-  const updated = { ...existing, ...data, id, updated_at: toISO() };
-  updated.amount = (updated.quantity || 0) * (updated.unit_price || 0);
-  await db.put('parcel_items', updated);
-}
-
-export async function deleteParcelItem(id: string): Promise<void> {
-  const db = await getDB();
-  await db.delete('parcel_items', id);
-}
 
 // ============================================================
 // PAYMENTS
@@ -681,8 +637,7 @@ export async function getPayments(): Promise<Payment[]> {
     try { return await listOnlinePayments(); } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
-  const user = getAuthenticatedUser();
-  const all = (await db.getAll('payments')).filter((payment) => canAccessOwnedRecord(user, payment.recorded_by));
+  const all = await db.getAll('payments');
   return all.sort((a, b) => b.payment_date.localeCompare(a.payment_date));
 }
 
@@ -692,10 +647,8 @@ export async function getPaymentsByParcel(parcelId: string): Promise<Payment[]> 
   }
   const db = await getDB();
   if (!(await getParcelById(parcelId))) return [];
-  const user = getAuthenticatedUser();
   const all = await db.getAllFromIndex('payments', 'by-parcel', parcelId);
-  return all.filter((payment) => canAccessOwnedRecord(user, payment.recorded_by))
-    .sort((a, b) => b.payment_date.localeCompare(a.payment_date));
+  return all.sort((a, b) => b.payment_date.localeCompare(a.payment_date));
 }
 
 export async function getPaymentsByClient(clientId: string): Promise<Payment[]> {
@@ -704,9 +657,7 @@ export async function getPaymentsByClient(clientId: string): Promise<Payment[]> 
   }
   const db = await getDB();
   if (!(await getClientById(clientId))) return [];
-  const user = getAuthenticatedUser();
-  const payments = await db.getAllFromIndex('payments', 'by-client', clientId);
-  return payments.filter((payment) => canAccessOwnedRecord(user, payment.recorded_by));
+  return db.getAllFromIndex('payments', 'by-client', clientId);
 }
 
 export async function createPayment(
@@ -744,60 +695,7 @@ export async function createPayment(
   return payment;
 }
 
-export async function deletePayment(id: string): Promise<void> {
-  if (canUsePaymentApi()) {
-    // Online: attempt API deletion. If it fails, propagate the error and do NOT
-    // fall back to local deletion. The server may have already deleted it.
-    try {
-      await deleteOnlinePayment(id);
-      // API succeeded (204 No Content); now clean up local cache.
-      const db = await getDB();
-      const payment = await db.get('payments', id);
-      if (payment) {
-        // Clean up payment from local cache.
-        await db.delete('payments', id);
-        
-        // Recalculate parcel balance based on remaining payments.
-        const parcel = await db.get('parcels', payment.parcel_id);
-        if (parcel) {
-          const allPayments = await db.getAllFromIndex('payments', 'by-parcel', payment.parcel_id);
-          const totalPaid = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-          const condition = parcel.payment_condition || 'unpaid';
-          const newBalance = condition === 'paid_origin' ? 0 : Math.max((parcel.total_amount || 0) - totalPaid, 0);
-          await db.put('parcels', { ...parcel, amount_paid: totalPaid, balance: newBalance });
-        }
-      }
-      
-      // Clean up associated attachments.
-      const attachments = await getAttachmentsByEntity('payment', id);
-      for (const attachment of attachments) {
-        const db = await getDB();
-        await db.delete('attachments', attachment.id);
-      }
-    } catch (error) {
-      // API error: propagate it; do NOT delete locally.
-      if (!isPaymentApiUnavailable(error)) throw error;
-      // TypeError (network unavailable): fall through to local deletion.
-    }
-  }
-  
-  // Offline or API unavailable: use local deletion.
-  const db = await getDB();
-  const payment = await db.get('payments', id);
-  if (!payment) return;
-  requireOwnedAccess(payment.recorded_by);
-  await db.delete('payments', id);
-  const parcel = await db.get('parcels', payment.parcel_id);
-  if (parcel) {
-    const allPayments = await db.getAllFromIndex('payments', 'by-parcel', payment.parcel_id);
-    const totalPaid = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const condition = parcel.payment_condition || 'unpaid';
-    const newBalance = condition === 'paid_origin' ? 0 : Math.max((parcel.total_amount || 0) - totalPaid, 0);
-    await db.put('parcels', { ...parcel, amount_paid: totalPaid, balance: newBalance });
-  }
-  const attachments = await getAttachmentsByEntity('payment', id);
-  for (const attachment of attachments) await db.delete('attachments', attachment.id);
-}
+
 
 // ============================================================
 // STATUS HISTORY
@@ -865,20 +763,12 @@ export async function updateSettings(data: Partial<AppSettings>): Promise<void> 
 // DASHBOARD STATS
 // ============================================================
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const db = await getDB();
-  const user = getAuthenticatedUser();
-  const [allParcels, allClients, allPayments, allTrips] = await Promise.all([
-    db.getAll('parcels'),
-    db.getAll('clients'),
-    db.getAll('payments'),
-    db.getAll('trips'),
+  const [parcels, clients, payments, trips] = await Promise.all([
+    getParcels(),
+    getClients(),
+    getPayments(),
+    getTrips(),
   ]);
-  const parcels = allParcels.filter((parcel) =>
-    canSeeAllData(user) || parcel.registered_by === user?.id || parcel.agent_id === user?.id,
-  );
-  const clients = allClients.filter((client) => canAccessOwnedRecord(user, client.created_by));
-  const payments = allPayments.filter((payment) => canAccessOwnedRecord(user, payment.recorded_by));
-  const trips = allTrips.filter((trip) => canAccessOwnedRecord(user, trip.created_by));
 
   const paymentsByParcel = new Map<string, number>();
   for (const payment of payments) {
@@ -887,13 +777,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   const collectedToday = payments
     .filter((p) => isToday(p.payment_date))
-    .reduce((sum, p) => sum + p.amount, 0) + (canSeeAllData(user) ? parcels
+    .reduce((sum, p) => sum + p.amount, 0) + parcels
       .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0 && isToday(p.received_date || p.created_at))
-      .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0) : 0);
+      .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
 
-  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0) + (canSeeAllData(user) ? parcels
+  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0) + parcels
     .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0)
-    .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0) : 0);
+    .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
+
   const totalOutstanding = parcels
     .filter((p) => p.status !== 'cancelled')
     .reduce((sum, p) => sum + (p.balance || 0), 0);

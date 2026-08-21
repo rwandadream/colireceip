@@ -19,7 +19,7 @@ import type { Parcel, Payment, Client, ActivityLog } from '../lib/types';
 import { PARCEL_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../lib/types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { formatCurrency, formatDate, formatDateTime } from '../lib/format';
+import { formatCurrency, formatDate, formatDateTime, formatTrackingNumber } from '../lib/format';
 import { generateReportPDF } from '../lib/pdf';
 import * as XLSX from 'xlsx';
 
@@ -56,7 +56,7 @@ export function ReportsPage() {
           'Tous les colis',
           ['N° Colis', 'Client', 'Téléphone', 'Statut', 'Total', 'Payé', 'Reste', 'Date'],
           parcels.map((p) => [
-            p.tracking_number,
+            formatTrackingNumber(p.tracking_number),
             p.client_name,
             p.client_phone || '—',
             PARCEL_STATUS_LABELS[p.status],
@@ -74,7 +74,7 @@ export function ReportsPage() {
           'Colis livrés',
           ['N° Colis', 'Client', 'Téléphone', 'Total', 'Payé', 'Date livraison'],
           delivered.map((p) => [
-            p.tracking_number,
+            formatTrackingNumber(p.tracking_number),
             p.client_name,
             p.client_phone || '—',
             formatCurrency(p.total_amount),
@@ -91,7 +91,7 @@ export function ReportsPage() {
           'Colis en attente',
           ['N° Colis', 'Client', 'Téléphone', 'Statut', 'Total', 'Reste', 'Date réception'],
           pending.map((p) => [
-            p.tracking_number,
+            formatTrackingNumber(p.tracking_number),
             p.client_name,
             p.client_phone || '—',
             PARCEL_STATUS_LABELS[p.status],
@@ -109,7 +109,7 @@ export function ReportsPage() {
           ['Date', 'Colis', 'Client', 'Montant', 'Mode', 'Agent'],
           payments.map((p) => [
             formatDateTime(p.payment_date),
-            p.parcel_tracking,
+            formatTrackingNumber(p.parcel_tracking),
             p.client_name,
             formatCurrency(p.amount),
             PAYMENT_METHOD_LABELS[p.payment_method],
@@ -155,7 +155,7 @@ export function ReportsPage() {
     switch (type) {
       case 'all_parcels':
         data = parcels.map((p) => ({
-          'N° Colis': p.tracking_number,
+          'N° Colis': formatTrackingNumber(p.tracking_number),
           Client: p.client_name,
           Téléphone: p.client_phone || '',
           Statut: PARCEL_STATUS_LABELS[p.status],
@@ -172,7 +172,7 @@ export function ReportsPage() {
         break;
       case 'delivered':
         data = parcels.filter((p) => p.status === 'delivered').map((p) => ({
-          'N° Colis': p.tracking_number,
+          'N° Colis': formatTrackingNumber(p.tracking_number),
           Client: p.client_name,
           Téléphone: p.client_phone || '',
           Total: p.total_amount,
@@ -183,7 +183,7 @@ export function ReportsPage() {
         break;
       case 'pending':
         data = parcels.filter((p) => p.status === 'pending' || p.status === 'received').map((p) => ({
-          'N° Colis': p.tracking_number,
+          'N° Colis': formatTrackingNumber(p.tracking_number),
           Client: p.client_name,
           Statut: PARCEL_STATUS_LABELS[p.status],
           Total: p.total_amount,
@@ -195,7 +195,7 @@ export function ReportsPage() {
       case 'payments':
         data = payments.map((p) => ({
           Date: formatDateTime(p.payment_date),
-          'N° Colis': p.parcel_tracking,
+          'N° Colis': formatTrackingNumber(p.parcel_tracking),
           Client: p.client_name,
           Montant: p.amount,
           'Mode de paiement': PAYMENT_METHOD_LABELS[p.payment_method],

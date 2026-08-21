@@ -25,8 +25,9 @@ import {
   deleteParcel,
   logActivity,
   getRelatedDataForParcel,
+  getParcelItems,
 } from '../../lib/data';
-import type { Parcel, Payment, StatusHistory, ParcelStatus } from '../../lib/types';
+import type { Parcel, Payment, StatusHistory, ParcelStatus, ParcelItem } from '../../lib/types';
 import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS, PARCEL_STATUSES, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_COLORS } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
@@ -36,6 +37,7 @@ import { Modal } from '../../components/ui/Modal';
 import { ConfirmModalWithDetails, type RelatedItemSummary } from '../../components/ui/ConfirmModalWithDetails';
 import { Select } from '../../components/ui/Input';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
+import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { formatCurrency, formatDateTime, formatDate } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
 
@@ -45,6 +47,7 @@ export function ParcelDetailPage() {
   const { user } = useAuth();
   const { addToast } = useToast();
   const [parcel, setParcel] = useState<Parcel | null>(null);
+  const [items, setItems] = useState<ParcelItem[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [history, setHistory] = useState<StatusHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,12 +62,14 @@ export function ParcelDetailPage() {
     (async () => {
       if (!id) return;
       try {
-        const [parcelData, paymentsData, historyData] = await Promise.all([
+        const [parcelData, itemsData, paymentsData, historyData] = await Promise.all([
           getParcelById(id),
+          getParcelItems(id),
           getPaymentsByParcel(id),
           getStatusHistory(id),
         ]);
         setParcel(parcelData || null);
+        setItems(itemsData);
         setPayments(paymentsData);
         setHistory(historyData);
         if (parcelData) setNewStatus(parcelData.status);
@@ -161,7 +166,7 @@ export function ParcelDetailPage() {
   };
 
   const handlePrint = () => {
-    if (parcel) generateReceiptPDF(parcel, payments);
+    if (parcel) generateReceiptPDF({ ...parcel, items }, payments);
   };
 
   if (loading) {
@@ -188,10 +193,8 @@ export function ParcelDetailPage() {
             <ArrowLeft size={20} />
           </Link>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">
-                {parcel.tracking_number}
-              </h1>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <TrackingBadge tracking={parcel.tracking_number} size="lg" />
               <Badge className={PARCEL_STATUS_COLORS[parcel.status]}>
                 {PARCEL_STATUS_LABELS[parcel.status]}
               </Badge>

@@ -62,39 +62,39 @@ svg {
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm transition-all duration-300;
+    @apply bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 transition-all duration-200;
   }
 
   .card-hover {
-    @apply hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-600;
+    @apply hover:border-slate-300 dark:hover:border-slate-700;
   }
 
   .glass-card {
-    @apply bg-white/70 dark:bg-slate-800/70 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 shadow-sm rounded-2xl transition-all duration-300;
+    @apply bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl transition-all duration-200;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:pointer-events-none select-none btn-shine;
+    @apply inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none select-none;
   }
 
   .btn-primary {
-    @apply btn bg-gradient-to-r from-brand-600 to-brand-700 text-white hover:from-brand-700 hover:to-brand-800 px-4 py-2.5 text-sm shadow-md hover:shadow-lg focus:ring-2 focus:ring-brand-500/20;
+    @apply btn bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 text-sm shadow-sm focus:ring-2 focus:ring-brand-500/20;
   }
 
   .btn-secondary {
-    @apply btn bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 px-4 py-2.5 text-sm focus:ring-2 focus:ring-slate-500/10;
+    @apply btn bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700/80 hover:bg-slate-200 dark:hover:bg-slate-700 px-3.5 py-2 text-sm;
   }
 
   .btn-ghost {
-    @apply btn text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2 text-sm;
+    @apply btn text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 px-3 py-1.5 text-sm;
   }
 
   .btn-danger {
-    @apply btn bg-gradient-to-r from-error-600 to-error-700 text-white hover:from-error-700 hover:to-error-800 px-4 py-2.5 text-sm shadow-md hover:shadow-lg;
+    @apply btn bg-error-600 hover:bg-error-700 text-white px-3.5 py-2 text-sm shadow-sm;
   }
 
   .input {
-    @apply w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all duration-200 text-sm shadow-sm;
+    @apply w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors duration-150 text-sm;
   }
 
   .label {
@@ -102,19 +102,19 @@ svg {
   }
 
   .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium transition-colors duration-150;
   }
 
   .stat-card {
-    @apply glass-card p-5 flex flex-col gap-2 relative overflow-hidden;
+    @apply card p-4 flex flex-col justify-between relative overflow-hidden;
   }
 
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-300;
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-150;
   }
 
   .nav-link-active {
-    @apply bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-semibold shadow-sm;
+    @apply bg-slate-100 dark:bg-slate-800/90 text-slate-900 dark:text-white font-semibold border-l-2 border-brand-600 dark:border-brand-500 rounded-l-none;
   }
 }
 

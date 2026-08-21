@@ -26,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Badge, Skeleton } from '../../components/ui/Badge';
+import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -254,8 +255,8 @@ export function ClientDetailPage() {
                 className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{p.tracking_number}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <TrackingBadge tracking={p.tracking_number} size="sm" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     {formatDate(p.received_date)} · {formatCurrency(p.total_amount)}
                   </p>
                 </div>

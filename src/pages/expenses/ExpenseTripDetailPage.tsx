@@ -6,6 +6,7 @@ import type { Parcel, TripExpense } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { formatCurrency, formatDate } from '../../lib/format';
 import { generateTripExpensePDF } from '../../lib/pdf';
 
@@ -70,7 +71,9 @@ export function ExpenseTripDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Détail du voyage</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{parcel.tracking_number} · {parcel.origin} → {parcel.destination}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-1">
+            <TrackingBadge tracking={parcel.tracking_number} size="sm" /> · {parcel.origin} → {parcel.destination}
+          </p>
         </div>
         <div className="flex gap-3">
           <Link to="/expenses" className="btn-secondary">Retour</Link>
@@ -84,9 +87,9 @@ export function ExpenseTripDetailPage() {
         <div>
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Informations du voyage</h2>
           <div className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span>Numéro du voyage</span>
-              <span className="font-semibold">{parcel.tracking_number}</span>
+              <TrackingBadge tracking={parcel.tracking_number} size="sm" />
             </div>
             <div className="flex justify-between">
               <span>Camion</span>

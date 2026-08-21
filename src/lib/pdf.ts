@@ -1,12 +1,12 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Parcel, Payment, TripExpense } from './types';
+import type { Parcel, ParcelItem, Payment, TripExpense } from './types';
 import { PARCEL_STATUS_LABELS, PAYMENT_METHOD_LABELS } from './types';
-import { formatCurrency, formatDate, formatDateTime } from './format';
+import { formatCurrency, formatDate, formatDateTime, formatTrackingNumber } from './format';
 
 type LastAutoTableInfo = { lastAutoTable: { finalY: number } };
 
-export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
+export function generateReceiptPDF(parcel: Parcel & { items?: ParcelItem[] }, payments: Payment[]): void {
   const doc = new jsPDF({ unit: 'mm', format: 'a5' });
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 15;
@@ -18,7 +18,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   y += 6;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Logistique & Transit Bamako - Abidjan', pageWidth / 2, y, { align: 'center' });
+  doc.text('Logistique & Transit Bamako - Abidjan - Bouaké', pageWidth / 2, y, { align: 'center' });
   y += 5;
   doc.text('Tél: +223 76 00 00 00 | Email: contact@groupe-gaff.com', pageWidth / 2, y, { align: 'center' });
   y += 8;
@@ -30,13 +30,13 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
   // Receipt title
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('RECU DE COLIS', pageWidth / 2, y, { align: 'center' });
+  doc.text('BORDEREAU / RECU DE COLIS', pageWidth / 2, y, { align: 'center' });
   y += 8;
 
   // Tracking number
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(parcel.tracking_number, pageWidth / 2, y, { align: 'center' });
+  doc.text(formatTrackingNumber(parcel.tracking_number), pageWidth / 2, y, { align: 'center' });
   y += 8;
 
   // Info table
@@ -47,13 +47,13 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
     bodyStyles: { fontSize: 8 },
     head: [['Information', 'Détails']],
     body: [
-      ['Client', parcel.client_name],
-      ['Téléphone', parcel.client_phone || '—'],
-      ['Type de marchandise', parcel.merchandise_type || '—'],
-      ['Description', parcel.description || '—'],
-      ['Quantité', String(parcel.quantity)],
+      ['Expéditeur (Client)', parcel.client_name],
+      ['Téléphone client', parcel.client_phone || '—'],
+      ['Destinataire', `${parcel.recipient_name} (${parcel.recipient_phone || '—'})`],
+      ['Adresse destinataire', parcel.recipient_address || '—'],
+      ['Trajet', `${parcel.origin} (${parcel.departure_branch || parcel.origin}) → ${parcel.destination} (${parcel.arrival_branch || parcel.destination})`],
+      ['Quantité totale', String(parcel.quantity)],
       ['Poids', parcel.weight ? `${parcel.weight} kg` : '—'],
-      ['Trajet', `${parcel.origin} → ${parcel.destination}`],
       ['Statut', PARCEL_STATUS_LABELS[parcel.status]],
       ['Date de réception', formatDateTime(parcel.received_date)],
       ['Enregistré par', parcel.registered_by_name],
@@ -62,14 +62,33 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
 
   y = (doc.internal as unknown as LastAutoTableInfo).lastAutoTable.finalY + 6;
 
+  // Items Detail Table if available
+  if (parcel.items && parcel.items.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      theme: 'grid',
+      headStyles: { fontSize: 8, fillColor: [71, 85, 105] },
+      bodyStyles: { fontSize: 8 },
+      head: [['Article / Colis', 'Quantité', 'Prix Unitaire', 'Montant']],
+      body: parcel.items.map((item) => [
+        item.designation,
+        String(item.quantity),
+        formatCurrency(item.unit_price),
+        formatCurrency(item.amount),
+      ]),
+    });
+    y = (doc.internal as unknown as LastAutoTableInfo).lastAutoTable.finalY + 6;
+  }
+
   // Financial summary
   autoTable(doc, {
     startY: y,
     theme: 'grid',
     headStyles: { fontSize: 9, fillColor: [22, 163, 74] },
     bodyStyles: { fontSize: 9 },
-    head: [['Désignation', 'Montant']],
+    head: [['Désignation Financière', 'Montant']],
     body: [
+      ['Sous-total marchandises', formatCurrency(parcel.sub_total ?? 0)],
       ['Prix de transport', formatCurrency(parcel.transport_price)],
       ['Frais supplémentaires', formatCurrency(parcel.additional_fees)],
       ['Montant total', formatCurrency(parcel.total_amount)],
@@ -110,7 +129,7 @@ export function generateReceiptPDF(parcel: Parcel, payments: Payment[]): void {
     { align: 'center' }
   );
 
-  doc.save(`recu-${parcel.tracking_number}.pdf`);
+  doc.save(`recu-${formatTrackingNumber(parcel.tracking_number)}.pdf`);
 }
 
 export function generateReportPDF(
@@ -178,7 +197,7 @@ export function generateTripExpensePDF(
     bodyStyles: { fontSize: 9 },
     head: [['Numéro voyage', 'Camion', 'Chauffeur', 'Agence départ', 'Agence arrivée', 'Départ', 'Arrivée']],
     body: [[
-      parcel.tracking_number,
+      formatTrackingNumber(parcel.tracking_number),
       parcel.vehicle || '—',
       parcel.agent_name || '—',
       parcel.departure_branch || '—',
@@ -217,5 +236,5 @@ export function generateTripExpensePDF(
   doc.text('Signature:', 14, y);
   doc.line(30, y + 2, 100, y + 2);
 
-  doc.save(`depenses-${parcel.tracking_number}.pdf`);
+  doc.save(`depenses-${formatTrackingNumber(parcel.tracking_number)}.pdf`);
 }

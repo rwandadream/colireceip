@@ -23,10 +23,11 @@ import { PAYMENT_METHOD_LABELS, PAYMENT_METHOD_COLORS } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card, StatCard } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
+import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
-import { formatCurrency, formatDateTime, isToday } from '../../lib/format';
+import { formatCurrency, formatDateTime, isToday, formatTrackingNumber } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
 
 export function PaymentsListPage() {
@@ -164,8 +165,8 @@ export function PaymentsListPage() {
                   <tr key={p.id} className="border-t border-slate-100 dark:border-slate-700/60">
                     <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">{p.client_name}</td>
                     <td className="px-4 py-3">
-                      <Link to={`/parcels/${p.parcel_id}`} className="font-semibold text-brand-600 hover:underline">
-                        {p.parcel_tracking}
+                      <Link to={`/parcels/${p.parcel_id}`}>
+                        <TrackingBadge tracking={p.parcel_tracking} size="sm" />
                       </Link>
                     </td>
                     <td className="px-4 py-3 font-semibold text-success-700 dark:text-success-400">{formatCurrency(p.amount)}</td>
@@ -353,7 +354,7 @@ export function PaymentNewPage() {
             <option value="">— Sélectionner un colis —</option>
             {selectedClientParcels.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.tracking_number} · Reste: {formatCurrency(p.balance)}
+                {formatTrackingNumber(p.tracking_number)} · Reste: {formatCurrency(p.balance)}
               </option>
             ))}
           </Select>
