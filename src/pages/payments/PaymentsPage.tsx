@@ -38,9 +38,14 @@ export function PaymentsListPage() {
 
   useEffect(() => {
     (async () => {
-      const data = await getPayments();
-      setPayments(data);
-      setLoading(false);
+      try {
+        const data = await getPayments();
+        setPayments(data);
+      } catch (error) {
+        console.error('Erreur lors du chargement des paiements:', error);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -201,16 +206,22 @@ export function PaymentNewPage() {
 
   useEffect(() => {
     (async () => {
-      const [parcelsData, clientsData] = await Promise.all([getParcels(), getClients()]);
-      const active = parcelsData.filter((p) => p.status !== 'cancelled' && p.balance > 0);
-      setParcels(active);
-      setClients(clientsData);
-      if (parcelIdParam) {
-        const p = await getParcelById(parcelIdParam);
-        setSelectedParcel(p || null);
-        if (p) setForm((f) => ({ ...f, client_id: p.client_id, parcel_id: parcelIdParam, amount: p.balance }));
+      try {
+        const [parcelsData, clientsData] = await Promise.all([getParcels(), getClients()]);
+        const active = parcelsData.filter((p) => p.status !== 'cancelled' && p.balance > 0);
+        setParcels(active);
+        setClients(clientsData);
+        if (parcelIdParam) {
+          const p = await getParcelById(parcelIdParam);
+          setSelectedParcel(p || null);
+          if (p) setForm((f) => ({ ...f, client_id: p.client_id, parcel_id: parcelIdParam, amount: p.balance }));
+        }
+      } catch (err) {
+        const message = err instanceof Error && err.message ? err.message : 'Erreur de chargement des données.';
+        setSaveError(message);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
   }, [parcelIdParam]);
 

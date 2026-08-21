@@ -20,7 +20,7 @@ const publicValue = (value) => {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, publicValue(item)]));
   return value;
 };
-const vehicleData = (input, vehicleNumber) => ({ vehicleNumber, registration: required(input.registration, 'registration'), ...Object.fromEntries(vehicleFeeFields.map(([inputKey, field]) => [field, amount(input[inputKey] ?? 0, 'fee')])) });
+const vehicleData = (input, vehicleNumber) => ({ vehicleNumber, registration: clean(input.registration) || 'Non immatriculé', ...Object.fromEntries(vehicleFeeFields.map(([inputKey, field]) => [field, amount(input[inputKey] ?? 0, 'fee')])) });
 const ownedTrip = async (tripId, user) => { const trip = await prisma.trip.findUnique({ where: { id: required(tripId, 'tripId') } }); if (!trip || !owned(user, trip)) throw new Error('Forbidden.'); return trip; };
 const paymentFingerprint = (parcelId, paymentAmount, paymentMethod, paymentDate, note) => createHash('sha256').update(JSON.stringify({ parcelId, amount: paymentAmount, paymentMethod, paymentDate: paymentDate.toISOString().slice(0, 10), note })).digest('hex');
 const idempotencyConflict = () => { const error = new Error('Idempotency key conflict.'); error.code = 'IDEMPOTENCY_CONFLICT'; return error; };
@@ -46,7 +46,7 @@ export async function create(resource, input, user, options = {}) {
     return publicValue(await prisma.product.create({ data: { name: required(input.name, 'name'), category: required(input.category, 'category'), defaultPrice: amount(input.defaultPrice, 'defaultPrice') } }));
   }
   if (resource === 'clients') return publicValue(await prisma.client.create({ data: { fullName: required(input.fullName, 'fullName'), phone: clean(input.phone) || '', companyName: clean(input.companyName) || null, email: clean(input.email)?.toLowerCase() || null, city: clean(input.city) || '', neighborhood: clean(input.neighborhood) || null, address: clean(input.address) || '', reference: clean(input.reference) || null, notes: clean(input.notes) || '', createdById: user.id, createdByName: user.full_name } }));
-  if (resource === 'trips') return publicValue(await prisma.trip.create({ data: { tripNumber: required(input.tripNumber, 'tripNumber'), tripDate: date(input.tripDate, 'tripDate'), origin: required(input.origin, 'origin'), destination: required(input.destination, 'destination'), status: allowed(input.status ?? 'planned', tripStatuses, 'status'), createdById: user.id, createdByName: user.full_name, vehicles: input.vehicles?.length ? { create: input.vehicles.map((vehicle, index) => vehicleData(vehicle, index + 1)) } : undefined } , include: { vehicles: true } }));
+  if (resource === 'trips') return publicValue(await prisma.trip.create({ data: { tripNumber: clean(input.tripNumber) || `TRIP-${Date.now()}`, tripDate: date(input.tripDate || new Date(), 'tripDate'), origin: clean(input.origin) || 'Bamako', destination: clean(input.destination) || 'Abidjan', status: allowed(input.status ?? 'planned', tripStatuses, 'status'), createdById: user.id, createdByName: user.full_name, vehicles: input.vehicles?.length ? { create: input.vehicles.map((vehicle, index) => vehicleData(vehicle, index + 1)) } : undefined } , include: { vehicles: true } }));
   if (resource === 'trip-vehicles') { const trip = await ownedTrip(input.tripId, user); const lastVehicle = await prisma.tripVehicle.aggregate({ where: { tripId: trip.id }, _max: { vehicleNumber: true } }); return publicValue(await prisma.tripVehicle.create({ data: { tripId: trip.id, ...vehicleData(input, (lastVehicle._max.vehicleNumber ?? 0) + 1) } })); }
   if (resource === 'parcels') {
     const client = await prisma.client.findUnique({ where: { id: required(input.clientId, 'clientId') } }); if (!client || !owned(user, client)) throw new Error('Forbidden.');
@@ -63,8 +63,8 @@ export async function create(resource, input, user, options = {}) {
     if (!parcel || !owned(user, parcel)) throw new Error('Forbidden.');
     const paymentAmount = amount(input.amount, 'amount');
     if (paymentAmount <= 0) throw new Error('Invalid amount.');
-    const paymentMethod = allowed(input.paymentMethod, paymentMethods, 'paymentMethod');
-    const paymentDate = date(input.paymentDate ?? new Date(), 'paymentDate');
+    const paymentMethod = allowed(input.paymentMethod ?? 'cash', paymentMethods, 'paymentMethod');
+    const paymentDate = date(input.paymentDate || new Date(), 'paymentDate');
     const note = clean(input.note) || '';
     const fingerprint = paymentFingerprint(parcel.id, paymentAmount, paymentMethod, paymentDate, note);
     const existing = await prisma.payment.findUnique({ where: { idempotencyKey } });
