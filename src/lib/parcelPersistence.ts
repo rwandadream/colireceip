@@ -64,13 +64,33 @@ export async function listOnlineStatusHistory(parcelId: string): Promise<StatusH
 
 export async function createParcelOnline(parcel: OnlineParcelInput, items: Array<{ product_id?: string; designation: string; quantity: number; unit_price: number }>): Promise<{ parcel: Parcel; items: ParcelItem[] }> {
   const payload = await request('POST', undefined, {
-      clientId: parcel.client_id, recipientName: parcel.recipient_name, recipientPhone: parcel.recipient_phone,
-      recipientAddress: parcel.recipient_address, merchandiseType: parcel.merchandise_type, description: parcel.description,
-      weight: parcel.weight, vehicle: parcel.vehicle, origin: parcel.origin, destination: parcel.destination,
-      departureBranch: parcel.departure_branch, arrivalBranch: parcel.arrival_branch, packageType: parcel.package_type,
-      paymentCondition: parcel.payment_condition, transportPrice: parcel.transport_price, additionalFees: parcel.additional_fees,
-      amountPaid: parcel.amount_paid, status: parcel.status, receivedDate: parcel.received_date, tripId: parcel.trip_id,
-      tripVehicleId: parcel.trip_vehicle_id, items: items.map((item) => ({ productId: item.product_id, designation: item.designation, quantity: item.quantity, unitPrice: item.unit_price })),
+    clientId: parcel.client_id,
+    recipientName: parcel.recipient_name || 'Destinataire',
+    recipientPhone: parcel.recipient_phone || '',
+    recipientAddress: parcel.recipient_address || '',
+    merchandiseType: parcel.merchandise_type || (items[0]?.designation) || 'Colis',
+    description: parcel.description || '',
+    weight: Number(parcel.weight) || 0,
+    vehicle: parcel.vehicle || '',
+    origin: parcel.origin || 'Bamako',
+    destination: parcel.destination || 'Abidjan',
+    departureBranch: parcel.departure_branch || parcel.origin || 'Bamako',
+    arrivalBranch: parcel.arrival_branch || parcel.destination || 'Abidjan',
+    packageType: parcel.package_type || 'Petit colis',
+    paymentCondition: parcel.payment_condition || 'unpaid',
+    transportPrice: Number(parcel.transport_price) || 0,
+    additionalFees: Number(parcel.additional_fees) || 0,
+    amountPaid: Number(parcel.amount_paid) || 0,
+    status: parcel.status || 'received',
+    receivedDate: parcel.received_date || new Date().toISOString(),
+    tripId: parcel.trip_id || null,
+    tripVehicleId: parcel.trip_vehicle_id || null,
+    items: items.map((item) => ({
+      productId: item.product_id || null,
+      designation: item.designation.trim() || 'Article',
+      quantity: Number(item.quantity) || 1,
+      unitPrice: Number(item.unit_price) || 0,
+    })),
   });
   const converted = toParcel(payload);
   return { parcel: converted, items: converted.items ?? [] };

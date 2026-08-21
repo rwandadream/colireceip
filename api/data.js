@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Méthode non autorisée.' });
   } catch (error) {
     const status = error.message === 'Forbidden.' ? 403 : error.code === 'IDEMPOTENCY_CONFLICT' || error.code === 'P2002' ? 409 : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 400 : 400;
-    const message = status === 403 ? 'Accès refusé.' : status === 409 ? 'Conflit d\'idempotence.' : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 'En-tête Idempotency-Key requis.' : 'Requête invalide.';
+    const message = status === 403 ? 'Accès refusé.' : status === 409 ? 'Conflit d\'idempotence.' : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 'En-tête Idempotency-Key requis.' : (error.message || 'Requête invalide.');
     return res.status(status).json({ error: message });
   }
 }
