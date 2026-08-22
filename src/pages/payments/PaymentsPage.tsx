@@ -82,41 +82,48 @@ export function PaymentsListPage() {
   const filteredTotal = filtered.reduce((s, p) => s + p.amount, 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Paiements</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{payments.length} paiements enregistrés</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Registre des Paiements
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {payments.length} encaissements enregistrés au total
+          </p>
         </div>
-        <Link to="/payments/new" className="btn-primary w-full sm:w-auto">
-          <Plus size={18} />
+        <Link to="/payments/new" className="btn-primary">
+          <Plus size={16} />
           Nouveau paiement
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard label="Encaissé aujourd'hui" value={formatCurrency(totalToday)} icon={<Wallet size={20} />} color="success" />
-        <StatCard label="Total encaissé" value={formatCurrency(totalAll)} icon={<TrendingUp size={20} />} color="brand" />
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Encaissé aujourd'hui" value={formatCurrency(totalToday)} icon={<Wallet size={18} />} color="success" />
+        <StatCard label="Total encaissé" value={formatCurrency(totalAll)} icon={<TrendingUp size={18} />} color="brand" />
       </div>
 
-      <Card className="p-4">
-        <div className="flex flex-col gap-3 lg:flex-row">
+      {/* Toolbar */}
+      <Card className="p-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <div className="flex-1">
             <Input
               placeholder="Rechercher par colis, client, note, agent..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              icon={<Search size={18} />}
+              icon={<Search size={16} />}
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="sm:w-48">
+          <div className="grid grid-cols-2 gap-2 sm:w-auto">
+            <Select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="sm:w-44">
               <option value="all">Tous les modes</option>
               {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((m) => (
                 <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>
               ))}
             </Select>
-            <Select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as 'all' | 'today' | 'week' | 'month')} className="sm:w-48">
+            <Select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as 'all' | 'today' | 'week' | 'month')} className="sm:w-44">
               <option value="all">Toutes les dates</option>
               <option value="today">Aujourd’hui</option>
               <option value="week">7 derniers jours</option>
@@ -126,10 +133,11 @@ export function PaymentsListPage() {
         </div>
       </Card>
 
+      {/* Data Table */}
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
-        </div>
+        <Card className="p-4 space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState
@@ -138,48 +146,60 @@ export function PaymentsListPage() {
             description={search || methodFilter !== 'all' ? 'Aucun paiement ne correspond à vos critères.' : 'Enregistrez votre premier paiement.'}
             action={!search && methodFilter === 'all' ? (
               <Link to="/payments/new" className="btn-primary">
-                <Plus size={18} /> Nouveau paiement
+                <Plus size={16} /> Nouveau paiement
               </Link>
             ) : undefined}
           />
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-            <span>{filtered.length} résultats dans la vue filtrée</span>
-            <span className="font-semibold text-slate-700 dark:text-slate-200">Total filtré : {formatCurrency(filteredTotal)}</span>
+        <div className="data-table-container">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2 bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+            <span>{filtered.length} encaissements filtrés</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              Total filtré : <span className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(filteredTotal)}</span>
+            </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/70">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Client</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Colis</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Montant</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Mode</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Date</th>
+                  <th>Client</th>
+                  <th>Colis</th>
+                  <th className="text-right">Montant</th>
+                  <th>Mode</th>
+                  <th>Date & Heure</th>
+                  <th>Agent</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p) => (
-                  <tr key={p.id} className="border-t border-slate-100 dark:border-slate-700/60">
-                    <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">{p.client_name}</td>
-                    <td className="px-4 py-3">
+                  <tr key={p.id}>
+                    <td className="font-semibold text-slate-900 dark:text-white">{p.client_name}</td>
+                    <td className="whitespace-nowrap">
                       <Link to={`/parcels/${p.parcel_id}`}>
                         <TrackingBadge tracking={p.parcel_tracking} size="sm" />
                       </Link>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-success-700 dark:text-success-400">{formatCurrency(p.amount)}</td>
-                    <td className="px-4 py-3">
-                      <Badge className={PAYMENT_METHOD_COLORS[p.payment_method]}>{PAYMENT_METHOD_LABELS[p.payment_method]}</Badge>
+                    <td className="text-right font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(p.amount)}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDateTime(p.payment_date)}</td>
+                    <td>
+                      <Badge className={PAYMENT_METHOD_COLORS[p.payment_method]}>
+                        {PAYMENT_METHOD_LABELS[p.payment_method]}
+                      </Badge>
+                    </td>
+                    <td className="text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">
+                      {formatDateTime(p.payment_date)}
+                    </td>
+                    <td className="text-xs text-slate-600 dark:text-slate-400">
+                      {p.recorded_by_name}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

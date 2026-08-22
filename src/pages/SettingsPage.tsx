@@ -155,21 +155,21 @@ export function SettingsPage() {
   if (loading || !settings) return <Skeleton className="h-96" />;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Paramètres</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Configuration de l'application et préférences</p>
+    <div className="max-w-4xl mx-auto space-y-4">
+      <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Paramètres Système</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Configuration générale et préférences de l'entreprise</p>
       </div>
 
       {/* Profil & Préférences Card */}
-      <Card className="p-5">
-        <h2 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <User size={18} />
+      <Card className="p-4">
+        <h2 className="font-bold text-sm text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+          <User size={16} />
           Profil & Préférences
         </h2>
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-            <div className="w-12 h-12 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300 font-bold text-lg">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/60 dark:border-slate-800">
+            <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-950/80 flex items-center justify-center text-brand-700 dark:text-brand-300 font-bold text-base">
               {user?.full_name?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="min-w-0 flex-1">
@@ -179,7 +179,7 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+          <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/60 dark:border-slate-800">
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Mode Sombre</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Activer le thème sombre de l'application</p>
@@ -200,9 +200,9 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      <Card className="p-5">
-        <h2 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <Building2 size={18} />
+      <Card className="p-4">
+        <h2 className="font-bold text-sm text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+          <Building2 size={16} />
           Informations de l'entreprise
         </h2>
         <div className="space-y-4">

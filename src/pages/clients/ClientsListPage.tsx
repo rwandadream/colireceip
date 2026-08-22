@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, Plus, Phone, MapPin } from 'lucide-react';
+import { Users, Search, Plus, Phone, MapPin, ArrowUpRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getClients, getParcels } from '../../lib/data';
 import { useToast } from '../../context/ToastContext';
 import type { Client, Parcel } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
-import { EmptyState, Skeleton } from '../../components/ui/Badge';
+import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
-import { formatCurrency, formatDate } from '../../lib/format';
+import { formatCurrency } from '../../lib/format';
 
 export function ClientsListPage() {
   const { addToast } = useToast();
@@ -30,9 +30,10 @@ export function ClientsListPage() {
         setError(null);
       } catch (err) {
         if (!active) return;
-        const message = err instanceof Error && err.message
-          ? err.message
-          : 'Impossible de charger les clients pour le moment.';
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : 'Impossible de charger les clients pour le moment.';
         setError(message);
         addToast({
           type: 'error',
@@ -49,12 +50,18 @@ export function ClientsListPage() {
     };
   }, [addToast]);
 
-  const getClientStats = useCallback((clientId: string) => {
-    const clientParcels = parcels.filter((p) => p.client_id === clientId);
-    const totalAmount = clientParcels.reduce((sum, p) => sum + p.total_amount, 0);
-    const outstanding = clientParcels.reduce((sum, p) => sum + (p.status !== 'cancelled' ? p.balance : 0), 0);
-    return { count: clientParcels.length, totalAmount, outstanding };
-  }, [parcels]);
+  const getClientStats = useCallback(
+    (clientId: string) => {
+      const clientParcels = parcels.filter((p) => p.client_id === clientId);
+      const totalAmount = clientParcels.reduce((sum, p) => sum + p.total_amount, 0);
+      const outstanding = clientParcels.reduce(
+        (sum, p) => sum + (p.status !== 'cancelled' ? p.balance : 0),
+        0
+      );
+      return { count: clientParcels.length, totalAmount, outstanding };
+    },
+    [parcels]
+  );
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -85,29 +92,39 @@ export function ClientsListPage() {
   }, [clients, getClientStats, search, statusFilter]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Clients</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{clients.length} clients enregistrés</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Répertoire Clients
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {clients.length} clients enregistrés · suivi commercial et financier
+          </p>
         </div>
-        <Link to="/clients/new" className="btn-primary w-full sm:w-auto">
-          <Plus size={18} />
+        <Link to="/clients/new" className="btn-primary">
+          <Plus size={16} />
           Nouveau client
         </Link>
       </div>
 
-      <Card className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="flex-1">
+      {/* Toolbar Filters */}
+      <Card className="p-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex-1 w-full">
             <Input
-              placeholder="Rechercher par nom, téléphone, ville, adresse..."
+              placeholder="Rechercher par nom, téléphone, ville, entreprise..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              icon={<Search size={18} />}
+              icon={<Search size={16} />}
             />
           </div>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | 'with_balance' | 'paid_up')} className="sm:w-56">
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'with_balance' | 'paid_up')}
+            className="w-full sm:w-52"
+          >
             <option value="all">Tous les clients</option>
             <option value="with_balance">Avec solde impayé</option>
             <option value="paid_up">À jour</option>
@@ -115,83 +132,141 @@ export function ClientsListPage() {
         </div>
       </Card>
 
+      {/* Content View */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <Card className="p-4 space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-32" />
+            <Skeleton key={i} className="h-10 w-full" />
           ))}
-        </div>
+        </Card>
       ) : error ? (
-        <Card>
-          <div className="p-8 text-center">
-            <p className="text-red-600 dark:text-red-400 font-semibold mb-4">{error}</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Veuillez vérifier votre connexion et réessayer.
-            </p>
-          </div>
+        <Card className="p-6 text-center">
+          <AlertCircle className="mx-auto text-error-500 mb-2" size={28} />
+          <p className="text-sm font-semibold text-error-600 dark:text-error-400">{error}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Veuillez vérifier votre connexion et rafraîchir la page.
+          </p>
         </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Users size={32} />}
             title="Aucun client trouvé"
-            description={search ? 'Aucun client ne correspond à votre recherche.' : 'Ajoutez votre premier client.'}
+            description={
+              search ? 'Aucun client ne correspond à vos filtres.' : 'Ajoutez votre premier client.'
+            }
             action={
               !search ? (
                 <Link to="/clients/new" className="btn-primary">
-                  <Plus size={18} />
-                  Nouveau client
+                  <Plus size={16} /> Nouveau client
                 </Link>
               ) : undefined
             }
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((client) => {
-            const stats = getClientStats(client.id);
-            return (
-              <Link key={client.id} to={`/clients/${client.id}`}>
-                <Card hover className="p-4 h-full">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-11 h-11 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300 font-semibold flex-shrink-0">
-                      {client.full_name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900 dark:text-white truncate">{client.full_name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Client depuis {formatDate(client.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 text-sm">
-                    {client.phone && (
-                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                        <Phone size={14} className="text-slate-400" />
-                        <span>{client.phone}</span>
-                      </div>
-                    )}
-                    {client.city && (
-                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                        <MapPin size={14} className="text-slate-400" />
-                        <span>{client.city}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">Colis</p>
-                      <p className="font-bold text-slate-900 dark:text-white">{stats.count}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-400 dark:text-slate-500">Total</p>
-                      <p className="font-bold text-slate-900 dark:text-white">{formatCurrency(stats.totalAmount)}</p>
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-            );
-          })}
+        <div className="data-table-container">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Contact</th>
+                  <th>Ville / Adresse</th>
+                  <th className="text-center">Colis</th>
+                  <th className="text-right">Montant Total</th>
+                  <th className="text-right">Solde Impayé</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((client) => {
+                  const stats = getClientStats(client.id);
+                  const hasOutstanding = stats.outstanding > 0;
+                  return (
+                    <tr key={client.id}>
+                      <td className="font-semibold">
+                        <Link
+                          to={`/clients/${client.id}`}
+                          className="flex items-center gap-2.5 group hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                            {client.full_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                              {client.full_name}
+                            </p>
+                            {client.company_name && (
+                              <p className="text-[11px] font-normal text-slate-400 truncate">
+                                {client.company_name}
+                              </p>
+                            )}
+                          </div>
+                        </Link>
+                      </td>
+
+                      <td>
+                        <div className="space-y-0.5 text-xs text-slate-600 dark:text-slate-300">
+                          {client.phone && (
+                            <p className="flex items-center gap-1.5 font-medium">
+                              <Phone size={12} className="text-slate-400" />
+                              {client.phone}
+                            </p>
+                          )}
+                          {client.email && (
+                            <p className="text-slate-400 truncate text-[11px]">{client.email}</p>
+                          )}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                          <MapPin size={12} className="text-slate-400 flex-shrink-0" />
+                          <span className="truncate">
+                            {client.city}
+                            {client.neighborhood ? `, ${client.neighborhood}` : ''}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="text-center font-semibold">
+                        <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {stats.count}
+                        </Badge>
+                      </td>
+
+                      <td className="text-right font-medium tabular-nums">
+                        {formatCurrency(stats.totalAmount)}
+                      </td>
+
+                      <td className="text-right tabular-nums">
+                        {hasOutstanding ? (
+                          <span className="font-bold text-error-600 dark:text-error-400">
+                            {formatCurrency(stats.outstanding)}
+                          </span>
+                        ) : (
+                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            <CheckCircle2 size={11} /> À jour
+                          </Badge>
+                        )}
+                      </td>
+
+                      <td className="text-right">
+                        <Link
+                          to={`/clients/${client.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-md transition-colors"
+                        >
+                          Fiche
+                          <ArrowUpRight size={13} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

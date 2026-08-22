@@ -43,63 +43,106 @@ export function LogsPage() {
   }, [logs, search, userFilter]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Journal des actions</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{logs.length} actions enregistrées</p>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          Journal des Actions & Audit
+        </h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          {logs.length} activités et événements système enregistrés
+        </p>
       </div>
 
-      <Card className="p-4">
+      {/* Toolbar */}
+      <Card className="p-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
-              placeholder="Rechercher une action..."
+              placeholder="Rechercher par action, agent, détail..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              icon={<Search size={18} />}
+              icon={<Search size={16} />}
             />
           </div>
-          <Select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className="sm:w-48">
+          <Select
+            value={userFilter}
+            onChange={(e) => setUserFilter(e.target.value)}
+            className="sm:w-48"
+          >
             <option value="all">Tous les utilisateurs</option>
             {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.full_name}</option>
+              <option key={u.id} value={u.id}>
+                {u.full_name}
+              </option>
             ))}
           </Select>
         </div>
       </Card>
 
+      {/* Data Table */}
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
-        </div>
+        <Card className="p-4 space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState icon={<ScrollText size={32} />} title="Aucune action trouvée" />
         </Card>
       ) : (
-        <Card className="p-2">
-          <div className="space-y-1">
-            {filtered.map((log) => (
-              <div key={log.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                <div className="w-9 h-9 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300 text-xs font-semibold flex-shrink-0">
-                  {log.user_name?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-700 dark:text-slate-200">
-                    <span className="font-medium">{log.user_name}</span>{' '}
-                    <span>{log.action}</span>
-                  </p>
-                  {log.details && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{log.details}</p>
-                  )}
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                    {formatDateTime(log.created_at)} · {timeAgo(log.created_at)}
-                  </p>
-                </div>
-              </div>
-            ))}
+        <div className="data-table-container">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date & Heure</th>
+                  <th>Agent</th>
+                  <th>Action</th>
+                  <th>Détails</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((log) => (
+                  <tr key={log.id}>
+                    <td className="text-xs text-slate-500 whitespace-nowrap">
+                      <span>{formatDateTime(log.created_at)}</span>
+                      <span className="text-[11px] text-slate-400 block font-normal">
+                        ({timeAgo(log.created_at)})
+                      </span>
+                    </td>
+
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                          {log.user_name?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate">
+                          {log.user_name}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="font-medium text-slate-800 dark:text-slate-200">
+                      {log.action}
+                    </td>
+
+                    <td className="text-xs text-slate-500 dark:text-slate-400">
+                      {log.details ? (
+                        <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[11px]">
+                          {log.details}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

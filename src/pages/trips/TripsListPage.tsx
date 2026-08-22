@@ -1,44 +1,215 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Truck, CalendarDays } from 'lucide-react';
+import { Plus, Truck, CalendarDays, Search, ArrowUpRight } from 'lucide-react';
 import { getTrips, getTripVehicles, getParcelsByTripId, getTripStatusLabel } from '../../lib/data';
-import type { Trip } from '../../lib/types';
+import type { Trip, TripStatus } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
+import { Input, Select } from '../../components/ui/Input';
 import { formatCurrency, formatDate } from '../../lib/format';
 
+const TRIP_STATUS_COLORS: Record<TripStatus, string> = {
+  planned: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  in_transit: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300',
+  arrived: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300',
+  closed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  cancelled: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300',
+};
+
 export function TripsListPage() {
-    const [trips, setTrips] = useState<Trip[]>([]);
-    const [stats, setStats] = useState<Record<string, { vehicles: number; parcels: number; expenses: number }>>({});
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [stats, setStats] = useState<Record<string, { vehicles: number; parcels: number; expenses: number }>>({});
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-    useEffect(() => {
-        void (async () => {
-            const data = await getTrips();
-            const entries = await Promise.all(data.map(async (trip) => {
-                const [vehicles, parcels] = await Promise.all([getTripVehicles(trip.id), getParcelsByTripId(trip.id)]);
-                const expenses = vehicles.reduce((sum, vehicle) => sum + vehicle.customs_fee + vehicle.frontier_formalities + vehicle.road_bamako_frontier + vehicle.road_frontier_bouake + vehicle.road_bouake_abidjan + vehicle.road_abidjan + vehicle.loading_fee + vehicle.unloading_fee + vehicle.truck_quota + vehicle.monthly_fee, 0);
-                return [trip.id, { vehicles: vehicles.length, parcels: parcels.length, expenses }] as const;
-            }));
-            setTrips(data);
-            setStats(Object.fromEntries(entries));
-        })();
-    }, []);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await getTrips();
+        const entries = await Promise.all(
+          data.map(async (trip) => {
+            const [vehicles, parcels] = await Promise.all([
+              getTripVehicles(trip.id),
+              getParcelsByTripId(trip.id),
+            ]);
+            const expenses = vehicles.reduce(
+              (sum, vehicle) =>
+                sum +
+                vehicle.customs_fee +
+                vehicle.frontier_formalities +
+                vehicle.road_bamako_frontier +
+                vehicle.road_frontier_bouake +
+                vehicle.road_bouake_abidjan +
+                vehicle.road_abidjan +
+                vehicle.loading_fee +
+                vehicle.unloading_fee +
+                vehicle.truck_quota +
+                vehicle.monthly_fee,
+              0
+            );
+            return [trip.id, { vehicles: vehicles.length, parcels: parcels.length, expenses }] as const;
+          })
+        );
+        setTrips(data);
+        setStats(Object.fromEntries(entries));
+      } catch (err) {
+        console.error('Erreur lors du chargement des voyages:', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-    return <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-            <div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Voyages</h1><p className="text-sm text-slate-500">Trajets, véhicules, colis et frais regroupés.</p></div>
-            <Link to="/trips/new"><Button><Plus size={16} /> Nouveau voyage</Button></Link>
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return trips.filter((t) => {
+      const text = `${t.trip_number} ${t.origin} ${t.destination}`.toLowerCase();
+      const matchesSearch = !query || text.includes(query);
+      const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [trips, search, statusFilter]);
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Gestion des Voyages
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {trips.length} trajets et convoi logistiques enregistrés
+          </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {trips.map((trip) => {
-                const stat = stats[trip.id] || { vehicles: 0, parcels: 0, expenses: 0 }; return <Link key={trip.id} to={`/trips/${trip.id}`}>
-                    <Card className="p-5 h-full hover:border-brand-300 transition-colors"><div className="flex justify-between gap-3"><div><p className="text-lg font-bold text-slate-900 dark:text-white">Voyage {trip.trip_number || 'sans numéro'}</p><p className="text-sm text-slate-500">{trip.origin || 'Départ non renseigné'} → {trip.destination || 'Destination non renseignée'}</p></div><span className="badge bg-brand-50 text-brand-700">{getTripStatusLabel(trip.status)}</span></div>
-                        <div className="mt-5 flex items-center gap-2 text-sm text-slate-500"><CalendarDays size={16} />{formatDate(trip.trip_date)}</div>
-                        <div className="mt-4 grid grid-cols-3 gap-2 text-center"><div><Truck size={16} className="mx-auto mb-1 text-brand-500" /><b>{stat.vehicles}</b><p className="text-xs text-slate-500">Véhicules</p></div><div><b>{stat.parcels}</b><p className="text-xs text-slate-500">Colis</p></div><div><b className="text-xs">{formatCurrency(stat.expenses)}</b><p className="text-xs text-slate-500">Frais</p></div></div>
-                    </Card>
-                </Link>;
-            })}
-            {trips.length === 0 && <Card className="p-10 text-center md:col-span-2 xl:col-span-3"><p className="text-slate-500">Aucun voyage enregistré.</p></Card>}
+        <Link to="/trips/new">
+          <Button>
+            <Plus size={16} /> Nouveau voyage
+          </Button>
+        </Link>
+      </div>
+
+      {/* Toolbar */}
+      <Card className="p-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex-1 w-full">
+            <Input
+              placeholder="Rechercher par N° de voyage, origine, destination..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              icon={<Search size={16} />}
+            />
+          </div>
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-52"
+          >
+            <option value="all">Tous les statuts</option>
+            <option value="planned">Planifié</option>
+            <option value="in_transit">En route</option>
+            <option value="arrived">Arrivé</option>
+            <option value="closed">Clôturé</option>
+            <option value="cancelled">Annulé</option>
+          </Select>
         </div>
-    </div>;
+      </Card>
+
+      {/* Data Table */}
+      {loading ? (
+        <Card className="p-4 space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </Card>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<Truck size={32} />}
+            title="Aucun voyage trouvé"
+            description={
+              search ? 'Aucun trajet ne correspond à vos filtres.' : 'Créez votre premier voyage.'
+            }
+            action={
+              !search ? (
+                <Link to="/trips/new">
+                  <Button>
+                    <Plus size={16} /> Nouveau voyage
+                  </Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        </Card>
+      ) : (
+        <div className="data-table-container">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>N° Voyage</th>
+                  <th>Itinéraire</th>
+                  <th>Date</th>
+                  <th className="text-center">Camions</th>
+                  <th className="text-center">Colis</th>
+                  <th className="text-right">Frais Totaux</th>
+                  <th>Statut</th>
+                  <th className="text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((trip) => {
+                  const stat = stats[trip.id] || { vehicles: 0, parcels: 0, expenses: 0 };
+                  return (
+                    <tr key={trip.id}>
+                      <td className="font-bold">
+                        <Link
+                          to={`/trips/${trip.id}`}
+                          className="text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1.5"
+                        >
+                          <Truck size={14} className="text-slate-400" />
+                          <span>{trip.trip_number || 'SANS-N°'}</span>
+                        </Link>
+                      </td>
+                      <td className="font-medium">
+                        {trip.origin} <span className="text-slate-400 font-normal">➔</span>{' '}
+                        {trip.destination}
+                      </td>
+                      <td className="text-slate-500 whitespace-nowrap text-xs">
+                        <span className="flex items-center gap-1">
+                          <CalendarDays size={12} className="text-slate-400" />
+                          {formatDate(trip.trip_date)}
+                        </span>
+                      </td>
+                      <td className="text-center font-semibold">{stat.vehicles}</td>
+                      <td className="text-center font-semibold">{stat.parcels}</td>
+                      <td className="text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                        {formatCurrency(stat.expenses)}
+                      </td>
+                      <td>
+                        <Badge className={TRIP_STATUS_COLORS[trip.status]}>
+                          {getTripStatusLabel(trip.status)}
+                        </Badge>
+                      </td>
+                      <td className="text-right">
+                        <Link
+                          to={`/trips/${trip.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-md transition-colors"
+                        >
+                          Détails
+                          <ArrowUpRight size={13} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

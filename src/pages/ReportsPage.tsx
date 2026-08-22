@@ -293,34 +293,34 @@ export function ReportsPage() {
   if (loading) return <div className="animate-pulse"><div className="skeleton h-96 rounded-xl" /></div>;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Rapports</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-          Générez et exportez des rapports en PDF ou Excel
+    <div className="space-y-4">
+      <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Rapports & Exports</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Générez et exportez vos rapports métiers en formats PDF et Excel
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {reports.map((report) => (
-          <Card key={report.type} className="p-5">
-            <div className="flex items-start gap-4 mb-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colorMap[report.color]}`}>
+          <Card key={report.type} className="p-4 flex flex-col justify-between">
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${colorMap[report.color]}`}>
                 {report.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-slate-900 dark:text-white">{report.title}</h3>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">{report.title}</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{report.description}</p>
-                <p className="text-sm font-semibold text-brand-600 dark:text-brand-400 mt-1">{report.count} enregistrements</p>
+                <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mt-1">{report.count} enregistrements</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <Button variant="secondary" size="sm" onClick={() => exportPDF(report.type)} className="flex-1">
-                <FileDown size={16} />
+                <FileDown size={14} />
                 PDF
               </Button>
               <Button variant="secondary" size="sm" onClick={() => exportExcel(report.type)} className="flex-1">
-                <FileSpreadsheet size={16} />
+                <FileSpreadsheet size={14} />
                 Excel
               </Button>
             </div>

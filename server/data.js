@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { prisma } from './prisma.js';
+import { publicUser } from './auth.js';
 
+const userRoles = new Set(['admin', 'agent']);
 const parcelStatuses = new Set(['received', 'pending', 'in_transit', 'arrived', 'delivered', 'cancelled']);
 const tripStatuses = new Set(['planned', 'in_transit', 'arrived', 'closed', 'cancelled']);
 const paymentMethods = new Set(['cash', 'orange_money', 'wave', 'bank_transfer']);
@@ -29,9 +32,14 @@ const resolveExistingPayment = (existing, user, fingerprint) => { if (existing.i
 
 export async function list(resource, user, query = {}) {
   switch (resource) {
+    case 'users': {
+      if (!isAdmin(user)) throw new Error('Forbidden.');
+      const users = await prisma.user.findMany({ orderBy: { fullName: 'asc' } });
+      return users.map(publicUser);
+    }
     case 'products': return publicValue(await prisma.product.findMany({ orderBy: { name: 'asc' } }));
     case 'clients': return publicValue(await prisma.client.findMany({ orderBy: { createdAt: 'desc' } }));
-    case 'trips': return publicValue(await prisma.trip.findMany({ orderBy: { tripDate: 'desc' } }));
+    case 'trips': return publicValue(await prisma.trip.findMany({ include: { vehicles: true }, orderBy: { tripDate: 'desc' } }));
     case 'trip-vehicles': { await ownedTrip(query.tripId, user); return publicValue(await prisma.tripVehicle.findMany({ where: { tripId: query.tripId }, orderBy: { vehicleNumber: 'asc' } })); }
     case 'parcels': return publicValue(await prisma.parcel.findMany({ include: { items: true }, orderBy: { createdAt: 'desc' } }));
     case 'status-history': { const parcel = await prisma.parcel.findUnique({ where: { id: required(query.parcelId, 'parcelId') } }); if (!parcel) throw new Error('Colis introuvable.'); return publicValue(await prisma.statusHistory.findMany({ where: { parcelId: parcel.id }, orderBy: { createdAt: 'asc' } })); }
@@ -41,6 +49,20 @@ export async function list(resource, user, query = {}) {
 }
 
 export async function create(resource, input, user, options = {}) {
+  if (resource === 'users') {
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    const fullName = required(input.fullName || input.full_name, 'fullName');
+    const phone = required(input.phone, 'phone');
+    const password = required(input.password, 'password');
+    const role = allowed(input.role, userRoles, 'role');
+    const active = input.active !== undefined ? Boolean(input.active) : true;
+    const email = clean(input.email)?.toLowerCase() || null;
+    const passwordHash = await bcrypt.hash(password, 12);
+    const newUser = await prisma.user.create({
+      data: { fullName, phone, role, active, email, passwordHash },
+    });
+    return publicUser(newUser);
+  }
   if (resource === 'products') {
     if (!isAdmin(user)) throw new Error('Forbidden.');
     return publicValue(await prisma.product.create({ data: { name: required(input.name, 'name'), category: required(input.category, 'category'), defaultPrice: amount(input.defaultPrice, 'defaultPrice') } }));
@@ -90,12 +112,35 @@ export async function create(resource, input, user, options = {}) {
 }
 
 export async function remove(resource, id, user) {
+  if (resource === 'users') {
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    if (id === user.id) throw new Error('Impossible de supprimer votre propre compte.');
+    return publicUser(await prisma.user.delete({ where: { id } }));
+  }
   if (resource === 'products') { if (!isAdmin(user)) throw new Error('Forbidden.'); return prisma.product.delete({ where: { id } }); }
   if (resource === 'trip-vehicles') { const vehicle = await prisma.tripVehicle.findUnique({ where: { id } }); if (!vehicle) throw new Error('Forbidden.'); await ownedTrip(vehicle.tripId, user); return prisma.tripVehicle.delete({ where: { id } }); }
   const model = resource === 'clients' ? prisma.client : resource === 'trips' ? prisma.trip : resource === 'parcels' ? prisma.parcel : resource === 'payments' ? prisma.payment : null; if (!model) throw new Error('Unknown resource.'); const record = await model.findUnique({ where: { id } }); if (!record || !owned(user, record)) throw new Error('Forbidden.'); return model.delete({ where: { id } });
 }
 
 export async function update(resource, id, input, user) {
+  if (resource === 'users') {
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) throw new Error('Utilisateur introuvable.');
+    const updateData = {};
+    if (input.fullName !== undefined || input.full_name !== undefined) {
+      updateData.fullName = required(input.fullName || input.full_name, 'fullName');
+    }
+    if (input.phone !== undefined) updateData.phone = required(input.phone, 'phone');
+    if (input.email !== undefined) updateData.email = clean(input.email)?.toLowerCase() || null;
+    if (input.role !== undefined) updateData.role = allowed(input.role, userRoles, 'role');
+    if (input.active !== undefined) updateData.active = Boolean(input.active);
+    if (input.password && typeof input.password === 'string' && input.password.trim()) {
+      updateData.passwordHash = await bcrypt.hash(input.password.trim(), 12);
+    }
+    const updatedUser = await prisma.user.update({ where: { id }, data: updateData });
+    return publicUser(updatedUser);
+  }
   if (resource === 'products') { if (!isAdmin(user)) throw new Error('Forbidden.'); return publicValue(await prisma.product.update({ where: { id }, data: { ...(input.name !== undefined ? { name: required(input.name, 'name') } : {}), ...(input.category !== undefined ? { category: required(input.category, 'category') } : {}), ...(input.defaultPrice !== undefined ? { defaultPrice: amount(input.defaultPrice, 'defaultPrice') } : {}) } })); }
   if (resource === 'clients') { const record = await prisma.client.findUnique({ where: { id } }); if (!record) throw new Error('Client introuvable.'); return publicValue(await prisma.client.update({ where: { id }, data: { ...(input.fullName !== undefined ? { fullName: required(input.fullName, 'fullName') } : {}), ...(input.phone !== undefined ? { phone: clean(input.phone) || '' } : {}), ...(input.city !== undefined ? { city: clean(input.city) || '' } : {}), ...(input.address !== undefined ? { address: clean(input.address) || '' } : {}), ...(input.notes !== undefined ? { notes: clean(input.notes) || '' } : {}) } })); }
   if (resource === 'trips') { const record = await prisma.trip.findUnique({ where: { id } }); if (!record || !owned(user, record)) throw new Error('Forbidden.'); return publicValue(await prisma.trip.update({ where: { id }, data: { ...(input.status !== undefined ? { status: allowed(input.status, tripStatuses, 'status') } : {}), ...(input.origin !== undefined ? { origin: required(input.origin, 'origin') } : {}), ...(input.destination !== undefined ? { destination: required(input.destination, 'destination') } : {}) } })); }
@@ -133,3 +178,4 @@ export async function update(resource, id, input, user) {
   if (resource === 'payments') { const record = await prisma.payment.findUnique({ where: { id } }); if (!record) throw new Error('Paiement introuvable.'); return publicValue(await prisma.payment.update({ where: { id }, data: { ...(input.note !== undefined ? { note: clean(input.note) || '' } : {}), ...(input.paymentMethod !== undefined ? { paymentMethod: allowed(input.paymentMethod, paymentMethods, 'paymentMethod') } : {}) } })); }
   throw new Error('Unknown resource.');
 }
+

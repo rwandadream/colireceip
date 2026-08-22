@@ -5,6 +5,7 @@ import {
   Plus,
   Search,
   User as UserIcon,
+  ArrowUpRight,
 } from 'lucide-react';
 import { getParcels } from '../../lib/data';
 import type { Parcel } from '../../lib/types';
@@ -31,7 +32,10 @@ export function ParcelsListPage() {
         const data = await getParcels();
         setParcels(data);
       } catch (err) {
-        const message = err instanceof Error && err.message ? err.message : 'Impossible de charger la liste des colis.';
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : 'Impossible de charger la liste des colis.';
         addToast({ type: 'error', title: 'Erreur', description: message });
       } finally {
         setLoading(false);
@@ -78,32 +82,36 @@ export function ParcelsListPage() {
   }, [parcels, search, statusFilter, paymentFilter, sortBy]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Colis</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Registre des Colis
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {parcels.length} colis au total · suivi opérationnel centralisé
           </p>
         </div>
-        <Link to="/parcels/new" className="btn-primary w-full sm:w-auto">
-          <Plus size={18} />
+        <Link to="/parcels/new" className="btn-primary">
+          <Plus size={16} />
           Nouveau colis
         </Link>
       </div>
 
-      <Card className="p-4">
-        <div className="flex flex-col gap-3 lg:flex-row">
+      {/* Toolbar Filters */}
+      <Card className="p-3">
+        <div className="flex flex-col gap-2 lg:flex-row">
           <div className="flex-1">
             <Input
               placeholder="Rechercher par numéro, client, téléphone, destinataire..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              icon={<Search size={18} />}
+              icon={<Search size={16} />}
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:w-48">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="all">Tous les statuts</option>
               {PARCEL_STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -111,13 +119,26 @@ export function ParcelsListPage() {
                 </option>
               ))}
             </Select>
-            <Select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value as 'all' | 'outstanding' | 'paid' | 'paid_origin')} className="sm:w-56">
+            <Select
+              value={paymentFilter}
+              onChange={(e) =>
+                setPaymentFilter(
+                  e.target.value as 'all' | 'outstanding' | 'paid' | 'paid_origin'
+                )
+              }
+            >
               <option value="all">Tous les paiements</option>
               <option value="outstanding">Solde ouvert</option>
               <option value="paid">Payé</option>
               <option value="paid_origin">Payé au départ</option>
             </Select>
-            <Select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'recent' | 'balance' | 'amount')} className="sm:w-48">
+            <Select
+              value={sortBy}
+              onChange={(e) =>
+                setSortBy(e.target.value as 'recent' | 'balance' | 'amount')
+              }
+              className="col-span-2 sm:col-span-1"
+            >
               <option value="recent">Plus récents</option>
               <option value="balance">Plus de solde</option>
               <option value="amount">Plus de montant</option>
@@ -126,22 +147,27 @@ export function ParcelsListPage() {
         </div>
       </Card>
 
+      {/* Data Table */}
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-20" />
+        <Card className="p-4 space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
           ))}
-        </div>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Package size={32} />}
             title="Aucun colis trouvé"
-            description={search || statusFilter !== 'all' ? 'Aucun colis ne correspond à vos critères de recherche.' : 'Commencez par enregistrer votre premier colis.'}
+            description={
+              search || statusFilter !== 'all'
+                ? 'Aucun colis ne correspond à vos critères de recherche.'
+                : 'Commencez par enregistrer votre premier colis.'
+            }
             action={
               !search && statusFilter === 'all' ? (
                 <Link to="/parcels/new" className="btn-primary">
-                  <Plus size={18} />
+                  <Plus size={16} />
                   Nouveau colis
                 </Link>
               ) : undefined
@@ -149,49 +175,81 @@ export function ParcelsListPage() {
           />
         </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <div className="data-table-container">
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/70">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">N° colis</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Client</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Trajet</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Statut</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Solde</th>
+                  <th>N° Colis</th>
+                  <th>Client</th>
+                  <th>Trajet</th>
+                  <th>Statut</th>
+                  <th className="text-right">Montant</th>
+                  <th className="text-right">Solde / Statut</th>
+                  <th className="text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((parcel) => (
-                  <tr key={parcel.id} className="border-t border-slate-100 dark:border-slate-700/60">
-                    <td className="px-4 py-3">
+                  <tr key={parcel.id}>
+                    <td className="font-semibold whitespace-nowrap">
                       <Link to={`/parcels/${parcel.id}`}>
                         <TrackingBadge tracking={parcel.tracking_number} size="sm" />
                       </Link>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                        <UserIcon size={14} className="text-slate-400" />
-                        <span>{parcel.client_name}</span>
+                    <td>
+                      <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <UserIcon size={13} className="text-slate-400 flex-shrink-0" />
+                        <span className="truncate">{parcel.client_name}</span>
                       </div>
+                      {parcel.client_phone && (
+                        <p className="text-[11px] text-slate-400 pl-4">{parcel.client_phone}</p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{parcel.origin} → {parcel.destination}</td>
-                    <td className="px-4 py-3"><Badge className={PARCEL_STATUS_COLORS[parcel.status]}>{PARCEL_STATUS_LABELS[parcel.status]}</Badge></td>
-                    <td className="px-4 py-3">
+                    <td className="text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {parcel.origin} <span className="text-slate-400 font-normal">➔</span>{' '}
+                      {parcel.destination}
+                    </td>
+                    <td>
+                      <Badge className={PARCEL_STATUS_COLORS[parcel.status]}>
+                        {PARCEL_STATUS_LABELS[parcel.status]}
+                      </Badge>
+                    </td>
+                    <td className="text-right font-medium tabular-nums">
+                      {formatCurrency(parcel.total_amount)}
+                    </td>
+                    <td className="text-right tabular-nums">
                       {parcel.payment_condition === 'paid_origin' ? (
-                        <Badge className="bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-300">Payé au départ</Badge>
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          Payé au départ
+                        </Badge>
                       ) : parcel.balance > 0 && parcel.status !== 'cancelled' ? (
-                        <span className="font-semibold text-error-600 dark:text-error-400">{formatCurrency(parcel.balance)}</span>
+                        <span className="font-bold text-error-600 dark:text-error-400">
+                          Reste: {formatCurrency(parcel.balance)}
+                        </span>
                       ) : parcel.status !== 'cancelled' ? (
-                        <Badge className="bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-300">Payé</Badge>
-                      ) : null}
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          Payé
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      <Link
+                        to={`/parcels/${parcel.id}`}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 rounded-md transition-colors"
+                      >
+                        Voir
+                        <ArrowUpRight size={13} />
+                      </Link>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

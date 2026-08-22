@@ -34,6 +34,7 @@ export function AgentsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -60,12 +61,12 @@ export function AgentsPage() {
     loadUsers();
   }, []);
 
-  const filtered = users.filter(
-    (u) =>
-      !search ||
-      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.phone.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users.filter((u) => {
+    const text = `${u.full_name} ${u.phone}`.toLowerCase();
+    const matchesSearch = !search || text.includes(search.toLowerCase());
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
 
   const openCreate = () => {
     setEditUser(null);
@@ -128,101 +129,159 @@ export function AgentsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Agents</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{users.length} comptes</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Gestion des Utilisateurs & Agents
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {users.length} comptes enregistrés dans le système
+          </p>
         </div>
-        <Button onClick={openCreate} className="w-full sm:w-auto">
-          <Plus size={18} />
-          Nouvel agent
+        <Button onClick={openCreate}>
+          <Plus size={16} /> Nouveau compte
         </Button>
       </div>
 
-      <Card className="p-4">
-        <Input
-          placeholder="Rechercher par nom ou téléphone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          icon={<Search size={18} />}
-        />
+      {/* Toolbar */}
+      <Card className="p-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex-1 w-full">
+            <Input
+              placeholder="Rechercher par nom ou numéro de téléphone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              icon={<Search size={16} />}
+            />
+          </div>
+          <Select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="w-full sm:w-48"
+          >
+            <option value="all">Tous les rôles</option>
+            <option value="admin">Directeurs</option>
+            <option value="agent">Agents</option>
+          </Select>
+        </div>
       </Card>
 
+      {/* User Data Table */}
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
-        </div>
+        <Card className="p-4 space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState
             icon={<UserCog size={32} />}
             title="Aucun utilisateur trouvé"
-            action={<Button onClick={openCreate}><Plus size={18} /> Nouvel agent</Button>}
+            action={<Button onClick={openCreate}><Plus size={16} /> Nouveau compte</Button>}
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((u) => (
-            <Card key={u.id} className="p-4">
-              <div className="flex items-start gap-3">
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center font-semibold flex-shrink-0 ${u.role === 'admin' ? 'bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300' : 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300'}`}>
-                  {u.full_name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-slate-900 dark:text-white truncate">{u.full_name}</p>
-                    {u.role === 'admin' && (
-                      <Badge className="bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
-                        <Shield size={12} /> Directeur
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-1 space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {u.phone && <p className="flex items-center gap-1.5"><Phone size={12} /> {u.phone}</p>}
-                    <p>Créé le {formatDate(u.created_at)}</p>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    {u.active ? (
-                      <Badge className="bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-300">
-                        <CheckCircle2 size={12} /> Actif
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-error-100 text-error-700 dark:bg-error-900/40 dark:text-error-300">
-                        <XCircle size={12} /> Désactivé
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-2">
-                <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
-                  <Edit size={14} /> Modifier
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => { setUserToReset(u); setResetOpen(true); }}>
-                  <KeyRound size={14} /> Mot de passe
-                </Button>
-                {u.id !== currentUser?.id && (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u)}>
-                      <Power size={14} /> {u.active ? 'Désactiver' : 'Activer'}
-                    </Button>
-                    {u.role !== 'admin' && (
-                      <Button variant="ghost" size="sm" className="text-error-600 dark:text-error-400" onClick={() => { setUserToDelete(u); setDeleteOpen(true); }}>
-                        <Trash2 size={14} />
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-            </Card>
-          ))}
+        <div className="data-table-container">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Utilisateur</th>
+                  <th>Téléphone</th>
+                  <th>Rôle</th>
+                  <th>Statut</th>
+                  <th>Créé le</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${u.role === 'admin' ? 'bg-accent-100 dark:bg-accent-950/80 text-accent-700 dark:text-accent-300' : 'bg-brand-100 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300'}`}>
+                          {u.full_name.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-slate-900 dark:text-white truncate">
+                          {u.full_name}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td>
+                      {u.phone ? (
+                        <span className="flex items-center gap-1.5 font-medium text-xs text-slate-700 dark:text-slate-300">
+                          <Phone size={12} className="text-slate-400" /> {u.phone}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">—</span>
+                      )}
+                    </td>
+
+                    <td>
+                      {u.role === 'admin' ? (
+                        <Badge className="bg-accent-100 text-accent-700 dark:bg-accent-950/60 dark:text-accent-300">
+                          <Shield size={11} /> Directeur
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-brand-100 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+                          Agent
+                        </Badge>
+                      )}
+                    </td>
+
+                    <td>
+                      {u.active ? (
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          <CheckCircle2 size={11} /> Actif
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                          <XCircle size={11} /> Désactivé
+                        </Badge>
+                      )}
+                    </td>
+
+                    <td className="text-xs text-slate-500 whitespace-nowrap">
+                      {formatDate(u.created_at)}
+                    </td>
+
+                    <td className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Modifier">
+                          <Edit size={14} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setUserToReset(u); setResetOpen(true); }} title="Mot de passe">
+                          <KeyRound size={14} />
+                        </Button>
+                        {u.id !== currentUser?.id && (
+                          <>
+                            <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u)} title={u.active ? 'Désactiver' : 'Activer'}>
+                              <Power size={14} className={u.active ? 'text-amber-600' : 'text-emerald-600'} />
+                            </Button>
+                            {u.role !== 'admin' && (
+                              <Button variant="ghost" size="sm" className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30" onClick={() => { setUserToDelete(u); setDeleteOpen(true); }} title="Supprimer">
+                                <Trash2 size={14} />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Create/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editUser ? 'Modifier le compte' : 'Nouveau compte'} size="md">
-        <div className="space-y-4">
+        <div className="space-y-3">
           <Input
             label="Nom complet *"
             value={form.full_name}
@@ -243,7 +302,7 @@ export function AgentsPage() {
             <option value="admin">Directeur</option>
           </Select>
           <Input
-            label={editUser ? 'Nouveau mot de passe (laisser vide pour ne pas changer)' : 'Mot de passe *'}
+            label={editUser ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe *'}
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -259,10 +318,10 @@ export function AgentsPage() {
               <option value="false">Désactivé</option>
             </Select>
           )}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="btn-secondary">Annuler</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              <Save size={18} /> {editUser ? 'Enregistrer' : 'Créer'}
+              <Save size={16} /> {editUser ? 'Enregistrer' : 'Créer'}
             </button>
           </div>
         </div>
@@ -270,9 +329,9 @@ export function AgentsPage() {
 
       {/* Reset Password Modal */}
       <Modal open={resetOpen} onClose={() => setResetOpen(false)} title="Réinitialiser le mot de passe" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Définissez un nouveau mot de passe pour <span className="font-semibold">{userToReset?.full_name}</span>
+        <div className="space-y-3">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Nouveau mot de passe pour <span className="font-semibold">{userToReset?.full_name}</span>
           </p>
           <Input
             label="Nouveau mot de passe"
@@ -281,9 +340,9 @@ export function AgentsPage() {
             onChange={(e) => setNewPassword(e.target.value)}
             required
           />
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setResetOpen(false)} className="btn-secondary">Annuler</button>
-            <button onClick={handleResetPassword} className="btn-primary">Réinitialiser</button>
+            <button onClick={handleResetPassword} className="btn-primary">Enregistrer</button>
           </div>
         </div>
       </Modal>

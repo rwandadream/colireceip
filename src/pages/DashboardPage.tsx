@@ -22,24 +22,24 @@ import { useAuth } from '../context/AuthContext';
 
 function AgentDashboard({ stats, user }: { stats: DashboardStats; user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
             Tableau de bord · Agent
           </p>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Bonjour, {user.full_name.split(' ')[0]}
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Activité et enregistrements associés à votre compte.
           </p>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Mes colis" value={stats.total_parcels} icon={<Package size={16} />} />
         <StatCard label="Mes clients" value={stats.total_clients} icon={<Users size={16} />} />
         <StatCard label="Mes voyages" value={stats.total_trips} icon={<Truck size={16} />} />
@@ -47,16 +47,16 @@ function AgentDashboard({ stats, user }: { stats: DashboardStats; user: NonNulla
       </div>
 
       {/* Total revenue overview */}
-      <Card className="p-5">
+      <Card className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Montant de vos paiements enregistrés</p>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">
+            <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">
               {formatCurrency(stats.total_revenue)}
             </p>
           </div>
-          <span className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-            <TrendingUp size={20} />
+          <span className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+            <TrendingUp size={18} />
           </span>
         </div>
       </Card>
@@ -97,16 +97,16 @@ export function DashboardPage() {
 
   if (loading || !stats) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-16 w-full" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
+            <Skeleton key={i} className="h-20" />
           ))}
         </div>
-        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-40 w-full" />
         <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
@@ -125,35 +125,35 @@ export function DashboardPage() {
   const deliveryRate = totalParcelsCount > 0 ? Math.round((stats.delivered / totalParcelsCount) * 100) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 1. Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
             Tableau de bord
           </p>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Bonjour, {user?.full_name?.split(' ')[0] || 'Groupe-Gaff'}
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Vue d'ensemble de votre activité logistique.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Link to="/payments/new" className="btn-secondary text-sm">
-            <Wallet size={16} />
+        <div className="flex items-center gap-2">
+          <Link to="/payments/new" className="btn-secondary">
+            <Wallet size={15} />
             <span>Enregistrer paiement</span>
           </Link>
-          <Link to="/parcels/new" className="btn-primary text-sm">
-            <Plus size={16} />
+          <Link to="/parcels/new" className="btn-primary">
+            <Plus size={15} />
             <span>Nouveau colis</span>
           </Link>
         </div>
       </div>
 
       {/* 2. Main KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Total colis" value={stats.total_parcels} icon={<Package size={16} />} />
         <StatCard label="Reçus aujourd'hui" value={stats.received_today} icon={<PackageCheck size={16} />} />
         <StatCard label="Total clients" value={stats.total_clients} icon={<Users size={16} />} />
@@ -161,10 +161,10 @@ export function DashboardPage() {
       </div>
 
       {/* 3. Parcel Status Tracking (Single Unified Section) */}
-      <Card className="p-5 space-y-4">
+      <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
               Suivi logistique des colis
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">

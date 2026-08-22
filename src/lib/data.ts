@@ -26,6 +26,7 @@ import { canUseProductApi, createOnlineProduct, isProductApiUnavailable, listOnl
 import { canUseTripApi, createOnlineTrip, createOnlineTripVehicle, deleteOnlineTrip, deleteOnlineTripVehicle, isTripApiUnavailable, listOnlineTrips, listOnlineTripVehicles, updateOnlineTrip } from './tripPersistence';
 import { canUsePaymentApi, createOnlinePayment, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
 import { canUseParcelApi, createParcelOnline, deleteOnlineParcel, isParcelApiUnavailable, listOnlineParcels, listOnlineStatusHistory, updateOnlineParcelStatus } from './parcelPersistence';
+import { canUseUserApi, createOnlineUser, deleteOnlineUser, isUserApiUnavailable, listOnlineUsers, updateOnlineUser } from './userPersistence';
 
 export async function ensureSeed(): Promise<void> {
   await seedDefaultData();
@@ -144,13 +145,24 @@ export function getTripStatusLabel(status: TripStatus): string {
 // USERS
 // ============================================================
 export async function getUsers(): Promise<User[]> {
+  if (canUseUserApi()) {
+    try {
+      const onlineUsers = await listOnlineUsers();
+      const db = await getDB();
+      for (const u of onlineUsers) {
+        await db.put('users', u);
+      }
+      return onlineUsers;
+    } catch (error) {
+      if (!isUserApiUnavailable(error)) throw error;
+    }
+  }
   const db = await getDB();
   return db.getAll('users');
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
-  const db = await getDB();
-  const all = await db.getAll('users');
+  const all = await getUsers();
   const normalized = email.trim().toLowerCase();
   return all.find((u) => u.email?.toLowerCase() === normalized || u.phone.trim().toLowerCase() === normalized);
 }
@@ -187,21 +199,40 @@ export async function getUserById(id: string): Promise<User | undefined> {
 export async function createUser(
   data: Omit<User, 'id' | 'created_at' | 'updated_at'>
 ): Promise<User> {
+  let createdUser: User | undefined;
+  if (canUseUserApi()) {
+    try {
+      createdUser = await createOnlineUser(data);
+    } catch (error) {
+      if (!isUserApiUnavailable(error)) throw error;
+    }
+  }
+
   const db = await getDB();
-  if (!data.full_name.trim() || !data.phone.trim() || !data.password?.trim()) {
+  if (!data.full_name.trim() || !data.phone.trim() || (!createdUser && !data.password?.trim())) {
     throw new Error('Le nom complet, le téléphone et le mot de passe sont obligatoires.');
   }
-  const users = await db.getAll('users');
-  if (users.some((user) => user.phone.trim() === data.phone.trim())) {
-    throw new Error('Ce numéro de téléphone est déjà utilisé.');
-  }
+
   const now = toISO();
-  const user: User = { ...data, id: generateId(), created_at: now, updated_at: now };
+  const user: User = createdUser || {
+    ...data,
+    id: generateId(),
+    created_at: now,
+    updated_at: now,
+  };
+
   await db.put('users', user);
   return user;
 }
 
 export async function updateUser(id: string, data: Partial<User>): Promise<void> {
+  if (canUseUserApi()) {
+    try {
+      await updateOnlineUser(id, data);
+    } catch (error) {
+      if (!isUserApiUnavailable(error)) throw error;
+    }
+  }
   const db = await getDB();
   const existing = await db.get('users', id);
   if (!existing) return;
@@ -209,6 +240,13 @@ export async function updateUser(id: string, data: Partial<User>): Promise<void>
 }
 
 export async function deleteUser(id: string): Promise<void> {
+  if (canUseUserApi()) {
+    try {
+      await deleteOnlineUser(id);
+    } catch (error) {
+      if (!isUserApiUnavailable(error)) throw error;
+    }
+  }
   const db = await getDB();
   await db.delete('users', id);
 }
