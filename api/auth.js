@@ -3,8 +3,10 @@ import { authenticate, clearSessionCookie, createSessionToken, requireAuthentica
 
 function body(req) {
   if (typeof req.body === 'object' && req.body !== null) return req.body;
-  if (typeof req.body !== 'string') return {};
-  try { return JSON.parse(req.body); } catch { return {}; }
+  if (typeof req.body === 'string' && req.body.trim()) {
+    try { return JSON.parse(req.body); } catch { return {}; }
+  }
+  return {};
 }
 
 export default async function handler(req, res) {
