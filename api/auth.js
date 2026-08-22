@@ -8,7 +8,7 @@ function body(req) {
 }
 
 export default async function handler(req, res) {
-  const action = req.query.action;
+  const action = req.query?.action || (req.url ? new URL(req.url, 'http://localhost').searchParams.get('action') : undefined);
   try {
     if (req.method === 'POST' && action === 'login') {
       const { identifier, password } = body(req);
@@ -28,7 +28,8 @@ export default async function handler(req, res) {
     }
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Méthode non autorisée.' });
-  } catch {
-    return res.status(500).json({ error: 'Une erreur serveur est survenue.' });
+  } catch (error) {
+    console.error('Error in /api/auth handler:', error);
+    return res.status(500).json({ error: error?.message || 'Une erreur serveur est survenue.' });
   }
 }

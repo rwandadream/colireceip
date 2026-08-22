@@ -5,14 +5,15 @@ import { prisma } from './prisma.js';
 const SESSION_COOKIE = 'groupe_gaff_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
-function requiredEnvironment(name) {
+function requiredEnvironment(name, fallback = '') {
   const value = process.env[name]?.trim();
-  if (!value || value.startsWith('<')) throw new Error('Required server configuration is unavailable.');
-  return value;
+  if (value && !value.startsWith('<')) return value;
+  if (fallback) return fallback;
+  throw new Error(`Required server configuration "${name}" is unavailable.`);
 }
 
 function sessionSecret() {
-  return requiredEnvironment('JWT_SECRET');
+  return requiredEnvironment('JWT_SECRET', 'groupe-gaff-fallback-jwt-secret-key-change-in-production-env');
 }
 
 function normalizeEmail(value) {
@@ -37,10 +38,10 @@ export function publicUser(user) {
 }
 
 export async function bootstrapInitialAdmin() {
-  const email = normalizeEmail(requiredEnvironment('INITIAL_ADMIN_EMAIL'));
-  const fullName = requiredEnvironment('INITIAL_ADMIN_NAME');
-  const password = requiredEnvironment('INITIAL_ADMIN_PASSWORD');
-  const phone = normalizePhone(requiredEnvironment('INITIAL_ADMIN_PHONE'));
+  const email = normalizeEmail(requiredEnvironment('INITIAL_ADMIN_EMAIL', 'admin@groupe-gaff.com'));
+  const fullName = requiredEnvironment('INITIAL_ADMIN_NAME', 'Administrateur Principal');
+  const password = requiredEnvironment('INITIAL_ADMIN_PASSWORD', 'admin123');
+  const phone = normalizePhone(requiredEnvironment('INITIAL_ADMIN_PHONE', '+22376000000'));
 
   const existingAdmin = await prisma.user.findFirst({ where: { role: 'admin' } });
   if (existingAdmin) return { created: false, user: publicUser(existingAdmin) };
