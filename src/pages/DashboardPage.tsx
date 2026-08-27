@@ -8,12 +8,15 @@ import {
   TrendingUp,
   Plus,
   ArrowRight,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getDashboardStats, getParcels } from '../lib/data';
 import type { DashboardStats, Parcel } from '../lib/types';
 import { StatCard } from '../components/ui/Card';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { Badge, Skeleton } from '../components/ui/Badge';
 import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS } from '../lib/types';
 import { formatCurrency } from '../lib/format';
@@ -69,9 +72,13 @@ export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentParcels, setRecentParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setLoadError(false);
+    setLoading(true);
 
     (async () => {
       try {
@@ -85,6 +92,7 @@ export function DashboardPage() {
         setRecentParcels(parcelsData.slice(0, 5));
       } catch (error) {
         console.error('Erreur de chargement du tableau de bord:', error);
+        if (active) setLoadError(true);
       } finally {
         if (active) setLoading(false);
       }
@@ -93,9 +101,9 @@ export function DashboardPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-12 w-full" />
@@ -107,6 +115,25 @@ export function DashboardPage() {
         <Skeleton className="h-28 w-full" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+
+  if (!stats || loadError) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-6 flex flex-col items-center justify-center text-center gap-3">
+          <AlertCircle size={32} className="text-error-500" />
+          <div>
+            <p className="font-bold text-slate-900 dark:text-white">Impossible de charger le tableau de bord</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Vérifiez votre connexion puis réessayez.
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => setReloadKey((key) => key + 1)}>
+            <RefreshCw size={15} /> Réessayer
+          </Button>
+        </Card>
       </div>
     );
   }

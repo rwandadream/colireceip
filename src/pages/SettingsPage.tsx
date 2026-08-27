@@ -22,6 +22,7 @@ import type { AppSettings, ActivityLog } from '../lib/types';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Card } from '../components/ui/Card';
+import { OfflineNotice } from '../components/ui/OfflineNotice';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Skeleton } from '../components/ui/Badge';
@@ -156,6 +157,7 @@ export function SettingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      <OfflineNotice />
       <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
         <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Paramètres Système</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Configuration générale et préférences de l'entreprise</p>

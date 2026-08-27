@@ -3,6 +3,7 @@ import { ScrollText, Search } from 'lucide-react';
 import { getActivityLogs, getUsers } from '../lib/data';
 import type { ActivityLog, User } from '../lib/types';
 import { Card } from '../components/ui/Card';
+import { OfflineNotice } from '../components/ui/OfflineNotice';
 import { EmptyState, Skeleton } from '../components/ui/Badge';
 import { Input, Select } from '../components/ui/Input';
 import { formatDateTime, timeAgo } from '../lib/format';
@@ -44,6 +45,7 @@ export function LogsPage() {
 
   return (
     <div className="space-y-4">
+      <OfflineNotice />
       {/* Header */}
       <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
         <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">

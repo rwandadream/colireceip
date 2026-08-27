@@ -16,7 +16,8 @@
     "test-payment-idempotency": "node scripts/test-payment-idempotency.mjs",
     "test-payment-persistence": "node scripts/test-payment-persistence.mjs",
     "test-sync-logic": "node --experimental-strip-types scripts/test-sync-logic.mjs",
-    "test-sync-engine": "node scripts/test-sync-engine.mjs"
+    "test-sync-engine": "node scripts/test-sync-engine.mjs",
+    "test-tracking-collision": "node scripts/test-tracking-collision.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

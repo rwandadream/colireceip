@@ -21,6 +21,7 @@ import {
 import type { Attachment, TripExpense, ExpenseCategory, Parcel } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
+import { OfflineNotice } from '../../components/ui/OfflineNotice';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
@@ -270,6 +271,7 @@ export function ExpensesPage() {
 
   return (
     <div className="space-y-6">
+      <OfflineNotice />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dépenses</h1>

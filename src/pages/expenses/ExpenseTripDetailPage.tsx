@@ -4,6 +4,7 @@ import { Printer } from 'lucide-react';
 import { getParcelById, getExpensesByParcelId } from '../../lib/data';
 import type { Parcel, TripExpense } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
+import { OfflineNotice } from '../../components/ui/OfflineNotice';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { TrackingBadge } from '../../components/ui/TrackingBadge';
@@ -68,6 +69,7 @@ export function ExpenseTripDetailPage() {
 
   return (
     <div className="space-y-6">
+      <OfflineNotice />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Détail du voyage</h1>

@@ -23,6 +23,7 @@ import {
 import type { User, UserRole } from '../lib/types';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
+import { OfflineNotice } from '../components/ui/OfflineNotice';
 import { Badge, EmptyState, Skeleton } from '../components/ui/Badge';
 import { Input, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -130,6 +131,7 @@ export function AgentsPage() {
 
   return (
     <div className="space-y-4">
+      <OfflineNotice />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
