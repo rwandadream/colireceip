@@ -1,4 +1,5 @@
 import type { Payment } from './types';
+import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
 
 export type PaymentCreateInput = Pick<Payment, 'parcel_id' | 'amount' | 'payment_method' | 'payment_date' | 'note'>;
 
@@ -14,7 +15,7 @@ const toSnake = (value: unknown): unknown => {
 };
 
 export const canUsePaymentApi = (): boolean => typeof navigator !== 'undefined' && navigator.onLine;
-export const isPaymentApiUnavailable = (error: unknown): boolean => error instanceof TypeError;
+export const isPaymentApiUnavailable = (error: unknown): boolean => isTransientApiError(error);
 
 const toPayment = (value: unknown): Payment => {
   const converted = toSnake(value) as Payment & { recorded_by_id?: string; recorded_by_name?: string };
@@ -26,34 +27,21 @@ export function createPaymentIdempotencyKey(): string {
   return `payment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-const request = async (method: 'GET' | 'POST' | 'DELETE', body?: PaymentCreateInput, idempotencyKey?: string, paymentId?: string): Promise<unknown> => {
+const request = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unknown, idempotencyKey?: string, paymentId?: string): Promise<unknown> => {
   const headers: Record<string, string> = {};
   if (body) headers['Content-Type'] = 'application/json';
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   
   const url = paymentId ? `/api/data?resource=payments&id=${encodeURIComponent(paymentId)}` : '/api/data?resource=payments';
   
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method,
     credentials: 'same-origin',
     headers,
-    body: body ? JSON.stringify({
-      parcelId: body.parcel_id,
-      amount: body.amount,
-      paymentMethod: body.payment_method,
-      paymentDate: body.payment_date,
-      note: body.note,
-    }) : undefined,
+    body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    let message = `API_${response.status}`;
-    try {
-      const payload = await response.json() as { error?: unknown };
-      if (typeof payload.error === 'string' && payload.error) message += `: ${payload.error}`;
-    } catch {
-      // Keep the HTTP status when the error response has no JSON body.
-    }
-    throw new Error(message);
+    throw new ApiError(response.status, `API_${response.status}`);
   }
   // 204 No Content is OK; no JSON body expected.
   if (response.status === 204) return null;
@@ -66,8 +54,26 @@ export async function listOnlinePayments(): Promise<Payment[]> {
 
 // A caller may provide this key when deliberately retrying the same operation.
 // This adapter never retries a payment automatically.
-export async function createOnlinePayment(data: PaymentCreateInput, idempotencyKey = createPaymentIdempotencyKey()): Promise<Payment> {
-  return toPayment(await request('POST', data, idempotencyKey));
+export async function createOnlinePayment(data: PaymentCreateInput, idempotencyKey = createPaymentIdempotencyKey(), id?: string): Promise<Payment> {
+  return toPayment(await request('POST', {
+    ...(id ? { id } : {}),
+    parcelId: data.parcel_id,
+    amount: data.amount,
+    paymentMethod: data.payment_method,
+    paymentDate: data.payment_date,
+    note: data.note,
+  }, idempotencyKey));
+}
+
+export async function updateOnlinePayment(paymentId: string, data: { note?: string; payment_method?: Payment['payment_method'] }): Promise<Payment> {
+  return toPayment(await request('PATCH', {
+    ...(data.note !== undefined ? { note: data.note } : {}),
+    ...(data.payment_method !== undefined ? { paymentMethod: data.payment_method } : {}),
+  }, undefined, paymentId));
+}
+
+export async function deleteOnlinePayment(paymentId: string): Promise<void> {
+  await request('DELETE', undefined, undefined, paymentId);
 }
 
 

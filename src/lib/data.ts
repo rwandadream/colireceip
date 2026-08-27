@@ -1,4 +1,5 @@
 import { getDB, seedDefaultData } from './db';
+import { createOfflineVerifier, storeUserVerifier, normalizeIdentifier } from './authVerifier';
 import type {
   User,
   Client,
@@ -21,15 +22,46 @@ import type {
 } from './types';
 import { generateId, generateTrackingNumber, isToday, toISO } from './format';
 import { AUTH_STORAGE_KEYS, readStorageJson } from './storage';
-import { canUseClientApi, createOnlineClient, deleteOnlineClient, isApiUnavailable, listOnlineClients, updateOnlineClient } from './clientPersistence';
-import { canUseProductApi, createOnlineProduct, isProductApiUnavailable, listOnlineProducts, updateOnlineProduct } from './productPersistence';
-import { canUseTripApi, createOnlineTrip, createOnlineTripVehicle, deleteOnlineTrip, deleteOnlineTripVehicle, isTripApiUnavailable, listOnlineTrips, listOnlineTripVehicles, updateOnlineTrip } from './tripPersistence';
-import { canUsePaymentApi, createOnlinePayment, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
-import { canUseParcelApi, createParcelOnline, deleteOnlineParcel, isParcelApiUnavailable, listOnlineParcels, listOnlineStatusHistory, updateOnlineParcelStatus } from './parcelPersistence';
+import { canUseClientApi, isApiUnavailable, listOnlineClients } from './clientPersistence';
+import { canUseProductApi, isProductApiUnavailable, listOnlineProducts } from './productPersistence';
+import { canUseTripApi, isTripApiUnavailable, listOnlineTripVehicles, listOnlineTrips } from './tripPersistence';
+import { canUsePaymentApi, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
+import { canUseParcelApi, isParcelApiUnavailable, listOnlineParcels, listOnlineStatusHistory } from './parcelPersistence';
 import { canUseUserApi, createOnlineUser, deleteOnlineUser, isUserApiUnavailable, listOnlineUsers, updateOnlineUser } from './userPersistence';
+import { enqueueMutation, hasProtectedMutation, listProtectedTargets, mergeLocalPending } from './syncQueue';
+import { requestSync } from './syncEngine';
+import { refreshClients, refreshParcels, refreshPayments, refreshProducts, refreshTrips, reconcileParcelFromPayments } from './localCache';
+import type { SyncEntity } from './syncTypes';
 
 export async function ensureSeed(): Promise<void> {
   await seedDefaultData();
+}
+
+function notifySync(): void {
+  void requestSync();
+}
+
+function pickChanged<T extends object>(
+  previous: T,
+  next: T,
+  keys: Array<keyof T & string>
+): Record<string, unknown> {
+  const changed: Record<string, unknown> = {};
+  for (const key of keys) {
+    const before = (previous as Record<string, unknown>)[key];
+    const after = (next as Record<string, unknown>)[key];
+    if (after !== undefined && after !== before) changed[key] = after;
+  }
+  return changed;
+}
+
+async function collectProtectedIds(entity: SyncEntity, ids: string[]): Promise<Set<string>> {
+  const map = await listProtectedTargets();
+  const set = new Set<string>();
+  for (const id of ids) {
+    if (map.has(`${entity}:${id}`)) set.add(id);
+  }
+  return set;
 }
 
 // ============================================================
@@ -37,7 +69,18 @@ export async function ensureSeed(): Promise<void> {
 // ============================================================
 export async function getTrips(): Promise<Trip[]> {
   if (canUseTripApi()) {
-    try { return await listOnlineTrips(); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+    try {
+      const server = await listOnlineTrips();
+      const vehicles = server.flatMap((trip) => (trip as Trip & { vehicles?: TripVehicle[] }).vehicles ?? []);
+      await refreshTrips(server, vehicles);
+      const db = await getDB();
+      const local = await db.getAll('trips');
+      const protectedIds = await collectProtectedIds('trips', local.map((t) => t.id));
+      const user = getAuthenticatedUser();
+      return mergeLocalPending(server, local, protectedIds)
+        .filter((trip) => canAccessOwnedRecord(user, trip.created_by))
+        .sort((a, b) => b.trip_date.localeCompare(a.trip_date));
+    } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
   const user = getAuthenticatedUser();
@@ -46,18 +89,11 @@ export async function getTrips(): Promise<Trip[]> {
 }
 
 export async function getTripById(id: string): Promise<Trip | undefined> {
-  if (canUseTripApi()) {
-    try { return (await listOnlineTrips()).find((trip) => trip.id === id); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
-  }
-  const db = await getDB();
-  const trip = await db.get('trips', id);
-  return trip && canAccessOwnedRecord(getAuthenticatedUser(), trip.created_by) ? trip : undefined;
+  const all = await getTrips();
+  return all.find((trip) => trip.id === id);
 }
 
 export async function createTrip(data: Omit<Trip, 'id' | 'created_at' | 'updated_at'>): Promise<Trip> {
-  if (canUseTripApi()) {
-    try { return await createOnlineTrip(data); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const now = toISO();
   const user = getAuthenticatedUser();
@@ -70,38 +106,56 @@ export async function createTrip(data: Omit<Trip, 'id' | 'created_at' | 'updated
     updated_at: now,
   };
   await db.put('trips', trip);
+  await enqueueMutation({ entity: 'trips', entityId: trip.id, action: 'create', payload: { ...trip } });
+  notifySync();
   return trip;
 }
 
 export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip | undefined> {
-  if (canUseTripApi()) {
-    try { return await updateOnlineTrip(id, data); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const existing = await db.get('trips', id);
   if (!existing) return undefined;
   requireOwnedAccess(existing.created_by);
   const trip = { ...existing, ...data, id, updated_at: toISO() };
   await db.put('trips', trip);
+  const changed = pickChanged(existing, trip, ['trip_number', 'trip_date', 'origin', 'destination', 'status']);
+  if (Object.keys(changed).length > 0) {
+    await enqueueMutation({ entity: 'trips', entityId: id, action: 'update', payload: changed });
+    notifySync();
+  }
   return trip;
 }
 
 export async function deleteTrip(id: string): Promise<void> {
-  if (canUseTripApi()) {
-    try { await deleteOnlineTrip(id); return; } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const existing = await db.get('trips', id);
   if (!existing) return;
   requireOwnedAccess(existing.created_by);
-  await db.delete('trips', id);
-  const vehicles = await getTripVehicles(id);
+  const vehicles = await db.getAllFromIndex('trip_vehicles', 'by-trip', id);
   for (const vehicle of vehicles) await db.delete('trip_vehicles', vehicle.id);
+  await db.delete('trips', id);
+  // Vehicles must be removed first on the server (foreign key).
+  for (const vehicle of vehicles) {
+    await enqueueMutation({ entity: 'trip-vehicles', entityId: vehicle.id, action: 'delete', payload: {} });
+  }
+  await enqueueMutation({ entity: 'trips', entityId: id, action: 'delete', payload: {} });
+  notifySync();
 }
 
 export async function getTripVehicles(tripId: string): Promise<TripVehicle[]> {
   if (canUseTripApi()) {
-    try { return await listOnlineTripVehicles(tripId); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+    try {
+      const server = await listOnlineTripVehicles(tripId);
+      const db = await getDB();
+      for (const vehicle of server) {
+        if (!(await hasProtectedMutation('trip-vehicles', vehicle.id))) {
+          await db.put('trip_vehicles', vehicle);
+        }
+      }
+      const local = await db.getAllFromIndex('trip_vehicles', 'by-trip', tripId);
+      const protectedIds = await collectProtectedIds('trip-vehicles', local.map((v) => v.id));
+      return mergeLocalPending(server, local, protectedIds).sort((a, b) => a.vehicle_number - b.vehicle_number);
+    } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
   if (!(await getTripById(tripId))) return [];
@@ -112,24 +166,22 @@ export async function getTripVehicles(tripId: string): Promise<TripVehicle[]> {
 export async function createTripVehicle(
   data: Omit<TripVehicle, 'id' | 'vehicle_number' | 'created_at' | 'updated_at'>
 ): Promise<TripVehicle> {
-  if (canUseTripApi()) {
-    try { return await createOnlineTripVehicle(data); } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
-  const existing = await getTripVehicles(data.trip_id);
+  const existing = await db.getAllFromIndex('trip_vehicles', 'by-trip', data.trip_id);
   const vehicle_number = existing.reduce((max, vehicle) => Math.max(max, vehicle.vehicle_number), 0) + 1;
   const now = toISO();
   const vehicle: TripVehicle = { ...data, id: generateId(), vehicle_number, created_at: now, updated_at: now };
   await db.put('trip_vehicles', vehicle);
+  await enqueueMutation({ entity: 'trip-vehicles', entityId: vehicle.id, action: 'create', payload: { ...vehicle } });
+  notifySync();
   return vehicle;
 }
 
 export async function deleteTripVehicle(id: string): Promise<void> {
-  if (canUseTripApi()) {
-    try { await deleteOnlineTripVehicle(id); return; } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   await db.delete('trip_vehicles', id);
+  await enqueueMutation({ entity: 'trip-vehicles', entityId: id, action: 'delete', payload: {} });
+  notifySync();
 }
 
 export async function getParcelsByTripId(tripId: string): Promise<Parcel[]> {
@@ -163,8 +215,11 @@ export async function getUsers(): Promise<User[]> {
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   const all = await getUsers();
-  const normalized = email.trim().toLowerCase();
-  return all.find((u) => u.email?.toLowerCase() === normalized || u.phone.trim().toLowerCase() === normalized);
+  const query = normalizeIdentifier(email);
+  return all.find((u) =>
+    (u.email ? normalizeIdentifier(u.email) === query : false) ||
+    normalizeIdentifier(u.phone) === query
+  );
 }
 
 function requireDirectorAccess(): void {
@@ -199,6 +254,7 @@ export async function getUserById(id: string): Promise<User | undefined> {
 export async function createUser(
   data: Omit<User, 'id' | 'created_at' | 'updated_at'>
 ): Promise<User> {
+  const password = typeof data.password === 'string' ? data.password.trim() : '';
   let createdUser: User | undefined;
   if (canUseUserApi()) {
     try {
@@ -209,7 +265,7 @@ export async function createUser(
   }
 
   const db = await getDB();
-  if (!data.full_name.trim() || !data.phone.trim() || (!createdUser && !data.password?.trim())) {
+  if (!data.full_name.trim() || !data.phone.trim() || (!createdUser && !password)) {
     throw new Error('Le nom complet, le téléphone et le mot de passe sont obligatoires.');
   }
 
@@ -221,11 +277,15 @@ export async function createUser(
     updated_at: now,
   };
 
-  await db.put('users', user);
+  await db.put('users', toStoredUser(user));
+  if (password && !createdUser) {
+    await storeUserVerifier(user, password);
+  }
   return user;
 }
 
 export async function updateUser(id: string, data: Partial<User>): Promise<void> {
+  const password = typeof data.password === 'string' ? data.password.trim() : '';
   if (canUseUserApi()) {
     try {
       await updateOnlineUser(id, data);
@@ -236,7 +296,23 @@ export async function updateUser(id: string, data: Partial<User>): Promise<void>
   const db = await getDB();
   const existing = await db.get('users', id);
   if (!existing) return;
-  await db.put('users', { ...existing, ...data, id, updated_at: toISO() });
+  await db.put('users', toStoredUser({ ...existing, ...data, id, updated_at: toISO() }));
+  if (password) {
+    const identifiers = new Set<string>();
+    if (existing.email) identifiers.add(normalizeIdentifier(existing.email));
+    if (existing.phone) identifiers.add(normalizeIdentifier(existing.phone));
+    if (data.email) identifiers.add(normalizeIdentifier(data.email));
+    if (data.phone) identifiers.add(normalizeIdentifier(data.phone));
+    for (const identifier of identifiers) {
+      if (identifier) await createOfflineVerifier(identifier, password);
+    }
+  }
+}
+
+function toStoredUser(user: User): User {
+  const stored: User = { ...user };
+  delete (stored as User & { password?: string }).password;
+  return stored;
 }
 
 export async function deleteUser(id: string): Promise<void> {
@@ -256,7 +332,14 @@ export async function deleteUser(id: string): Promise<void> {
 // ============================================================
 export async function getClients(): Promise<Client[]> {
   if (canUseClientApi()) {
-    try { return await listOnlineClients(); } catch (error) { if (!isApiUnavailable(error)) throw error; }
+    try {
+      const server = await listOnlineClients();
+      await refreshClients(server);
+      const db = await getDB();
+      const local = await db.getAll('clients');
+      const protectedIds = await collectProtectedIds('clients', local.map((c) => c.id));
+      return mergeLocalPending(server, local, protectedIds).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    } catch (error) { if (!isApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
   const all = await db.getAll('clients');
@@ -264,19 +347,13 @@ export async function getClients(): Promise<Client[]> {
 }
 
 export async function getClientById(id: string): Promise<Client | undefined> {
-  if (canUseClientApi()) {
-    try { return (await listOnlineClients()).find((client) => client.id === id); } catch (error) { if (!isApiUnavailable(error)) throw error; }
-  }
-  const db = await getDB();
-  return db.get('clients', id);
+  const all = await getClients();
+  return all.find((client) => client.id === id);
 }
 
 export async function createClient(
   data: Omit<Client, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Client> {
-  if (canUseClientApi()) {
-    try { return await createOnlineClient(data); } catch (error) { if (!isApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const now = toISO();
   const user = getAuthenticatedUser();
@@ -289,18 +366,23 @@ export async function createClient(
     updated_at: now,
   };
   await db.put('clients', client);
+  await enqueueMutation({ entity: 'clients', entityId: client.id, action: 'create', payload: { ...client } });
+  notifySync();
   return client;
 }
 
 export async function updateClient(id: string, data: Partial<Client>): Promise<void> {
-  if (canUseClientApi()) {
-    try { await updateOnlineClient(id, data); return; } catch (error) { if (!isApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const existing = await db.get('clients', id);
   if (!existing) return;
   requireOwnedAccess(existing.created_by);
-  await db.put('clients', { ...existing, ...data, id, updated_at: toISO() });
+  const updated = { ...existing, ...data, id, updated_at: toISO() };
+  await db.put('clients', updated);
+  const changed = pickChanged(existing, updated, ['full_name', 'phone', 'company_name', 'email', 'city', 'neighborhood', 'address', 'reference', 'notes']);
+  if (Object.keys(changed).length > 0) {
+    await enqueueMutation({ entity: 'clients', entityId: id, action: 'update', payload: changed });
+    notifySync();
+  }
 }
 
 export async function getRelatedDataForClient(clientId: string): Promise<{ parcels: Parcel[]; payments: Payment[] }> {
@@ -313,14 +395,13 @@ export async function getRelatedDataForClient(clientId: string): Promise<{ parce
 }
 
 export async function deleteClient(id: string): Promise<void> {
-  if (canUseClientApi()) {
-    try { await deleteOnlineClient(id); return; } catch (error) { if (!isApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const existing = await db.get('clients', id);
   if (!existing) return;
   requireOwnedAccess(existing.created_by);
   await db.delete('clients', id);
+  await enqueueMutation({ entity: 'clients', entityId: id, action: 'delete', payload: {} });
+  notifySync();
 }
 
 // ============================================================
@@ -429,7 +510,14 @@ export async function deleteTripExpense(id: string): Promise<void> {
 // ============================================================
 export async function getParcels(): Promise<Parcel[]> {
   if (canUseParcelApi()) {
-    try { return await listOnlineParcels(); } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
+    try {
+      const server = await listOnlineParcels();
+      await refreshParcels(server);
+      const db = await getDB();
+      const local = await db.getAll('parcels');
+      const protectedIds = await collectProtectedIds('parcels', local.map((p) => p.id));
+      return mergeLocalPending(server, local, protectedIds).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
   const all = await db.getAll('parcels');
@@ -437,16 +525,13 @@ export async function getParcels(): Promise<Parcel[]> {
 }
 
 export async function getParcelById(id: string): Promise<Parcel | undefined> {
-  if (canUseParcelApi()) {
-    try { return (await listOnlineParcels()).find((parcel) => parcel.id === id); } catch (error) { if (!isParcelApiUnavailable(error)) throw error; }
-  }
-  const db = await getDB();
-  return db.get('parcels', id);
+  const all = await getParcels();
+  return all.find((parcel) => parcel.id === id);
 }
 
 export async function getParcelByTracking(tracking: string): Promise<Parcel | undefined> {
-  const db = await getDB();
-  return db.getFromIndex('parcels', 'by-tracking', tracking);
+  const all = await getParcels();
+  return all.find((parcel) => parcel.tracking_number === tracking);
 }
 
 export async function getParcelItems(parcelId: string): Promise<ParcelItem[]> {
@@ -457,7 +542,14 @@ export async function getParcelItems(parcelId: string): Promise<ParcelItem[]> {
 
 export async function getProducts(): Promise<Product[]> {
   if (canUseProductApi()) {
-    try { return await listOnlineProducts(); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
+    try {
+      const server = await listOnlineProducts();
+      await refreshProducts(server);
+      const db = await getDB();
+      const local = await db.getAll('products');
+      const protectedIds = await collectProtectedIds('products', local.map((p) => p.id));
+      return mergeLocalPending(server, local, protectedIds).sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
   const all = await db.getAll('products');
@@ -465,58 +557,52 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 export async function getProductById(id: string): Promise<Product | undefined> {
-  if (canUseProductApi()) {
-    try { return (await listOnlineProducts()).find((product) => product.id === id); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
-  }
-  const db = await getDB();
-  return db.get('products', id);
+  const all = await getProducts();
+  return all.find((product) => product.id === id);
 }
 
 export async function getProductByName(name: string): Promise<Product | undefined> {
-  if (canUseProductApi()) {
-    try { return (await listOnlineProducts()).find((product) => product.name === name); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
-  }
-  const db = await getDB();
-  return db.getFromIndex('products', 'by-name', name);
+  const all = await getProducts();
+  return all.find((product) => product.name === name);
 }
 
 export async function createProduct(
   data: Omit<Product, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Product> {
-  if (canUseProductApi()) {
-    try { return await createOnlineProduct(data); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const now = toISO();
   const product: Product = { ...data, id: generateId(), created_at: now, updated_at: now };
   await db.put('products', product);
+  await enqueueMutation({ entity: 'products', entityId: product.id, action: 'create', payload: { ...product } });
+  notifySync();
   return product;
 }
 
 export async function updateProduct(id: string, data: Partial<Product>): Promise<Product | undefined> {
-  if (canUseProductApi()) {
-    try { return await updateOnlineProduct(id, data); } catch (error) { if (!isProductApiUnavailable(error)) throw error; }
-  }
   const db = await getDB();
   const existing = await db.get('products', id);
   if (!existing) return undefined;
   const product = { ...existing, ...data, id, updated_at: toISO() };
   await db.put('products', product);
+  const changed = pickChanged(existing, product, ['name', 'category', 'default_price']);
+  if (Object.keys(changed).length > 0) {
+    await enqueueMutation({ entity: 'products', entityId: id, action: 'update', payload: changed });
+    notifySync();
+  }
   return product;
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('products', id);
+  await enqueueMutation({ entity: 'products', entityId: id, action: 'delete', payload: {} });
+  notifySync();
 }
 
 export async function createParcel(
   data: Omit<Parcel, 'id' | 'tracking_number' | 'total_amount' | 'balance' | 'created_at' | 'updated_at'>,
   items: Array<{ product_id?: string; designation: string; quantity: number; unit_price: number }> = []
 ): Promise<Parcel> {
-  if (canUseParcelApi()) {
-    try {
-      const res = await createParcelOnline(data, items);
-      return res.parcel;
-    } catch (error) {
-      if (!isParcelApiUnavailable(error)) throw error;
-    }
-  }
   const db = await getDB();
   const all = await db.getAll('parcels');
   const tracking = generateTrackingNumber(all.map((p) => p.tracking_number));
@@ -539,6 +625,33 @@ export async function createParcel(
     updated_at: now,
   };
   await db.put('parcels', parcel);
+  const localItems: ParcelItem[] = items.map((item) => ({
+    id: generateId(),
+    parcel_id: parcel.id,
+    product_id: item.product_id,
+    designation: item.designation,
+    quantity: Number(item.quantity) || 0,
+    unit_price: Number(item.unit_price) || 0,
+    amount: (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+    created_at: now,
+    updated_at: now,
+  }));
+  for (const item of localItems) await db.put('parcel_items', item);
+  await enqueueMutation({
+    entity: 'parcels',
+    entityId: parcel.id,
+    action: 'create',
+    payload: {
+      parcel: { ...parcel },
+      items: items.map((item) => ({
+        product_id: item.product_id,
+        designation: item.designation,
+        quantity: Number(item.quantity) || 0,
+        unit_price: Number(item.unit_price) || 0,
+      })),
+    },
+  });
+  notifySync();
   return parcel;
 }
 
@@ -554,6 +667,16 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
   const condition = updated.payment_condition || existing.payment_condition;
   updated.balance = condition === 'paid_origin' ? 0 : Math.max(updated.total_amount - amountPaid, 0);
   await db.put('parcels', updated);
+  const payload: Record<string, unknown> = {};
+  if (data.description !== undefined) payload.description = data.description;
+  if (data.status !== undefined && data.status !== existing.status) {
+    payload.status = data.status;
+    payload.expectedStatus = existing.status;
+  }
+  if (Object.keys(payload).length > 0) {
+    await enqueueMutation({ entity: 'parcels', entityId: id, action: 'update', payload });
+    notifySync();
+  }
 }
 
 export async function getRelatedDataForParcel(parcelId: string): Promise<{
@@ -586,21 +709,13 @@ async function deleteParcelLocalCache(id: string): Promise<void> {
 }
 
 export async function deleteParcel(id: string): Promise<void> {
-  if (canUseParcelApi()) {
-    try {
-      await deleteOnlineParcel(id);
-      await deleteParcelLocalCache(id);
-      return;
-    } catch (error) {
-      if (!isParcelApiUnavailable(error)) throw error;
-    }
-  }
-
   const db = await getDB();
   const existing = await db.get('parcels', id);
   if (!existing) return;
   requireOwnedAccess(existing.registered_by === getAuthenticatedUser()?.id ? existing.registered_by : existing.agent_id);
   await deleteParcelLocalCache(id);
+  await enqueueMutation({ entity: 'parcels', entityId: id, action: 'delete', payload: {} });
+  notifySync();
 }
 
 async function updateParcelStatusLocal(
@@ -629,7 +744,7 @@ async function updateParcelStatusLocal(
     updates.delivery_date = now;
   }
 
-  await updateParcel(parcelId, updates);
+  await db.put('parcels', { ...parcel, ...updates });
 
   const history: StatusHistory = {
     id: generateId(),
@@ -652,16 +767,19 @@ export async function updateParcelStatus(
   userName: string,
   note = ''
 ): Promise<void> {
-  if (canUseParcelApi()) {
-    try {
-      await updateOnlineParcelStatus(parcelId, newStatus, note);
-      return;
-    } catch (error) {
-      if (!isParcelApiUnavailable(error)) throw error;
-    }
-  }
-
+  const db = await getDB();
+  const parcel = await db.get('parcels', parcelId);
+  if (!parcel) return;
+  const previousStatus = parcel.status;
   await updateParcelStatusLocal(parcelId, newStatus, userId, userName, note);
+  if (previousStatus === newStatus) return;
+  await enqueueMutation({
+    entity: 'parcels',
+    entityId: parcelId,
+    action: 'update',
+    payload: { status: newStatus, note, expectedStatus: previousStatus },
+  });
+  notifySync();
 }
 
 // ============================================================
@@ -672,7 +790,14 @@ export async function updateParcelStatus(
 // ============================================================
 export async function getPayments(): Promise<Payment[]> {
   if (canUsePaymentApi()) {
-    try { return await listOnlinePayments(); } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
+    try {
+      const server = await listOnlinePayments();
+      await refreshPayments(server);
+      const db = await getDB();
+      const local = await db.getAll('payments');
+      const protectedIds = await collectProtectedIds('payments', local.map((p) => p.id));
+      return mergeLocalPending(server, local, protectedIds).sort((a, b) => b.payment_date.localeCompare(a.payment_date));
+    } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
   const all = await db.getAll('payments');
@@ -680,38 +805,18 @@ export async function getPayments(): Promise<Payment[]> {
 }
 
 export async function getPaymentsByParcel(parcelId: string): Promise<Payment[]> {
-  if (canUsePaymentApi()) {
-    try { return (await listOnlinePayments()).filter((payment) => payment.parcel_id === parcelId); } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
-  }
-  const db = await getDB();
-  if (!(await getParcelById(parcelId))) return [];
-  const all = await db.getAllFromIndex('payments', 'by-parcel', parcelId);
-  return all.sort((a, b) => b.payment_date.localeCompare(a.payment_date));
+  const all = await getPayments();
+  return all.filter((payment) => payment.parcel_id === parcelId);
 }
 
 export async function getPaymentsByClient(clientId: string): Promise<Payment[]> {
-  if (canUsePaymentApi()) {
-    try { return (await listOnlinePayments()).filter((payment) => payment.client_id === clientId); } catch (error) { if (!isPaymentApiUnavailable(error)) throw error; }
-  }
-  const db = await getDB();
-  if (!(await getClientById(clientId))) return [];
-  return db.getAllFromIndex('payments', 'by-client', clientId);
+  const all = await getPayments();
+  return all.filter((payment) => payment.client_id === clientId);
 }
 
 export async function createPayment(
   data: Omit<Payment, 'id' | 'created_at'>
 ): Promise<Payment> {
-  if (canUsePaymentApi()) {
-    // A failed online request may have committed server-side; never write an
-    // IndexedDB duplicate as a fallback after attempting it.
-    return createOnlinePayment({
-      parcel_id: data.parcel_id,
-      amount: data.amount,
-      payment_method: data.payment_method,
-      payment_date: data.payment_date,
-      note: data.note,
-    });
-  }
   const db = await getDB();
   const user = getAuthenticatedUser();
   const payment: Payment = {
@@ -726,11 +831,43 @@ export async function createPayment(
   requireOwnedAccess(parcel.registered_by === user?.id ? parcel.registered_by : parcel.agent_id);
   await db.put('payments', payment);
 
-  if (parcel) {
-    const newAmountPaid = (parcel.amount_paid || 0) + data.amount;
-    await updateParcel(parcel.id, { amount_paid: newAmountPaid });
-  }
+  const newAmountPaid = (parcel.amount_paid || 0) + data.amount;
+  const condition = parcel.payment_condition;
+  await db.put('parcels', {
+    ...parcel,
+    amount_paid: newAmountPaid,
+    balance: condition === 'paid_origin' ? 0 : Math.max((parcel.total_amount || 0) - newAmountPaid, 0),
+    updated_at: toISO(),
+  });
+
+  await enqueueMutation({ entity: 'payments', entityId: payment.id, action: 'create', payload: { ...payment } });
+  notifySync();
   return payment;
+}
+
+export async function updatePayment(id: string, data: { note?: string; payment_method?: Payment['payment_method'] }): Promise<void> {
+  const db = await getDB();
+  const existing = await db.get('payments', id);
+  if (!existing) return;
+  const updated = { ...existing, ...data };
+  await db.put('payments', updated);
+  const payload: Record<string, unknown> = {};
+  if (data.note !== undefined && data.note !== existing.note) payload.note = data.note;
+  if (data.payment_method !== undefined && data.payment_method !== existing.payment_method) payload.payment_method = data.payment_method;
+  if (Object.keys(payload).length > 0) {
+    await enqueueMutation({ entity: 'payments', entityId: id, action: 'update', payload });
+    notifySync();
+  }
+}
+
+export async function deletePayment(id: string): Promise<void> {
+  const db = await getDB();
+  const existing = await db.get('payments', id);
+  if (!existing) return;
+  await db.delete('payments', id);
+  if (existing.parcel_id) await reconcileParcelFromPayments(existing.parcel_id);
+  await enqueueMutation({ entity: 'payments', entityId: id, action: 'delete', payload: {} });
+  notifySync();
 }
 
 

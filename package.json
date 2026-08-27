@@ -14,7 +14,9 @@
     "test-admin-auth": "node scripts/test-admin-auth.mjs",
     "test-data-api": "node scripts/test-data-api.mjs",
     "test-payment-idempotency": "node scripts/test-payment-idempotency.mjs",
-    "test-payment-persistence": "node scripts/test-payment-persistence.mjs"
+    "test-payment-persistence": "node scripts/test-payment-persistence.mjs",
+    "test-sync-logic": "node --experimental-strip-types scripts/test-sync-logic.mjs",
+    "test-sync-engine": "node scripts/test-sync-engine.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
@@ -43,6 +45,7 @@
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^15.9.0",
     "postcss": "^8.4.35",
     "sharp": "^0.32.1",

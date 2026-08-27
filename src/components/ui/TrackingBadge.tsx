@@ -45,7 +45,7 @@ export function TrackingBadge({
     <span
       onClick={copyable ? handleCopy : undefined}
       title={copyable ? 'Cliquer pour copier le n° de bordereau' : undefined}
-      className={`inline-flex items-center font-mono font-semibold rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300 border border-brand-200/70 dark:border-brand-800/60 shadow-xs transition ${
+      className={`inline-flex items-center font-mono font-semibold rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300 border border-brand-200/70 dark:border-brand-800/60 shadow-sm transition ${
         copyable ? 'cursor-pointer hover:bg-brand-100 dark:hover:bg-brand-900/60' : ''
       } ${sizeClasses[size]} ${className}`}
     >

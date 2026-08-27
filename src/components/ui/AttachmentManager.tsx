@@ -333,7 +333,7 @@ export function AttachmentManager({
             return (
               <div
                 key={attachment.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700/80 dark:bg-slate-800/90 transition hover:border-slate-300 dark:hover:border-slate-600"
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-800/90 transition hover:border-slate-300 dark:hover:border-slate-600"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">

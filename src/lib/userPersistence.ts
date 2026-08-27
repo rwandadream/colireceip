@@ -1,4 +1,5 @@
 import type { User } from './types';
+import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
 
 const toSnake = (value: unknown): unknown =>
   Array.isArray(value)
@@ -15,7 +16,7 @@ const toSnake = (value: unknown): unknown =>
 const request = async (method: string, id?: string, body?: unknown) => {
   const query = new URLSearchParams({ resource: 'users' });
   if (id) query.set('id', id);
-  const response = await fetch(`/api/data?${query}`, {
+  const response = await fetchWithTimeout(`/api/data?${query}`, {
     method,
     credentials: 'same-origin',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -23,21 +24,14 @@ const request = async (method: string, id?: string, body?: unknown) => {
   });
 
   if (!response.ok) {
-    let message = `API_${response.status}`;
-    try {
-      const payload = (await response.json()) as { error?: unknown };
-      if (typeof payload.error === 'string' && payload.error) message += `: ${payload.error}`;
-    } catch {
-      // Keep HTTP status when error response has no JSON body.
-    }
-    throw new Error(message);
+    throw new ApiError(response.status, `API_${response.status}`);
   }
 
   return response.status === 204 ? undefined : ((await response.json()) as { data: unknown }).data;
 };
 
 export const canUseUserApi = () => navigator.onLine;
-export const isUserApiUnavailable = (error: unknown) => error instanceof TypeError;
+export const isUserApiUnavailable = (error: unknown): boolean => isTransientApiError(error);
 
 export async function listOnlineUsers() {
   return toSnake(await request('GET')) as User[];

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LogoBrand } from '../ui/Logo';
+import { SyncIndicator } from '../ui/SyncIndicator';
 
 interface NavItem {
   to: string;
@@ -69,7 +70,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+        <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0 space-y-1">
+          <SyncIndicator />
           <button onClick={logout} className="nav-link w-full text-slate-500 hover:text-error-600 dark:text-slate-400 dark:hover:text-error-400">
             <LogOut size={18} />
             <span>Déconnexion</span>
@@ -124,7 +126,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <Menu size={20} />
             </button>
             <LogoBrand size={22} showSubtitle={false} />
-            <div className="w-8" />
+            <div className="w-auto">
+              <SyncIndicator compact />
+            </div>
           </div>
         </header>
 

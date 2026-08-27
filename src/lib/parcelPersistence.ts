@@ -1,4 +1,5 @@
 import type { Parcel, ParcelItem, ParcelStatus, StatusHistory } from './types';
+import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
 
 type OnlineParcelInput = Record<string, unknown>;
 
@@ -22,7 +23,7 @@ const request = async (method: string, id?: string, body?: unknown, extraQuery?:
   const query = new URLSearchParams({ resource: 'parcels', ...extraQuery });
   if (id) query.set('id', id);
 
-  const response = await fetch(`/api/data?${query}`, {
+  const response = await fetchWithTimeout(`/api/data?${query}`, {
     method,
     credentials: 'same-origin',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -30,21 +31,14 @@ const request = async (method: string, id?: string, body?: unknown, extraQuery?:
   });
 
   if (!response.ok) {
-    let message = `API_${response.status}`;
-    try {
-      const payload = await response.json() as { error?: unknown };
-      if (typeof payload.error === 'string' && payload.error) message += `: ${payload.error}`;
-    } catch {
-      // Keep the HTTP status when the error response has no JSON body.
-    }
-    throw new Error(message);
+    throw new ApiError(response.status, `API_${response.status}`);
   }
 
   return response.status === 204 ? undefined : (await response.json() as { data: unknown }).data;
 };
 
 export const canUseParcelApi = (): boolean => navigator.onLine;
-export const isParcelApiUnavailable = (error: unknown): boolean => error instanceof TypeError;
+export const isParcelApiUnavailable = (error: unknown): boolean => isTransientApiError(error);
 
 export async function listOnlineParcels(): Promise<Parcel[]> {
   return (await request('GET') as unknown[]).map(toParcel);
@@ -58,12 +52,30 @@ export async function updateOnlineParcelStatus(parcelId: string, status: ParcelS
   return toParcel(await request('PATCH', parcelId, { status, note }));
 }
 
+export interface OnlineParcelUpdate {
+  description?: string;
+  status?: ParcelStatus;
+  note?: string;
+  expectedStatus?: ParcelStatus;
+}
+
+export async function updateOnlineParcel(parcelId: string, data: OnlineParcelUpdate): Promise<Parcel & { items?: ParcelItem[] }> {
+  const body: Record<string, unknown> = {};
+  if (data.description !== undefined) body.description = data.description;
+  if (data.status !== undefined) body.status = data.status;
+  if (data.note !== undefined) body.note = data.note;
+  if (data.expectedStatus !== undefined) body.expectedStatus = data.expectedStatus;
+  return toParcel(await request('PATCH', parcelId, body));
+}
+
 export async function listOnlineStatusHistory(parcelId: string): Promise<StatusHistory[]> {
   return (await request('GET', undefined, undefined, { resource: 'status-history', parcelId }) as unknown[]).map(toStatusHistory);
 }
 
-export async function createParcelOnline(parcel: OnlineParcelInput, items: Array<{ product_id?: string; designation: string; quantity: number; unit_price: number }>): Promise<{ parcel: Parcel; items: ParcelItem[] }> {
+export async function createParcelOnline(parcel: OnlineParcelInput, items: Array<{ product_id?: string; designation: string; quantity: number; unit_price: number }>, id?: string): Promise<{ parcel: Parcel; items: ParcelItem[] }> {
   const payload = await request('POST', undefined, {
+    ...(id ? { id } : {}),
+    trackingNumber: parcel.tracking_number || undefined,
     clientId: parcel.client_id,
     recipientName: parcel.recipient_name || 'Destinataire',
     recipientPhone: parcel.recipient_phone || '',

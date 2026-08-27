@@ -62,7 +62,7 @@ svg {
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800/90 shadow-xs transition-all duration-200;
+    @apply bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800/90 shadow-sm transition-all duration-200;
   }
 
   .card-hover {
@@ -78,7 +78,7 @@ svg {
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-xs focus:ring-2 focus:ring-brand-500/20 active:scale-[0.98];
+    @apply btn bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm focus:ring-2 focus:ring-brand-500/20 active:scale-[0.98];
   }
 
   .btn-secondary {
@@ -90,7 +90,7 @@ svg {
   }
 
   .btn-danger {
-    @apply btn bg-error-600 hover:bg-error-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-xs;
+    @apply btn bg-error-600 hover:bg-error-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm;
   }
 
   .input {

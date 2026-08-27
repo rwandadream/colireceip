@@ -18,8 +18,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Méthode non autorisée.' });
   } catch (error) {
     console.error('Error in /api/data handler:', error);
-    const status = error.message === 'Forbidden.' ? 403 : error.code === 'IDEMPOTENCY_CONFLICT' || error.code === 'P2002' ? 409 : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 400 : 400;
-    const message = status === 403 ? 'Accès refusé.' : status === 409 ? 'Conflit d\'idempotence.' : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 'En-tête Idempotency-Key requis.' : (error.message || 'Requête invalide.');
+    const status = error.message === 'Forbidden.' ? 403
+      : error.code === 'IDEMPOTENCY_CONFLICT' || error.code === 'P2002' || error.code === 'P2003' || error.code === 'STATUS_CONFLICT' ? 409
+      : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 400
+      : error.code === 'REQUIRED_CONFIG_MISSING' || error.message?.startsWith('Required server configuration') ? 503
+      : 400;
+    const message = status === 403 ? 'Accès refusé.'
+      : status === 409 ? error.code === 'P2003' ? 'Suppression impossible : des données liées existent.' : error.code === 'STATUS_CONFLICT' ? 'Conflit de statut : le colis a été modifié sur le serveur.' : 'Conflit d\'idempotence.'
+      : status === 503 ? 'Le service est temporairement indisponible (configuration serveur manquante).'
+      : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 'En-tête Idempotency-Key requis.'
+      : 'Requête invalide. Vérifiez les champs saisies.';
     return res.status(status).json({ error: message });
   }
 }

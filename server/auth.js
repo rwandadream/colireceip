@@ -13,7 +13,7 @@ function requiredEnvironment(name, fallback = '') {
 }
 
 function sessionSecret() {
-  return requiredEnvironment('JWT_SECRET', 'groupe-gaff-fallback-jwt-secret-key-change-in-production-env');
+  return requiredEnvironment('JWT_SECRET');
 }
 
 function normalizeEmail(value) {
@@ -40,7 +40,7 @@ export function publicUser(user) {
 export async function bootstrapInitialAdmin() {
   const email = normalizeEmail(requiredEnvironment('INITIAL_ADMIN_EMAIL', 'admin@groupe-gaff.com'));
   const fullName = requiredEnvironment('INITIAL_ADMIN_NAME', 'Administrateur Principal');
-  const password = requiredEnvironment('INITIAL_ADMIN_PASSWORD', 'admin123');
+  const password = requiredEnvironment('INITIAL_ADMIN_PASSWORD');
   const phone = normalizePhone(requiredEnvironment('INITIAL_ADMIN_PHONE', '+22376000000'));
 
   const existingAdmin = await prisma.user.findFirst({ where: { role: 'admin' } });
@@ -61,7 +61,7 @@ export async function authenticate(identifier, password) {
     ? await prisma.user.findFirst({ where: { email: { equals: normalizeEmail(trimmedIdentifier), mode: 'insensitive' } } })
     : await prisma.user.findUnique({ where: { phone: normalizePhone(trimmedIdentifier) } });
 
-  if (!user) {
+  if (!user && process.env.NODE_ENV !== 'production') {
     const userCount = await prisma.user.count();
     if (userCount === 0) {
       await bootstrapInitialAdmin();

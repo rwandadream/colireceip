@@ -1,4 +1,5 @@
 import type { Product } from './types';
+import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
 
 const toSnake = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(toSnake);
@@ -16,7 +17,7 @@ const toSnake = (value: unknown): unknown => {
 const request = async (method: string, id?: string, body?: unknown) => {
   const query = new URLSearchParams({ resource: 'products' });
   if (id) query.set('id', id);
-  const response = await fetch(`/api/data?${query}`, {
+  const response = await fetchWithTimeout(`/api/data?${query}`, {
     method,
     credentials: 'same-origin',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -24,29 +25,24 @@ const request = async (method: string, id?: string, body?: unknown) => {
   });
 
   if (!response.ok) {
-    let message = `API_${response.status}`;
-    try {
-      const payload = await response.json() as { error?: unknown };
-      if (typeof payload.error === 'string' && payload.error) message += `: ${payload.error}`;
-    } catch {
-      // Keep the HTTP status when the error response has no JSON body.
-    }
-    throw new Error(message);
+    throw new ApiError(response.status, `API_${response.status}`);
   }
   return (await response.json() as { data: unknown }).data;
 };
 
 export const canUseProductApi = () => navigator.onLine;
-export const isProductApiUnavailable = (error: unknown) => error instanceof TypeError;
+export const isProductApiUnavailable = (error: unknown): boolean => isTransientApiError(error);
 
 export async function listOnlineProducts(): Promise<Product[]> {
   return toSnake(await request('GET')) as Product[];
 }
 
 export async function createOnlineProduct(
-  data: Omit<Product, 'id' | 'created_at' | 'updated_at'>
+  data: Omit<Product, 'id' | 'created_at' | 'updated_at'>,
+  id?: string
 ): Promise<Product> {
   return toSnake(await request('POST', undefined, {
+    ...(id ? { id } : {}),
     name: data.name,
     category: data.category,
     defaultPrice: data.default_price,
@@ -60,4 +56,8 @@ export async function updateOnlineProduct(id: string, data: Partial<Product>): P
     ...(data.default_price !== undefined ? { defaultPrice: data.default_price } : {}),
   };
   return toSnake(await request('PATCH', id, body)) as Product;
+}
+
+export async function deleteOnlineProduct(id: string): Promise<void> {
+  await request('DELETE', id);
 }

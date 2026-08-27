@@ -1,5 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { generateId } from './format';
+import type { StoredVerifier } from './authVerifier';
+import { createOfflineVerifier } from './authVerifier';
 import type {
   User,
   Client,
@@ -12,9 +14,10 @@ import type {
   Trip,
   TripVehicle,
 } from './types';
+import type { SyncMutation } from './syncTypes';
 
 const DB_NAME = 'sarah-groupe-db';
-const DB_VERSION = 4;
+const DB_VERSION = 6;
 
 interface TransitDB extends DBSchema {
   users: { key: string; value: User };
@@ -68,6 +71,16 @@ interface TransitDB extends DBSchema {
   settings: { key: string; value: AppSettings };
   trips: { key: string; value: Trip; indexes: { 'by-date': string; 'by-status': string } };
   trip_vehicles: { key: string; value: TripVehicle; indexes: { 'by-trip': string; 'by-registration': string } };
+  auth_verifiers: { key: string; value: StoredVerifier };
+  sync_queue: {
+    key: string;
+    value: SyncMutation;
+    indexes: {
+      'by-status': string;
+      'by-target': [string, string];
+      'by-created': string;
+    };
+  };
 }
 
 let dbInstance: IDBPDatabase<TransitDB> | null = null;
@@ -142,6 +155,15 @@ export async function getDB(): Promise<IDBPDatabase<TransitDB>> {
         store.createIndex('by-trip', 'trip_id');
         store.createIndex('by-registration', 'registration');
       }
+      if (!db.objectStoreNames.contains('auth_verifiers')) {
+        db.createObjectStore('auth_verifiers', { keyPath: 'identifier' });
+      }
+      if (!db.objectStoreNames.contains('sync_queue')) {
+        const store = db.createObjectStore('sync_queue', { keyPath: 'id' });
+        store.createIndex('by-status', 'status');
+        store.createIndex('by-target', ['entity', 'entityId']);
+        store.createIndex('by-created', 'createdAt');
+      }
     },
   });
   return dbInstance;
@@ -170,33 +192,8 @@ export async function seedDefaultData(): Promise<void> {
       company_email: 'contact@groupe-gaff.com',
     });
   }
-  const adminEmail = 'admin@groupe-gaff.com';
-  const allUsers = await db.getAll('users');
-  const legacyAdmin = allUsers.find((u) => u.email === 'admin@sarah-groupe.com');
-  if (legacyAdmin) {
-    await db.put('users', {
-      ...legacyAdmin,
-      email: adminEmail,
-      updated_at: new Date().toISOString(),
-    });
-  } else {
-    const existingAdmin = allUsers.find((u) => u.email === adminEmail);
-    if (!existingAdmin) {
-      const adminId = generateId();
-      const now = new Date().toISOString();
-      await db.put('users', {
-        id: adminId,
-        email: adminEmail,
-        full_name: 'Administrateur Principal',
-        phone: '+223 76 00 00 00',
-        role: 'admin',
-        active: true,
-        password: 'admin123',
-        created_at: now,
-        updated_at: now,
-      });
-    }
-  }
+  await sanitizeLocalUsers(db);
+  await seedDevAdmin(db);
 
   const products = await db.getAll('products');
   if (products.length === 0) {
@@ -227,4 +224,48 @@ export async function seedDefaultData(): Promise<void> {
       });
     }
   }
+}
+
+// Security upgrade: no local user record may ever contain a plaintext (or any)
+// password. Older versions stored the password for offline login; those fields
+// are stripped on upgrade. The legacy admin email is migrated as well.
+async function sanitizeLocalUsers(db: IDBPDatabase<TransitDB>): Promise<void> {
+  const allUsers = await db.getAll('users');
+  for (const user of allUsers) {
+    const hasStoredPassword = typeof (user as User & { password?: string }).password === 'string';
+    const isLegacyEmail = user.email === 'admin@sarah-groupe.com';
+    if (!hasStoredPassword && !isLegacyEmail) continue;
+    const sanitized: User = { ...user, updated_at: new Date().toISOString() };
+    if (isLegacyEmail) sanitized.email = 'admin@groupe-gaff.com';
+    delete (sanitized as User & { password?: string }).password;
+    await db.put('users', sanitized);
+  }
+}
+
+// DEV-ONLY: bootstraps a local administrator when running `npm run dev` without
+// a configured database/API. Credentials come from VITE_DEV_ADMIN_EMAIL and
+// VITE_DEV_ADMIN_PASSWORD (never hardcoded). This code is compiled away in
+// production builds (`import.meta.env.DEV` is statically false), so no account
+// can be seeded from shipped source.
+async function seedDevAdmin(db: IDBPDatabase<TransitDB>): Promise<void> {
+  if (!import.meta.env.DEV) return;
+  const email = String(import.meta.env.VITE_DEV_ADMIN_EMAIL ?? '').trim();
+  const password = String(import.meta.env.VITE_DEV_ADMIN_PASSWORD ?? '').trim();
+  if (!email || !password || email.startsWith('<') || password.startsWith('<')) return;
+  const normalized = email.toLowerCase();
+  const allUsers = await db.getAll('users');
+  if (allUsers.some((user) => user.email?.toLowerCase() === normalized)) return;
+  const now = new Date().toISOString();
+  const admin: User = {
+    id: generateId(),
+    email: normalized,
+    full_name: 'Administrateur de développement',
+    phone: '',
+    role: 'admin',
+    active: true,
+    created_at: now,
+    updated_at: now,
+  };
+  await db.put('users', admin);
+  await createOfflineVerifier(normalized, password);
 }
