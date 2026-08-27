@@ -2,6 +2,7 @@ import { getDB } from './db';
 import { generateId, toISO } from './format';
 import type { SyncAction, SyncEntity, SyncMutation } from './syncTypes';
 import {
+  backoffSeconds,
   canRetryAfter,
   mergeLocalPending,
   orderPending,
@@ -107,6 +108,16 @@ export async function listProtectedTargets(): Promise<Map<string, PendingRecord>
   return map;
 }
 
+// True when at least one offline mutation for the entity still has to reach the
+// server. The local mirror GC uses this to avoid sweeping records the server has
+// not applied yet (e.g. a parcel created just before navigating to its detail
+// page, while its create is still being drained).
+export async function hasActiveMutations(entity: SyncEntity): Promise<boolean> {
+  const db = await getDB();
+  const all = await db.getAll('sync_queue');
+  return all.some((m) => m.entity === entity && m.status !== 'synced');
+}
+
 // Next pending mutation in FIFO order (oldest first), skipping mutations still
 // inside their backoff window. Recovers any mutation stuck in "syncing".
 export async function nextPendingMutation(): Promise<SyncMutation | null> {
@@ -164,6 +175,22 @@ export async function registerTransientFailure(mutation: SyncMutation, message: 
 export async function discardMutation(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('sync_queue', id);
+}
+
+// Earliest absolute timestamp (ms) at which a pending mutation may be retried,
+// i.e. the moment its current backoff window elapses. Mutations that never
+// failed (or have no recorded attempt) are already due and ignored here: they
+// are handled by the next drain directly.
+export async function nextPendingRetryDeadlineMs(): Promise<number | null> {
+  const db = await getDB();
+  const pending = await db.getAllFromIndex('sync_queue', 'by-status', 'pending');
+  let earliest: number | null = null;
+  for (const m of pending) {
+    if (m.retryCount <= 0 || !m.lastAttemptAt) continue;
+    const due = new Date(m.lastAttemptAt).getTime() + backoffSeconds(m.retryCount) * 1000;
+    if (earliest === null || due < earliest) earliest = due;
+  }
+  return earliest;
 }
 
 export async function countSyncedState(): Promise<SyncCounts> {

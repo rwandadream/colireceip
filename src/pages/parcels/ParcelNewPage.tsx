@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Plus, UserPlus, Save, Copy, Trash2, ChevronRight, ChevronLeft } from 'lucide-react';
 import {
@@ -21,11 +21,14 @@ import { Modal } from '../../components/ui/Modal';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
 import { formatCurrency, generateId, formatTrackingNumber } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
+import { SubmitLock } from '../../lib/submitLock';
+import { userErrorMessage } from '../../lib/userMessage';
 
 export function ParcelNewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const submitLockRef = useRef<SubmitLock | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [clientSuggestions, setClientSuggestions] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -236,6 +239,8 @@ export function ParcelNewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.client_id || !form.package_type || items.length === 0 || items.some((item) => !item.designation || Number(item.quantity) <= 0)) return;
+    if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
+    if (!submitLockRef.current.acquire()) return;
     setSaving(true);
 
     try {
@@ -304,9 +309,10 @@ export function ParcelNewPage() {
       navigate(`/parcels/${parcel.id}`);
     } catch (error) {
       console.error('Erreur d’enregistrement du colis', error);
-      const message = error instanceof Error && error.message ? error.message : 'Erreur d’enregistrement du colis';
+      const message = userErrorMessage(error, 'Erreur d’enregistrement du colis');
       addToast({ type: 'error', title: 'Erreur', description: message });
     } finally {
+      submitLockRef.current.release();
       setSaving(false);
     }
   };
@@ -316,6 +322,8 @@ export function ParcelNewPage() {
       addToast({ type: 'error', title: 'Champ requis', description: 'Le nom complet du client est obligatoire.' });
       return;
     }
+    if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
+    if (!submitLockRef.current.acquire()) return;
 
     const existing = clients.find((client) => {
       const samePhone = newClient.phone && client.phone && normalizeText(client.phone) === normalizeText(newClient.phone);
@@ -358,8 +366,10 @@ export function ParcelNewPage() {
       setNewClient({ full_name: '', phone: '', city: '' });
     } catch (error) {
       console.error('Erreur lors de la création rapide de client', error);
-      const message = error instanceof Error && error.message ? error.message : 'Impossible de créer le client.';
+      const message = userErrorMessage(error, 'Impossible de créer le client.');
       addToast({ type: 'error', title: 'Erreur', description: message });
+    } finally {
+      submitLockRef.current.release();
     }
   };
 

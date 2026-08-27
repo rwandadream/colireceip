@@ -40,17 +40,21 @@ import { AttachmentManager } from '../../components/ui/AttachmentManager';
 import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { formatCurrency, formatDateTime, formatDate } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
+import { userErrorMessage } from '../../lib/userMessage';
+import { OfflineNotice } from '../../components/ui/OfflineNotice';
 
 export function ParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const [reloadKey, setReloadKey] = useState(0);
   const [parcel, setParcel] = useState<Parcel | null>(null);
   const [items, setItems] = useState<ParcelItem[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [history, setHistory] = useState<StatusHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -74,15 +78,17 @@ export function ParcelDetailPage() {
         setHistory(historyData);
         if (parcelData) setNewStatus(parcelData.status);
       } catch (err) {
-        const message = err instanceof Error && err.message ? err.message : 'Impossible de charger le colis.';
+        setLoadError(true);
+        const message = userErrorMessage(err, 'Impossible de charger le colis.');
         addToast({ type: 'error', title: 'Erreur', description: message });
       } finally {
         setLoading(false);
       }
     })();
-  }, [id, addToast]);
+  }, [id, addToast, reloadKey]);
 
   const handleStatusChange = async () => {
+    if (statusLoading) return;
     if (!parcel || !user || parcel.status === newStatus) return;
     setStatusLoading(true);
     try {
@@ -102,9 +108,7 @@ export function ParcelDetailPage() {
     });
     } catch (error) {
       setNewStatus(parcel.status);
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Impossible de mettre à jour le statut du colis.';
+      const message = userErrorMessage(error, 'Impossible de mettre à jour le statut du colis.');
       addToast({ type: 'error', title: 'Erreur de mise à jour', description: message });
     } finally {
       setStatusLoading(false);
@@ -126,9 +130,7 @@ export function ParcelDetailPage() {
       setDeleteModalOpen(false);
       navigate('/parcels');
     } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Impossible de supprimer ce colis pour le moment.';
+      const message = userErrorMessage(error, 'Impossible de supprimer ce colis pour le moment.');
       addToast({
         type: 'error',
         title: 'Erreur de suppression',
@@ -152,9 +154,7 @@ export function ParcelDetailPage() {
       ]);
       setDeleteModalOpen(true);
     } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Impossible de vérifier les données liées à ce colis.';
+      const message = userErrorMessage(error, 'Impossible de vérifier les données liées à ce colis.');
       addToast({
         type: 'error',
         title: 'Impossible de préparer la suppression',
@@ -173,6 +173,28 @@ export function ParcelDetailPage() {
     return <div className="space-y-4"><Skeleton className="h-20" /><Skeleton className="h-64" /></div>;
   }
 
+  if (loadError) {
+    return (
+      <div className="text-center py-16">
+        <Package size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+        <p className="text-slate-500 dark:text-slate-400">Impossible de charger ce colis.</p>
+        <div className="flex gap-3 justify-center mt-4">
+          <Link to="/parcels" className="btn-secondary">Retour aux colis</Link>
+          <button
+            onClick={() => {
+              setLoading(true);
+              setLoadError(false);
+              setReloadKey((k) => k + 1);
+            }}
+            className="btn-primary"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!parcel) {
     return (
       <div className="text-center py-16">
@@ -187,6 +209,7 @@ export function ParcelDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      <OfflineNotice />
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Link to="/parcels" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0">
@@ -240,8 +263,9 @@ export function ParcelDetailPage() {
             key={status}
             variant={parcel.status === status ? 'primary' : 'secondary'}
             size="sm"
-            disabled={parcel.status === status}
+            disabled={parcel.status === status || statusLoading}
             onClick={async () => {
+              if (statusLoading) return;
               setNewStatus(status);
               await handleStatusChange();
             }}

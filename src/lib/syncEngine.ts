@@ -19,6 +19,7 @@ import {
   markConflict,
   markFailed,
   nextPendingMutation,
+  nextPendingRetryDeadlineMs,
   registerTransientFailure,
 } from './syncQueue';
 import {
@@ -376,6 +377,9 @@ async function pullAll(): Promise<boolean> {
 // Engine state + public API
 // ---------------------------------------------------------------
 let running = false;
+// A requestSync() issued while a cycle is in-flight is latched and re-run as
+// soon as that cycle finishes, so a reconnect/online event is never dropped.
+let syncQueued = false;
 let onlineState = typeof navigator !== 'undefined' ? navigator.onLine : false;
 let lastSyncAt: string | null = null;
 let lastError: string | null = null;
@@ -397,8 +401,39 @@ async function emitState(): Promise<void> {
   for (const listener of [...listeners]) listener(state);
 }
 
+// A retry only re-enters the normal engine cycle; it never "fakes" a sync.
+// It ensures a mutation waiting out its backoff is retried exactly when the
+// backoff elapses instead of waiting for the next 30s interval tick.
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function scheduleRetry(): Promise<void> {
+  if (retryTimer !== null) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  if (!onlineState) return;
+  let deadlineMs: number | null = null;
+  try {
+    deadlineMs = await nextPendingRetryDeadlineMs();
+  } catch {
+    return;
+  }
+  if (deadlineMs === null) return;
+  const delay = Math.max(0, deadlineMs - Date.now());
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void requestSync();
+  }, delay);
+}
+
 export async function requestSync(): Promise<void> {
-  if (running) return;
+  if (running) {
+    syncQueued = true;
+    return;
+  }
+  // A connectivity event may have been missed or arrived late; re-read the
+  // actual state so a stale offlineState never pins the engine down.
+  if (typeof navigator !== 'undefined') onlineState = navigator.onLine;
   if (!onlineState) {
     lastError = 'Hors ligne : la synchronisation reprendra au retour du réseau.';
     await emitState();
@@ -421,6 +456,11 @@ export async function requestSync(): Promise<void> {
   } finally {
     running = false;
     await emitState();
+    await scheduleRetry();
+    if (syncQueued) {
+      syncQueued = false;
+      void requestSync();
+    }
   }
 }
 
@@ -429,6 +469,10 @@ export function setOnlineState(value: boolean): void {
   if (value) {
     void requestSync();
   } else {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
     lastError = 'Hors ligne.';
     void emitState();
   }

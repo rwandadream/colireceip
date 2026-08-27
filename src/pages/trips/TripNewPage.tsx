@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
 import { createTrip, createTripVehicle } from '../../lib/data';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { SubmitLock } from '../../lib/submitLock';
+import { userErrorMessage } from '../../lib/userMessage';
 
 const feeFields = ['road_bamako_frontier', 'customs_fee', 'frontier_formalities', 'road_frontier_bouake', 'road_bouake_abidjan', 'road_abidjan', 'loading_fee', 'unloading_fee', 'truck_quota', 'monthly_fee'] as const;
 const feeLabels: Record<typeof feeFields[number], string> = { road_bamako_frontier: 'Route Bamako → frontière', customs_fee: 'Dédouanement', frontier_formalities: 'Formalités frontière', road_frontier_bouake: 'Frontière → Bouaké', road_bouake_abidjan: 'Bouaké → Abidjan', road_abidjan: 'Frais à Abidjan', loading_fee: 'Chargement', unloading_fee: 'Déchargement', truck_quota: 'Quota camion', monthly_fee: 'Frais mensuels' };
@@ -16,11 +19,15 @@ function emptyVehicle(): VehicleForm {
 
 export function TripNewPage() {
     const navigate = useNavigate(); const { user } = useAuth();
+    const { addToast } = useToast();
+    const submitLockRef = useRef<SubmitLock | null>(null);
     const [form, setForm] = useState({ trip_number: '', trip_date: new Date().toISOString().slice(0, 10), origin: 'Bamako', destination: 'Abidjan', status: 'planned' as const });
     const [vehicles, setVehicles] = useState<VehicleForm[]>([emptyVehicle()]); const [saving, setSaving] = useState(false);
     const updateVehicle = (index: number, field: string, value: string) => setVehicles((all) => all.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
     const submit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
+        if (!submitLockRef.current.acquire()) return;
         setSaving(true);
 
         try {
@@ -47,9 +54,22 @@ export function TripNewPage() {
                 } as never);
             }
 
+            addToast({
+                type: 'success',
+                title: 'Voyage créé',
+                description: `Le voyage a été enregistré avec ${vehiclesToCreate.length} véhicule(s).`,
+            });
             navigate(`/trips/${trip.id}`);
+        } catch (error) {
+            console.error('Erreur d’enregistrement du voyage', error);
+            addToast({
+                type: 'error',
+                title: 'Erreur d’enregistrement',
+                description: userErrorMessage(error, 'Impossible d’enregistrer le voyage. Réessayez.'),
+            });
         } finally {
             setSaving(false);
+            submitLockRef.current.release();
         }
     };
     return <div className="max-w-4xl mx-auto space-y-5"><div className="flex items-center gap-3"><Link to="/trips" className="p-2"><ArrowLeft size={20} /></Link><div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Nouveau voyage</h1><p className="text-sm text-slate-500">Créer le trajet progressivement, puis compléter les informations plus tard.</p></div></div>

@@ -21,11 +21,15 @@ export function TripsListPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [stats, setStats] = useState<Record<string, { vehicles: number; parcels: number; expenses: number }>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
     void (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const data = await getTrips();
         const entries = await Promise.all(
@@ -56,11 +60,12 @@ export function TripsListPage() {
         setStats(Object.fromEntries(entries));
       } catch (err) {
         console.error('Erreur lors du chargement des voyages:', err);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [reloadKey]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -123,6 +128,14 @@ export function TripsListPage() {
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
           ))}
+        </Card>
+      ) : loadError ? (
+        <Card className="p-10 text-center">
+          <p className="text-slate-500 dark:text-slate-400">Impossible de charger les voyages.</p>
+          <p className="text-xs text-slate-400 mt-1">Vérifiez votre connexion puis réessayez.</p>
+          <Button className="mt-4" onClick={() => setReloadKey((k) => k + 1)}>
+            Réessayer
+          </Button>
         </Card>
       ) : filtered.length === 0 ? (
         <Card>

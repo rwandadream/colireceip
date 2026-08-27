@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CreditCard,
   Search,
@@ -8,6 +8,7 @@ import {
   TrendingUp,
   ArrowLeft,
   Save,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   getPayments,
@@ -27,10 +28,16 @@ import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
+import { OfflineNotice } from '../../components/ui/OfflineNotice';
 import { formatCurrency, formatDateTime, isToday, formatTrackingNumber } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
+import { SubmitLock } from '../../lib/submitLock';
+import { userErrorMessage } from '../../lib/userMessage';
+import { useSync } from '../../context/SyncContext';
+import { useToast } from '../../context/ToastContext';
 
 export function PaymentsListPage() {
+  const { addToast } = useToast();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -44,11 +51,16 @@ export function PaymentsListPage() {
         setPayments(data);
       } catch (error) {
         console.error('Erreur lors du chargement des paiements:', error);
+        addToast({
+          type: 'error',
+          title: 'Erreur de chargement',
+          description: userErrorMessage(error, 'Impossible de charger les paiements. Réessayez.'),
+        });
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [addToast]);
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -207,8 +219,11 @@ export function PaymentsListPage() {
 
 export function PaymentNewPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { state: syncState } = useSync();
   const [searchParams] = useSearchParams();
   const parcelIdParam = searchParams.get('parcel');
+  const submitLockRef = useRef<SubmitLock | null>(null);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -217,6 +232,7 @@ export function PaymentNewPage() {
   const [saveError, setSaveError] = useState('');
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [success, setSuccess] = useState<{ payment: Payment; parcel: Parcel; offline: boolean } | null>(null);
   const [form, setForm] = useState({
     client_id: '',
     parcel_id: parcelIdParam || '',
@@ -238,7 +254,7 @@ export function PaymentNewPage() {
           if (p) setForm((f) => ({ ...f, client_id: p.client_id, parcel_id: parcelIdParam, amount: p.balance }));
         }
       } catch (err) {
-        const message = err instanceof Error && err.message ? err.message : 'Erreur de chargement des données.';
+        const message = userErrorMessage(err, 'Impossible de charger les données de paiement.');
         setSaveError(message);
       } finally {
         setLoading(false);
@@ -269,8 +285,14 @@ export function PaymentNewPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saved || success) return;
+    if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
+    if (!submitLockRef.current.acquire()) return;
     const amountNum = Number(form.amount);
-    if (!form.parcel_id || amountNum <= 0 || !selectedParcel) return;
+    if (!form.parcel_id || amountNum <= 0 || !selectedParcel) {
+      submitLockRef.current.release();
+      return;
+    }
     setSaving(true);
     setSaveError('');
 
@@ -288,10 +310,20 @@ export function PaymentNewPage() {
         note: form.note,
       });
 
+      // Reflect exactly what createPayment stored locally (the previous state
+      // snapshot must not be used for the success summary / receipt).
+      const refreshedParcel: Parcel = {
+        ...selectedParcel,
+        updated_at: new Date().toISOString(),
+        amount_paid: (selectedParcel.amount_paid || 0) + amountNum,
+        balance: selectedParcel.payment_condition === 'paid_origin'
+          ? 0
+          : Math.max((selectedParcel.total_amount || 0) - ((selectedParcel.amount_paid || 0) + amountNum), 0),
+      };
+      setSelectedParcel(refreshedParcel);
       setSaving(false);
       setSaved(true);
-      setAttachments([]);
-      setForm({ client_id: selectedParcel.client_id, parcel_id: selectedParcel.id, amount: '', payment_method: form.payment_method, note: '' });
+      setSuccess({ payment, parcel: refreshedParcel, offline: !syncState.online });
 
       void (async () => {
         try {
@@ -301,7 +333,7 @@ export function PaymentNewPage() {
           await logActivity(
             user?.id || '',
             user?.full_name || '',
-            `a enregistré un paiement de ${formatCurrency(amountNum)} pour le colis ${selectedParcel.tracking_number}`,
+            `a enregistré un paiement de ${formatCurrency(amountNum)} pour le colis ${refreshedParcel.tracking_number}`,
             'payment',
             payment.id,
             `Mode: ${PAYMENT_METHOD_LABELS[form.payment_method]}`
@@ -312,21 +344,104 @@ export function PaymentNewPage() {
       })();
 
       setTimeout(() => {
-        generateReceiptPDF(selectedParcel, [payment]);
+        generateReceiptPDF(refreshedParcel, [payment]);
       }, 0);
     } catch (error) {
       console.error('Erreur d’enregistrement du paiement', error);
-      setSaveError(error instanceof Error ? error.message : 'Unable to save the payment.');
+      setSaveError(userErrorMessage(error, 'Impossible d’enregistrer le paiement. Réessayez.'));
+    } finally {
       setSaving(false);
+      submitLockRef.current.release();
     }
   };
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = window.setTimeout(() => {
+      navigate(`/parcels/${success.payment.parcel_id}`);
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [success, navigate]);
 
   const selectedClientParcels = form.client_id ? parcels.filter((p) => p.client_id === form.client_id && p.balance > 0) : [];
 
   if (loading) return <Skeleton className="h-96" />;
 
+  if (success) {
+    const fullyPaid = success.parcel.payment_condition === 'paid_origin' || success.parcel.balance <= 0;
+    return (
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <Link to="/payments" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
+            <ArrowLeft size={20} />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Paiement enregistré</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Confirmation de l’encaissement</p>
+          </div>
+        </div>
+
+        <Card className="border-success-200 bg-success-50 p-5 dark:border-success-900/40 dark:bg-success-950/20">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 size={22} className="text-success-600 dark:text-success-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-success-800 dark:text-success-300">Paiement de {formatCurrency(success.payment.amount)} confirmé</p>
+              <p className="text-sm text-success-700 dark:text-success-300">
+                {success.offline
+                  ? 'Paiement enregistré localement — synchronisation en attente de connexion.'
+                  : 'Paiement enregistré — synchronisation avec le serveur en cours.'}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Colis</span>
+              <Link to={`/parcels/${success.payment.parcel_id}`} className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
+                {formatTrackingNumber(success.parcel.tracking_number)}
+              </Link>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Client</span>
+              <span className="font-medium text-slate-700 dark:text-slate-200">{success.parcel.client_name}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-slate-100 dark:border-slate-700">
+              <span className="text-slate-500 dark:text-slate-400">Montant total</span>
+              <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(success.parcel.total_amount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Total payé</span>
+              <span className="font-semibold text-success-600 dark:text-success-400">{formatCurrency(success.parcel.amount_paid)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Reste à payer</span>
+              {success.parcel.payment_condition === 'paid_origin' ? (
+                <span className="font-bold text-success-600 dark:text-success-400">Payé au départ</span>
+              ) : (
+                <span className={`font-bold ${fullyPaid ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400'}`}>
+                  {formatCurrency(success.parcel.balance)}
+                </span>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        <div className="flex gap-3 justify-end pb-4">
+          <Link to="/payments" className="btn-secondary">Retour aux paiements</Link>
+          <Link to={`/parcels/${success.payment.parcel_id}`} className="btn-primary">
+            Voir le colis
+          </Link>
+        </div>
+        <p className="text-xs text-slate-400 text-right">Redirection automatique vers le colis…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      <OfflineNotice />
       <div className="flex items-center gap-3">
         <Link to="/payments" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
           <ArrowLeft size={20} />
@@ -338,11 +453,6 @@ export function PaymentNewPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {saved && (
-          <Card className="border-success-200 bg-success-50 p-4 text-sm text-success-700 dark:border-success-900/40 dark:bg-success-950/20 dark:text-success-300">
-            Paiement enregistré instantanément. Le client et le colis sont maintenant mis à jour.
-          </Card>
-        )}
         {saveError && (
           <Card className="border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-900/40 dark:bg-error-950/20 dark:text-error-300">
             {saveError}

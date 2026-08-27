@@ -89,6 +89,10 @@ export async function getTrips(): Promise<Trip[]> {
 }
 
 export async function getTripById(id: string): Promise<Trip | undefined> {
+  const db = await getDB();
+  const user = getAuthenticatedUser();
+  const cached = await db.get('trips', id);
+  if (cached && canAccessOwnedRecord(user, cached.created_by)) return cached;
   const all = await getTrips();
   return all.find((trip) => trip.id === id);
 }
@@ -347,6 +351,9 @@ export async function getClients(): Promise<Client[]> {
 }
 
 export async function getClientById(id: string): Promise<Client | undefined> {
+  const db = await getDB();
+  const cached = await db.get('clients', id);
+  if (cached) return cached;
   const all = await getClients();
   return all.find((client) => client.id === id);
 }
@@ -525,6 +532,9 @@ export async function getParcels(): Promise<Parcel[]> {
 }
 
 export async function getParcelById(id: string): Promise<Parcel | undefined> {
+  const db = await getDB();
+  const cached = await db.get('parcels', id);
+  if (cached) return cached;
   const all = await getParcels();
   return all.find((parcel) => parcel.id === id);
 }

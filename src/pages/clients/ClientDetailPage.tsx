@@ -32,12 +32,16 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { ConfirmModalWithDetails, type RelatedItemSummary } from '../../components/ui/ConfirmModalWithDetails';
 import { formatCurrency, formatDate, formatDateTime } from '../../lib/format';
+import { userErrorMessage } from '../../lib/userMessage';
+import { OfflineNotice } from '../../components/ui/OfflineNotice';
 
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const [client, setClient] = useState<Client | null>(null);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -62,20 +66,19 @@ export function ClientDetailPage() {
         setPayments(paymentsData);
         if (clientData) setEditForm(clientData);
       } catch (error) {
-        const message = error instanceof Error && error.message
-          ? error.message
-          : 'Impossible de charger les données du client.';
+        setLoadError(true);
+        setClient(null);
+        const message = userErrorMessage(error, 'Impossible de charger les données du client.');
         addToast({
           type: 'error',
           title: 'Erreur de chargement',
           description: message,
         });
-        setClient(null);
       } finally {
         setLoading(false);
       }
     })();
-  }, [id, addToast]);
+  }, [id, addToast, reloadKey]);
 
   const handleSaveEdit = async () => {
     if (!editForm || !client) return;
@@ -90,9 +93,7 @@ export function ClientDetailPage() {
       });
       setEditOpen(false);
     } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Impossible de modifier ce client pour le moment.';
+      const message = userErrorMessage(error, 'Impossible de modifier ce client pour le moment.');
       addToast({
         type: 'error',
         title: 'Erreur de modification',
@@ -116,9 +117,7 @@ export function ClientDetailPage() {
       setDeleteOpen(false);
       navigate('/clients');
     } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Impossible de supprimer ce client pour le moment.';
+      const message = userErrorMessage(error, 'Impossible de supprimer ce client pour le moment.');
       addToast({
         type: 'error',
         title: 'Erreur de suppression',
@@ -140,9 +139,7 @@ export function ClientDetailPage() {
       ]);
       setDeleteOpen(true);
     } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Impossible de vérifier les données liées à ce client.';
+      const message = userErrorMessage(error, 'Impossible de vérifier les données liées à ce client.');
       addToast({
         type: 'error',
         title: 'Impossible de préparer la suppression',
@@ -154,6 +151,27 @@ export function ClientDetailPage() {
   };
 
   if (loading) return <Skeleton className="h-96" />;
+  if (loadError) {
+    return (
+      <div className="text-center py-16">
+        <Package size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+        <p className="text-slate-500 dark:text-slate-400">Impossible de charger les données du client.</p>
+        <div className="flex gap-3 justify-center mt-4">
+          <Link to="/clients" className="btn-secondary">Retour aux clients</Link>
+          <button
+            onClick={() => {
+              setLoading(true);
+              setLoadError(false);
+              setReloadKey((k) => k + 1);
+            }}
+            className="btn-primary"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (!client) {
     return (
       <div className="text-center py-16">
@@ -170,6 +188,7 @@ export function ClientDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      <OfflineNotice />
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Link to="/clients" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0">

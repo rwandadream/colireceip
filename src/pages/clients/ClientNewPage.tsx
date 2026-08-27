@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Sparkles } from 'lucide-react';
 import { createClient, getClients, logActivity } from '../../lib/data';
@@ -7,6 +7,8 @@ import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { SubmitLock } from '../../lib/submitLock';
+import { userErrorMessage } from '../../lib/userMessage';
 import type { Client } from '../../lib/types';
 
 const INITIAL_FORM = {
@@ -25,6 +27,7 @@ export function ClientNewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const submitLockRef = useRef<SubmitLock | null>(null);
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [suggestions, setSuggestions] = useState<Client[]>([]);
@@ -35,9 +38,7 @@ export function ClientNewPage() {
       try {
         setClients(await getClients());
       } catch (error) {
-        const message = error instanceof Error && error.message
-          ? error.message
-          : 'Impossible de charger les clients pour le moment.';
+        const message = userErrorMessage(error, 'Impossible de charger les clients pour le moment.');
         addToast({
           type: 'error',
           title: 'Erreur de chargement',
@@ -77,20 +78,22 @@ export function ClientNewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.full_name) return;
+    if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
+    if (!submitLockRef.current.acquire()) return;
 
-    const existing = clients.find((client) => {
-      const samePhone = form.phone && client.phone && normalizeText(client.phone) === normalizeText(form.phone);
-      const sameName = normalizeText(client.full_name) === normalizeText(form.full_name);
-      return samePhone || sameName;
-    });
-
-    if (existing) {
-      navigate(`/clients/${existing.id}`);
-      return;
-    }
-
-    setSaving(true);
     try {
+      const existing = clients.find((client) => {
+        const samePhone = form.phone && client.phone && normalizeText(client.phone) === normalizeText(form.phone);
+        const sameName = normalizeText(client.full_name) === normalizeText(form.full_name);
+        return samePhone || sameName;
+      });
+
+      if (existing) {
+        navigate(`/clients/${existing.id}`);
+        return;
+      }
+
+      setSaving(true);
       const client = await createClient({
         ...form,
         created_by: user?.id || '',
@@ -104,9 +107,7 @@ export function ClientNewPage() {
       });
       navigate(`/clients/${client.id}`);
     } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : 'Impossible de créer ce client pour le moment.';
+      const message = userErrorMessage(error, 'Impossible de créer ce client pour le moment.');
       addToast({
         type: 'error',
         title: 'Erreur de création',
@@ -114,6 +115,7 @@ export function ClientNewPage() {
       });
     } finally {
       setSaving(false);
+      submitLockRef.current.release();
     }
   };
 

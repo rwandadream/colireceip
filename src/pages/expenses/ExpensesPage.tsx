@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search,
@@ -28,6 +28,9 @@ import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
 import { formatCurrency, formatDate, formatTrackingNumber } from '../../lib/format';
 import { generateReportPDF } from '../../lib/pdf';
+import { useToast } from '../../context/ToastContext';
+import { SubmitLock } from '../../lib/submitLock';
+import { userErrorMessage } from '../../lib/userMessage';
 
 const DEFAULT_CATEGORY_NAMES = [
   'Douane',
@@ -48,6 +51,8 @@ const DEFAULT_CATEGORY_NAMES = [
 
 export function ExpensesPage() {
   const { user } = useAuth();
+  const { addToast } = useToast();
+  const submitLockRef = useRef<SubmitLock | null>(null);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [expenses, setExpenses] = useState<TripExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -196,60 +201,91 @@ export function ExpensesPage() {
   const handleSaveCategory = async () => {
     const name = newCategoryName.trim();
     if (!name) return;
-    const category = await createExpenseCategory({ name });
-    setCategories((prev) => [category, ...prev]);
-    setForm((prev) => ({ ...prev, category_id: category.id, category_name: category.name }));
-    setNewCategoryName('');
+    try {
+      const category = await createExpenseCategory({ name });
+      setCategories((prev) => [category, ...prev]);
+      setForm((prev) => ({ ...prev, category_id: category.id, category_name: category.name }));
+      setNewCategoryName('');
+    } catch (error) {
+      console.error('Erreur de création de catégorie', error);
+      addToast({
+        type: 'error',
+        title: 'Erreur',
+        description: userErrorMessage(error, 'Impossible de créer la catégorie.'),
+      });
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.parcel_id || !form.category_name || !form.label || Number(form.amount) <= 0) return;
+    if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
+    if (!submitLockRef.current.acquire()) return;
     setSaving(true);
 
-    const category = categories.find((cat) => cat.id === form.category_id);
-    const selectedParcel = parcelMap.get(form.parcel_id);
-    const payload = {
-      parcel_id: form.parcel_id,
-      trip_id: selectedParcel?.trip_id,
-      trip_vehicle_id: selectedParcel?.trip_vehicle_id,
-      category_id: category?.id,
-      category_name: category?.name || form.category_name,
-      label: form.label,
-      amount: Number(form.amount),
-      expense_date: form.expense_date,
-      location: form.location,
-      notes: form.notes,
-      created_by: user?.id || '',
-      created_by_name: user?.full_name || '',
-    };
+    try {
+      const category = categories.find((cat) => cat.id === form.category_id);
+      const selectedParcel = parcelMap.get(form.parcel_id);
+      const payload = {
+        parcel_id: form.parcel_id,
+        trip_id: selectedParcel?.trip_id,
+        trip_vehicle_id: selectedParcel?.trip_vehicle_id,
+        category_id: category?.id,
+        category_name: category?.name || form.category_name,
+        label: form.label,
+        amount: Number(form.amount),
+        expense_date: form.expense_date,
+        location: form.location,
+        notes: form.notes,
+        created_by: user?.id || '',
+        created_by_name: user?.full_name || '',
+      };
 
-    if (selectedExpense) {
-      const updated = await updateTripExpense(selectedExpense.id, payload);
-      if (updated) {
-        await saveAttachmentsForEntity('expense', selectedExpense.id, attachments);
-        setExpenses((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      }
-    } else {
-      const created = await createTripExpense(payload);
-      if (created) {
-        if (attachments.length > 0) {
-          await saveAttachmentsForEntity('expense', created.id, attachments);
+      if (selectedExpense) {
+        const updated = await updateTripExpense(selectedExpense.id, payload);
+        if (updated) {
+          await saveAttachmentsForEntity('expense', selectedExpense.id, attachments);
+          setExpenses((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+          setShowModal(false);
         }
-        setExpenses((prev) => [created, ...prev]);
+      } else {
+        const created = await createTripExpense(payload);
+        if (created) {
+          if (attachments.length > 0) {
+            await saveAttachmentsForEntity('expense', created.id, attachments);
+          }
+          setExpenses((prev) => [created, ...prev]);
+          setShowModal(false);
+        }
       }
+    } catch (error) {
+      console.error('Erreur d’enregistrement de la dépense', error);
+      addToast({
+        type: 'error',
+        title: 'Erreur d’enregistrement',
+        description: userErrorMessage(error, 'Impossible d’enregistrer la dépense. Réessayez.'),
+      });
+    } finally {
+      setSaving(false);
+      submitLockRef.current.release();
     }
-
-    setSaving(false);
-    setShowModal(false);
   };
 
   const handleDelete = async () => {
     if (!selectedExpense) return;
-    await deleteTripExpense(selectedExpense.id);
-    setExpenses((prev) => prev.filter((item) => item.id !== selectedExpense.id));
-    setShowDelete(false);
-    setShowModal(false);
+    try {
+      await deleteTripExpense(selectedExpense.id);
+      setExpenses((prev) => prev.filter((item) => item.id !== selectedExpense.id));
+      setShowDelete(false);
+      setShowModal(false);
+    } catch (error) {
+      console.error('Erreur de suppression de la dépense', error);
+      addToast({
+        type: 'error',
+        title: 'Erreur de suppression',
+        description: userErrorMessage(error, 'Impossible de supprimer la dépense.'),
+      });
+    }
   };
 
   const handlePrint = () => {

@@ -9,7 +9,7 @@ import type {
   TripVehicle,
 } from './types';
 import type { SyncEntity } from './syncTypes';
-import { hasProtectedMutation, listProtectedTargets } from './syncQueue';
+import { hasActiveMutations, hasProtectedMutation, listProtectedTargets } from './syncQueue';
 
 // ---------------------------------------------------------------
 // Server -> local polished refresh. Records still protected by a pending
@@ -27,8 +27,49 @@ function isProtected(map: ProtectedMap, entity: SyncEntity, id: string): boolean
   return map.has(`${entity}:${id}`);
 }
 
-export async function refreshClients(server: Client[]): Promise<void> {
+const STORE_BY_ENTITY: Record<
+  SyncEntity,
+  'clients' | 'products' | 'parcels' | 'payments' | 'trips' | 'trip_vehicles'
+> = {
+  clients: 'clients',
+  products: 'products',
+  parcels: 'parcels',
+  payments: 'payments',
+  trips: 'trips',
+  'trip-vehicles': 'trip_vehicles',
+};
+
+// Removes local records of `entity` that the server snapshot no longer
+// contains, unless:
+//   - any mutation for the entity is still active (the server may just not have
+//     applied it yet),
+//   - the specific record is still protected by a pending mutation,
+//   - the record was written at/after the snapshot was taken (it may not have
+//     reached the server list yet).
+// This keeps a record created just before a "get" from being garbage-collected
+// by a concurrent refresh racing the sync writer.
+async function gcMissingFromServer(
+  entity: SyncEntity,
+  serverIds: Set<string>,
+  serverFetchedAt: string
+): Promise<void> {
+  if (await hasActiveMutations(entity)) return;
   const db = await getDB();
+  const local = (await db.getAll(STORE_BY_ENTITY[entity])) as Array<{
+    id: string;
+    updated_at?: string;
+    created_at?: string;
+  }>;
+  for (const record of local) {
+    if (serverIds.has(record.id)) continue;
+    if (await hasProtectedMutation(entity, record.id)) continue;
+    const writtenAt = record.updated_at ?? record.created_at;
+    if (writtenAt && writtenAt >= serverFetchedAt) continue;
+    await removeFromLocal(entity, record.id);
+  }
+}
+
+export async function refreshClients(server: Client[]): Promise<void> {
   const protectedMap = await protectedKeys();
   const serverIds = new Set<string>();
   for (const client of server) {
@@ -36,16 +77,10 @@ export async function refreshClients(server: Client[]): Promise<void> {
     if (isProtected(protectedMap, 'clients', client.id)) continue;
     await upsertClient(client);
   }
-  const local = await db.getAll('clients');
-  for (const record of local) {
-    if (!serverIds.has(record.id) && !isProtected(protectedMap, 'clients', record.id)) {
-      await removeFromLocal('clients', record.id);
-    }
-  }
+  await gcMissingFromServer('clients', serverIds, new Date().toISOString());
 }
 
 export async function refreshProducts(server: Product[]): Promise<void> {
-  const db = await getDB();
   const protectedMap = await protectedKeys();
   const serverIds = new Set<string>();
   for (const product of server) {
@@ -53,16 +88,10 @@ export async function refreshProducts(server: Product[]): Promise<void> {
     if (isProtected(protectedMap, 'products', product.id)) continue;
     await upsertProduct(product);
   }
-  const local = await db.getAll('products');
-  for (const record of local) {
-    if (!serverIds.has(record.id) && !isProtected(protectedMap, 'products', record.id)) {
-      await removeFromLocal('products', record.id);
-    }
-  }
+  await gcMissingFromServer('products', serverIds, new Date().toISOString());
 }
 
 export async function refreshParcels(server: Array<Parcel & { items?: ParcelItem[] }>): Promise<void> {
-  const db = await getDB();
   const protectedMap = await protectedKeys();
   const serverIds = new Set<string>();
   for (const parcel of server) {
@@ -70,16 +99,10 @@ export async function refreshParcels(server: Array<Parcel & { items?: ParcelItem
     if (isProtected(protectedMap, 'parcels', parcel.id)) continue;
     await upsertParcel(parcel, parcel.items ?? []);
   }
-  const local = await db.getAll('parcels');
-  for (const record of local) {
-    if (!serverIds.has(record.id) && !isProtected(protectedMap, 'parcels', record.id)) {
-      await removeFromLocal('parcels', record.id);
-    }
-  }
+  await gcMissingFromServer('parcels', serverIds, new Date().toISOString());
 }
 
 export async function refreshPayments(server: Payment[]): Promise<void> {
-  const db = await getDB();
   const protectedMap = await protectedKeys();
   const serverIds = new Set<string>();
   for (const payment of server) {
@@ -87,16 +110,10 @@ export async function refreshPayments(server: Payment[]): Promise<void> {
     if (isProtected(protectedMap, 'payments', payment.id)) continue;
     await upsertPayment(payment);
   }
-  const local = await db.getAll('payments');
-  for (const record of local) {
-    if (!serverIds.has(record.id) && !isProtected(protectedMap, 'payments', record.id)) {
-      await removeFromLocal('payments', record.id);
-    }
-  }
+  await gcMissingFromServer('payments', serverIds, new Date().toISOString());
 }
 
 export async function refreshTrips(server: Trip[], allVehicles: TripVehicle[]): Promise<void> {
-  const db = await getDB();
   const protectedMap = await protectedKeys();
   const serverIds = new Set<string>();
   for (const trip of server) {
@@ -105,20 +122,10 @@ export async function refreshTrips(server: Trip[], allVehicles: TripVehicle[]): 
     const vehicles = allVehicles.filter((vehicle) => vehicle.trip_id === trip.id);
     await upsertTrip(trip, vehicles);
   }
-  const localTrips = await db.getAll('trips');
-  for (const record of localTrips) {
-    if (!serverIds.has(record.id) && !isProtected(protectedMap, 'trips', record.id)) {
-      await removeFromLocal('trips', record.id);
-    }
-  }
-  // Remove vehicle-level protected entries too (they are tracked separately).
-  const localVehicles = await db.getAll('trip_vehicles');
-  for (const vehicle of localVehicles) {
-    const tripStillPresent = server.some((trip) => trip.id === vehicle.trip_id);
-    if (!tripStillPresent && !isProtected(protectedMap, 'trip-vehicles', vehicle.id)) {
-      await db.delete('trip_vehicles', vehicle.id);
-    }
-  }
+  const serverFetchedAt = new Date().toISOString();
+  await gcMissingFromServer('trips', serverIds, serverFetchedAt);
+  // Vehicles of trips that vanished from the server snapshot are swept too.
+  await gcMissingFromServer('trip-vehicles', new Set(allVehicles.map((vehicle) => vehicle.id)), serverFetchedAt);
 }
 
 export async function protectedUpsert(entity: SyncEntity, id: string, write: () => Promise<void>): Promise<boolean> {
