@@ -24,7 +24,16 @@ const request = async (method: string, id?: string, body?: unknown) => {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, `API_${response.status}`);
+    let message = `API_${response.status}`;
+    // Surface the server's French error message (e.g. duplicate phone) instead
+    // of a raw code, so userErrorMessage can display a meaningful reason.
+    try {
+      const parsed = await response.json();
+      if (parsed && typeof parsed.error === 'string' && parsed.error.trim()) message = parsed.error;
+    } catch {
+      // keep the API_### fallback
+    }
+    throw new ApiError(response.status, message);
   }
 
   return response.status === 204 ? undefined : ((await response.json()) as { data: unknown }).data;

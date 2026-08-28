@@ -62,6 +62,83 @@ try {
   const usersList = await list('users', admin);
   console.log('User list count:', usersList.length);
 
+  console.log('--- TEST 7: Duplicate phone is rejected ---');
+  let duplicateThrown = null;
+  try {
+    await create('users', {
+      fullName: `Test Duplicate ${marker}`,
+      phone: adminPhone,
+      role: 'agent',
+      password: testPassword,
+      active: true,
+    }, admin);
+  } catch (error) {
+    duplicateThrown = error;
+  }
+  console.log('Duplicate phone error code:', duplicateThrown?.code);
+
+  console.log('--- TEST 8: Wrong password is rejected ---');
+  const wrongPasswordAuth = await authenticate(agentPhone, 'WrongPassword999!');
+  console.log('Wrong password result:', wrongPasswordAuth);
+
+  console.log('--- TEST 9: Inactive account cannot authenticate ---');
+  await update('users', createdAgent.id, { active: false }, admin);
+  const inactiveAuth = await authenticate(agentPhone, newPassword);
+  await update('users', createdAgent.id, { active: true }, admin);
+  const reactivatedAuth = await authenticate(agentPhone, newPassword);
+  console.log('Inactive login:', inactiveAuth, 'Reactivated login:', reactivatedAuth?.full_name);
+
+  console.log('--- TEST 10: Agent cannot access admin-only user endpoints (RBAC) ---');
+  const agentSession = await authenticate(agentPhone, newPassword);
+  let agentListThrown = null;
+  try {
+    await list('users', agentSession);
+  } catch (error) {
+    agentListThrown = error;
+  }
+  let agentCreateThrown = null;
+  try {
+    await create('users', {
+      fullName: `Blocked ${marker}`,
+      phone: `+22355${String(Date.now()).slice(-6)}`,
+      role: 'agent',
+      password: testPassword,
+    }, agentSession);
+  } catch (error) {
+    agentCreateThrown = error;
+  }
+  console.log('Agent list error:', agentListThrown?.message, '| Agent create error:', agentCreateThrown?.message);
+
+  console.log('--- TEST 11: Short password is rejected ---');
+  let shortPasswordThrown = null;
+  try {
+    await create('users', {
+      fullName: `Short ${marker}`,
+      phone: `+22344${String(Date.now()).slice(-6)}`,
+      role: 'agent',
+      password: 'short',
+      active: true,
+    }, admin);
+  } catch (error) {
+    shortPasswordThrown = error;
+  }
+  console.log('Short password error:', shortPasswordThrown?.message);
+
+  console.log('--- TEST 12: Invalid role is rejected ---');
+  let invalidRoleThrown = null;
+  try {
+    await create('users', {
+      fullName: `Role ${marker}`,
+      phone: `+22333${String(Date.now()).slice(-6)}`,
+      role: 'director',
+      password: testPassword,
+      active: true,
+    }, admin);
+  } catch (error) {
+    invalidRoleThrown = error;
+  }
+  console.log('Invalid role error:', invalidRoleThrown?.message);
+
   const results = {
     directeurCreated: createdAdmin?.role === 'admin',
     agentCreated: createdAgent?.role === 'agent',
@@ -69,6 +146,13 @@ try {
     agentAuthSuccess: authAgent?.role === 'agent',
     passwordUpdateSuccess: oldLoginFail === null && newLoginSuccess !== null,
     userListIncludesNewAccounts: usersList.some((u) => u.id === createdAdmin.id) && usersList.some((u) => u.id === createdAgent.id),
+    duplicatePhoneRejected: duplicateThrown?.code === 'DUPLICATE_PHONE',
+    wrongPasswordRejected: wrongPasswordAuth === null,
+    inactiveAccountRejected: inactiveAuth === null && reactivatedAuth?.full_name === createdAgent.full_name,
+    agentCannotListUsers: agentListThrown?.message === 'Forbidden.',
+    agentCannotCreateUsers: agentCreateThrown?.message === 'Forbidden.',
+    shortPasswordRejected: shortPasswordThrown?.message?.includes('8 caractères'),
+    invalidRoleRejected: invalidRoleThrown?.message === 'Invalid role.',
   };
 
   console.log('\n--- SUMMARY ---');

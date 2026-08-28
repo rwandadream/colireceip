@@ -62,3 +62,4 @@ jobs:
           npm run test-tracking-collision
           npm run test-payment-idempotency
           npm run test-payment-persistence
+          npm run test-payment-deletion

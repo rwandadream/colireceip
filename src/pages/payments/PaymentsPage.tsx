@@ -37,8 +37,10 @@ import { useSync } from '../../context/SyncContext';
 import { useToast } from '../../context/ToastContext';
 
 export function PaymentsListPage() {
+  const { user } = useAuth();
   const { addToast } = useToast();
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('all');
@@ -47,8 +49,9 @@ export function PaymentsListPage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getPayments();
-        setPayments(data);
+        const [paymentsData, parcelsData] = await Promise.all([getPayments(), getParcels()]);
+        setPayments(paymentsData);
+        setParcels(parcelsData);
       } catch (error) {
         console.error('Erreur lors du chargement des paiements:', error);
         addToast({
@@ -89,8 +92,36 @@ export function PaymentsListPage() {
     });
   }, [payments, search, methodFilter, dateFilter]);
 
-  const totalToday = payments.filter((p) => isToday(p.payment_date)).reduce((s, p) => s + p.amount, 0);
-  const totalAll = payments.reduce((s, p) => s + p.amount, 0);
+  // "Encaissé aujourd'hui" and "Total encaissé" must mirror getDashboardStats:
+  // sums runtime payment rows PLUS the origin contribution of any "paid at
+  // origin" parcel (the amount collected at creation is not a payment row).
+  // Same per-role scoping as the dashboard so the figures agree there too.
+  const { totalToday, totalAll } = useMemo(() => {
+    const isAgent = user?.role === 'agent';
+    const scopePayments = isAgent ? payments.filter((p) => p.recorded_by === user?.id) : payments;
+    const scopeParcels = isAgent
+      ? parcels.filter((p) => p.agent_id === user?.id || p.registered_by === user?.id)
+      : parcels;
+    const paymentsByParcel = new Map<string, number>();
+    for (const p of scopePayments) {
+      paymentsByParcel.set(p.parcel_id, (paymentsByParcel.get(p.parcel_id) || 0) + p.amount);
+    }
+    const originContribution = (parcel: Parcel): number =>
+      Math.max((parcel.amount_paid || 0) - (paymentsByParcel.get(parcel.id) || 0), 0);
+    const originToday = scopeParcels
+      .filter(
+        (p) => p.payment_condition === 'paid_origin' && originContribution(p) > 0 && isToday(p.received_date || p.created_at)
+      )
+      .reduce((sum, p) => sum + originContribution(p), 0);
+    const originTotal = scopeParcels
+      .filter((p) => p.payment_condition === 'paid_origin' && originContribution(p) > 0)
+      .reduce((sum, p) => sum + originContribution(p), 0);
+    return {
+      totalToday: scopePayments.filter((p) => isToday(p.payment_date)).reduce((sum, p) => sum + p.amount, 0) + originToday,
+      totalAll: scopePayments.reduce((sum, p) => sum + p.amount, 0) + originTotal,
+    };
+  }, [payments, parcels, user?.id, user?.role]);
+
   const filteredTotal = filtered.reduce((s, p) => s + p.amount, 0);
 
   return (

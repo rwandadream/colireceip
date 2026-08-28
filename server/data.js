@@ -88,9 +88,17 @@ export async function create(resource, input, user, options = {}) {
     const active = input.active !== undefined ? Boolean(input.active) : true;
     const email = clean(input.email)?.toLowerCase() || null;
     const passwordHash = await bcrypt.hash(password, 12);
-    const newUser = await prisma.user.create({
-      data: { fullName, phone, role, active, email, passwordHash },
-    });
+    let newUser;
+    try {
+      newUser = await prisma.user.create({ data: { fullName, phone, role, active, email, passwordHash } });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        const duplicatePhone = new Error('Un compte avec ce numéro de téléphone existe déjà.');
+        duplicatePhone.code = 'DUPLICATE_PHONE';
+        throw duplicatePhone;
+      }
+      throw error;
+    }
     return publicUser(newUser);
   }
   if (resource === 'products') {
@@ -227,7 +235,17 @@ export async function update(resource, id, input, user) {
       if (passwordValue.length < 8) throw new Error('Le mot de passe doit contenir au moins 8 caractères.');
       updateData.passwordHash = await bcrypt.hash(passwordValue, 12);
     }
-    const updatedUser = await prisma.user.update({ where: { id }, data: updateData });
+    let updatedUser;
+    try {
+      updatedUser = await prisma.user.update({ where: { id }, data: updateData });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        const duplicatePhone = new Error('Un compte avec ce numéro de téléphone existe déjà.');
+        duplicatePhone.code = 'DUPLICATE_PHONE';
+        throw duplicatePhone;
+      }
+      throw error;
+    }
     return publicUser(updatedUser);
   }
   if (resource === 'settings') {

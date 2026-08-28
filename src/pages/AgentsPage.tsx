@@ -30,6 +30,7 @@ import { Input, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Modal, ConfirmModal } from '../components/ui/Modal';
 import { formatDate } from '../lib/format';
+import { userErrorMessage } from '../lib/userMessage';
 
 export function AgentsPage() {
   const { user: currentUser } = useAuth();
@@ -120,7 +121,11 @@ export function AgentsPage() {
       loadUsers();
     } catch (error) {
       console.error('Enregistrement de l\'agent échoué', error);
-      addToast({ type: 'error', title: 'Enregistrement impossible', description: 'Une erreur est survenue lors de l\'enregistrement de l\'agent.' });
+      addToast({
+        type: 'error',
+        title: 'Enregistrement impossible',
+        description: userErrorMessage(error, 'Une erreur est survenue lors de l\'enregistrement de l\'agent.'),
+      });
     } finally {
       setSaving(false);
     }
