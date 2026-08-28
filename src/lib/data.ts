@@ -22,7 +22,8 @@ import type {
 } from './types';
 import { generateId, generateTrackingNumber, isToday, toISO } from './format';
 import { AUTH_STORAGE_KEYS, readStorageJson } from './storage';
-import { canUseClientApi, isApiUnavailable, listOnlineClients } from './clientPersistence';
+import { canUseClientApi, deleteOnlineClient, isApiUnavailable, listOnlineClients } from './clientPersistence';
+import { ApiError } from './api';
 import { canUseProductApi, isProductApiUnavailable, listOnlineProducts } from './productPersistence';
 import { canUseTripApi, isTripApiUnavailable, listOnlineTripVehicles, listOnlineTrips } from './tripPersistence';
 import { canUsePaymentApi, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
@@ -403,14 +404,42 @@ export async function getRelatedDataForClient(clientId: string): Promise<{ parce
   return { parcels, payments };
 }
 
-export async function deleteClient(id: string): Promise<void> {
+export async function deleteClient(id: string): Promise<{ pendingSync: boolean }> {
   const db = await getDB();
   const existing = await db.get('clients', id);
-  if (!existing) return;
+  if (!existing) return { pendingSync: false };
   requireOwnedAccess(existing.created_by);
+  if (canUseClientApi()) {
+    try {
+      // Online: the server must confirm the deletion before the UI may claim
+      // success. A permanent rejection (401/403/400/409) is surfaced to the
+      // user instead of presenting a local-only deletion as successful.
+      await deleteOnlineClient(id);
+    } catch (error) {
+      if (isApiUnavailable(error)) {
+        await db.delete('clients', id);
+        await enqueueMutation({ entity: 'clients', entityId: id, action: 'delete', payload: {} });
+        notifySync();
+        return { pendingSync: true };
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          throw new Error('Votre session a expiré. Connectez-vous à nouveau pour supprimer ce client.');
+        }
+        if (error.status === 403) {
+          throw new Error('Vous n\'avez pas la permission de supprimer ce client.');
+        }
+      }
+      throw error;
+    }
+  } else {
+    await db.delete('clients', id);
+    await enqueueMutation({ entity: 'clients', entityId: id, action: 'delete', payload: {} });
+    notifySync();
+    return { pendingSync: true };
+  }
   await db.delete('clients', id);
-  await enqueueMutation({ entity: 'clients', entityId: id, action: 'delete', payload: {} });
-  notifySync();
+  return { pendingSync: false };
 }
 
 // ============================================================

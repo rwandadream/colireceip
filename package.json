@@ -29,7 +29,8 @@
     "test-settings-sync": "node scripts/test-settings-sync.mjs",
     "test-excel-exports": "node scripts/test-excel-exports.mjs",
     "test-reconnect-sync": "node scripts/test-reconnect-sync.mjs",
-    "test-crud-persistence": "node scripts/test-crud-persistence.mjs"
+    "test-crud-persistence": "node scripts/test-crud-persistence.mjs",
+    "test-director-delete-guard": "node scripts/test-director-delete-guard.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

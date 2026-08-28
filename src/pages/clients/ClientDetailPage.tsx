@@ -107,13 +107,21 @@ export function ClientDetailPage() {
 
     setDeleteLoading(true);
     try {
-      await deleteClient(client.id);
+      const result = await deleteClient(client.id);
       await logActivity(user.id, user.full_name, `a supprimé le client ${client.full_name}`, 'client', client.id, '');
-      addToast({
-        type: 'success',
-        title: 'Client supprimé',
-        description: `Le client ${client.full_name} a été supprimé avec succès.`,
-      });
+      if (result.pendingSync) {
+        addToast({
+          type: 'warning',
+          title: 'Suppression en attente de synchronisation',
+          description: `Le client ${client.full_name} sera supprimé du serveur dès que la connexion sera rétablie.`,
+        });
+      } else {
+        addToast({
+          type: 'success',
+          title: 'Client supprimé',
+          description: `Le client ${client.full_name} a été supprimé avec succès.`,
+        });
+      }
       setDeleteOpen(false);
       navigate('/clients');
     } catch (error) {

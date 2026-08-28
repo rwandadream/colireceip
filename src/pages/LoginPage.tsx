@@ -23,6 +23,14 @@ export function LoginPage() {
     if (!result.ok) {
       setError(result.error || 'Erreur de connexion');
       setLoading(false);
+      return;
+    }
+    if (result.offline) {
+      addToast({
+        type: 'warning',
+        title: 'Connexion en mode hors-ligne',
+        description: 'Vous êtes connecté avec les données de cet appareil seul : vos modifications seront synchronisées lorsque la connexion au serveur sera rétablie.',
+      });
     }
   };
 

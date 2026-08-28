@@ -45,7 +45,7 @@ async function cacheAuthenticatedUser(authUser: User): Promise<void> {
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  login: (identifier: string, password: string) => Promise<{ ok: boolean; error?: string; offline?: boolean }>;
   logout: () => void;
 }
 
@@ -169,7 +169,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await storeUserVerifier(payload.user, password).catch(() => undefined);
         return { ok: true };
       } catch {
-        // The offline-first application remains usable with its IndexedDB account store.
+        // The offline-first application remains usable with its IndexedDB
+        // account store. The caller is told the session is local-only so the
+        // UI can warn that modifications will not reach the server.
       }
     }
 
@@ -182,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
     writeStorageJson('groupe-gaff-auth', u);
     await logActivity(u.id, u.full_name, 'Connexion', 'user', u.id, `Connexion de ${u.full_name}`);
-    return { ok: true };
+    return { ok: true, offline: true };
   };
 
   const logout = () => {
