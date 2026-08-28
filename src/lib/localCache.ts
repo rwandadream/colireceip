@@ -205,7 +205,7 @@ export async function removeFromLocal(entity: SyncEntity, id: string): Promise<v
   else if (entity === 'payments') {
     const payment = await db.get('payments', id);
     await db.delete('payments', id);
-    if (payment?.parcel_id) await reconcileParcelFromPayments(payment.parcel_id);
+    if (payment?.parcel_id) await reconcileParcelFromPayments(payment.parcel_id, Number(payment.amount) || 0);
   } else if (entity === 'trips') {
     const vehicles = await db.getAllFromIndex('trip_vehicles', 'by-trip', id);
     for (const vehicle of vehicles) await db.delete('trip_vehicles', vehicle.id);
@@ -224,14 +224,20 @@ export async function removeFromLocal(entity: SyncEntity, id: string): Promise<v
 }
 
 // Recomputes the local parcel "amount_paid"/"balance" after a local payment was
-// removed so the view stays coherent while offline.
-export async function reconcileParcelFromPayments(parcelId: string): Promise<void> {
+// removed so the view stays coherent while offline. For a "paid at origin"
+// parcel the origin amount has no payment row behind it, so it is preserved by
+// decrementing by the removed payment instead of recomputing from the remaining
+// rows (which would wipe it).
+export async function reconcileParcelFromPayments(parcelId: string, removedAmount = 0): Promise<void> {
   const db = await getDB();
   const parcel = await db.get('parcels', parcelId);
   if (!parcel) return;
-  const payments = await db.getAllFromIndex('payments', 'by-parcel', parcelId);
-  const amountPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const condition = parcel.payment_condition || 'unpaid';
+  const payments = await db.getAllFromIndex('payments', 'by-parcel', parcelId);
+  const runtimePaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const amountPaid = condition === 'paid_origin'
+    ? Math.max((Number(parcel.amount_paid) || 0) - removedAmount, 0)
+    : runtimePaid;
   const total = Number(parcel.total_amount) || 0;
   const updated = {
     ...parcel,

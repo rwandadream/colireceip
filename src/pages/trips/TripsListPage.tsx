@@ -41,16 +41,16 @@ export function TripsListPage() {
             const expenses = vehicles.reduce(
               (sum, vehicle) =>
                 sum +
-                vehicle.customs_fee +
-                vehicle.frontier_formalities +
-                vehicle.road_bamako_frontier +
-                vehicle.road_frontier_bouake +
-                vehicle.road_bouake_abidjan +
-                vehicle.road_abidjan +
-                vehicle.loading_fee +
-                vehicle.unloading_fee +
-                vehicle.truck_quota +
-                vehicle.monthly_fee,
+                (Number(vehicle.customs_fee) || 0) +
+                (Number(vehicle.frontier_formalities) || 0) +
+                (Number(vehicle.road_bamako_frontier) || 0) +
+                (Number(vehicle.road_frontier_bouake) || 0) +
+                (Number(vehicle.road_bouake_abidjan) || 0) +
+                (Number(vehicle.road_abidjan) || 0) +
+                (Number(vehicle.loading_fee) || 0) +
+                (Number(vehicle.unloading_fee) || 0) +
+                (Number(vehicle.truck_quota) || 0) +
+                (Number(vehicle.monthly_fee) || 0),
               0
             );
             return [trip.id, { vehicles: vehicles.length, parcels: parcels.length, expenses }] as const;

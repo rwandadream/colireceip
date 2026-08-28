@@ -876,7 +876,7 @@ export async function deletePayment(id: string): Promise<void> {
   const existing = await db.get('payments', id);
   if (!existing) return;
   await db.delete('payments', id);
-  if (existing.parcel_id) await reconcileParcelFromPayments(existing.parcel_id);
+  if (existing.parcel_id) await reconcileParcelFromPayments(existing.parcel_id, Number(existing.amount) || 0);
   await enqueueMutation({ entity: 'payments', entityId: id, action: 'delete', payload: {} });
   notifySync();
 }
@@ -977,42 +977,56 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     getTrips(),
   ]);
 
+  // Agents only see their own record. getTrips() is already agent-scoped
+  // internally, parcels/payments/clients are scoped here.
+  const user = getAuthenticatedUser();
+  const isAgent = user?.role === 'agent';
+  const scopedParcels = isAgent
+    ? parcels.filter((p) => p.agent_id === user.id || p.registered_by === user.id)
+    : parcels;
+  const scopedPayments = isAgent ? payments.filter((p) => p.recorded_by === user.id) : payments;
+  const scopedClients = isAgent ? clients.filter((c) => c.created_by === user.id) : clients;
+
   const paymentsByParcel = new Map<string, number>();
-  for (const payment of payments) {
+  for (const payment of scopedPayments) {
     paymentsByParcel.set(payment.parcel_id, (paymentsByParcel.get(payment.parcel_id) || 0) + payment.amount);
   }
+  // For a "paid at origin" parcel the origin amount sits on the parcel itself
+  // (no payment row). Total contribution = max(amount_paid - payments, 0).
+  const originContribution = (p: Parcel): number =>
+    Math.max((p.amount_paid || 0) - (paymentsByParcel.get(p.id) || 0), 0);
 
-  const collectedToday = payments
+  const collectedToday = scopedPayments
     .filter((p) => isToday(p.payment_date))
-    .reduce((sum, p) => sum + p.amount, 0) + parcels
-      .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0 && isToday(p.received_date || p.created_at))
-      .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
+    .reduce((sum, p) => sum + p.amount, 0) + scopedParcels
+      .filter((p) => p.payment_condition === 'paid_origin' && originContribution(p) > 0 && isToday(p.received_date || p.created_at))
+      .reduce((sum, p) => sum + originContribution(p), 0);
 
-  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0) + parcels
-    .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0)
-    .reduce((sum, p) => sum + ((paymentsByParcel.get(p.id) || 0) > 0 ? 0 : (p.amount_paid || 0)), 0);
+  const totalRevenue = scopedPayments.reduce((sum, p) => sum + p.amount, 0) + scopedParcels
+    .filter((p) => p.payment_condition === 'paid_origin' && originContribution(p) > 0)
+    .reduce((sum, p) => sum + originContribution(p), 0);
 
-  const totalOutstanding = parcels
+  const totalOutstanding = scopedParcels
     .filter((p) => p.status !== 'cancelled')
     .reduce((sum, p) => sum + (p.balance || 0), 0);
 
   return {
-    total_parcels: parcels.length,
-    received_today: parcels.filter((p) => isToday(p.received_date)).length,
-    pending: parcels.filter((p) => p.status === 'pending').length,
-    in_transit: parcels.filter((p) => p.status === 'in_transit').length,
-    arrived: parcels.filter((p) => p.status === 'arrived').length,
-    delivered: parcels.filter((p) => p.status === 'delivered').length,
-    cancelled: parcels.filter((p) => p.status === 'cancelled').length,
-    total_clients: clients.length,
+    total_parcels: scopedParcels.length,
+    received_today: scopedParcels.filter((p) => isToday(p.received_date)).length,
+    pending: scopedParcels.filter((p) => p.status === 'pending').length,
+    in_transit: scopedParcels.filter((p) => p.status === 'in_transit').length,
+    arrived: scopedParcels.filter((p) => p.status === 'arrived').length,
+    delivered: scopedParcels.filter((p) => p.status === 'delivered').length,
+    cancelled: scopedParcels.filter((p) => p.status === 'cancelled').length,
+    total_clients: scopedClients.length,
     collected_today: collectedToday,
-    pending_payments: parcels.filter(
+    pending_payments: scopedParcels.filter(
       (p) => p.status !== 'cancelled' && (p.balance || 0) > 0
     ).length,
     total_revenue: totalRevenue,
     total_outstanding: totalOutstanding,
     total_trips: trips.length,
-    total_payments: payments.length,
+    total_payments: scopedPayments.length,
   };
 }
 

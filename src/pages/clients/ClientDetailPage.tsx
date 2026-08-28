@@ -183,8 +183,17 @@ export function ClientDetailPage() {
   }
 
   const isAdmin = user?.role === 'admin';
-  const totalSpent = parcels.reduce((sum, p) => sum + p.total_amount, 0);
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalSpent = parcels.reduce((sum, p) => sum + (p.total_amount || 0), 0);
+  // "Payé au départ" parcels keep their origin amount on the parcel (no payment
+  // row); sum it per-parcel, otherwise sum the runtime payments per parcel.
+  const paymentsByParcel = new Map<string, number>();
+  for (const payment of payments) {
+    paymentsByParcel.set(payment.parcel_id, (paymentsByParcel.get(payment.parcel_id) || 0) + payment.amount);
+  }
+  const totalPaid = parcels.reduce(
+    (sum, p) => sum + (p.payment_condition === 'paid_origin' ? (p.amount_paid || 0) : (paymentsByParcel.get(p.id) || 0)),
+    0
+  );
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">

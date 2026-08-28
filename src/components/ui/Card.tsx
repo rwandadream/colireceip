@@ -27,7 +27,17 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ label, value, icon, trend, className = '' }: StatCardProps) {
+const STAT_COLORS: Record<string, string> = {
+  brand: 'text-brand-500 dark:text-brand-400',
+  success: 'text-emerald-500 dark:text-emerald-400',
+  warning: 'text-amber-500 dark:text-amber-400',
+  accent: 'text-accent-500 dark:text-accent-400',
+  purple: 'text-purple-500 dark:text-purple-400',
+  cyan: 'text-cyan-500 dark:text-cyan-400',
+};
+
+export function StatCard({ label, value, icon, color, trend, className = '' }: StatCardProps) {
+  const iconColor = color ? STAT_COLORS[color] || STAT_COLORS.brand : 'text-slate-400 dark:text-slate-500';
   return (
     <div className={`card p-4 flex flex-col justify-between ${className}`}>
       <div className="flex items-center justify-between gap-2">
@@ -35,7 +45,7 @@ export function StatCard({ label, value, icon, trend, className = '' }: StatCard
           {label}
         </p>
         {icon && (
-          <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">
+          <span className={`flex-shrink-0 ${iconColor}`}>
             {icon}
           </span>
         )}

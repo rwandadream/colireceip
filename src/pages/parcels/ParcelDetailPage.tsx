@@ -251,10 +251,12 @@ export function ParcelDetailPage() {
           <Clock size={16} />
           Changer le statut
         </Button>
-        <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-secondary text-sm">
-          <CreditCard size={16} />
-          Enregistrer paiement
-        </Link>
+        {parcel.balance > 0 && (
+          <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-secondary text-sm">
+            <CreditCard size={16} />
+            Enregistrer paiement
+          </Link>
+        )}
         {parcel.balance > 0 && (
           <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-primary text-sm">
             <CreditCard size={16} />

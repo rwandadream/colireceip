@@ -311,7 +311,7 @@ export function ExpensesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dépenses</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Suivi des dépenses de voyage et rapports.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Suivi des dépenses et rapports.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <Button variant="secondary" size="sm" onClick={handlePrint} className="w-full sm:w-auto">
@@ -333,7 +333,7 @@ export function ExpensesPage() {
           <p className="text-3xl font-bold text-slate-900 dark:text-white mt-3">{spendCount}</p>
         </Card>
         <Card className="p-5">
-          <p className="text-xs text-slate-400 uppercase tracking-wide">Nombre de voyages</p>
+          <p className="text-xs text-slate-400 uppercase tracking-wide">Nombre de colis concernés</p>
           <p className="text-3xl font-bold text-slate-900 dark:text-white mt-3">{tripsCount}</p>
         </Card>
       </div>
@@ -341,7 +341,7 @@ export function ExpensesPage() {
       <Card className="p-4">
         <div className="grid gap-4 lg:grid-cols-4">
           <Input
-            placeholder="Rechercher voyage, chauffeur, camion..."
+            placeholder="Rechercher colis, catégorie..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             icon={<Search size={18} />}
@@ -447,12 +447,12 @@ export function ExpensesPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Select
-              label="Voyage"
+              label="Colis"
               value={form.parcel_id}
               onChange={(e) => setForm({ ...form, parcel_id: e.target.value })}
               required
             >
-              <option value="">— Sélectionner un voyage —</option>
+              <option value="">— Sélectionner un colis —</option>
               {parcels.map((parcel) => (
                 <option key={parcel.id} value={parcel.id}>
                   {formatTrackingNumber(parcel.tracking_number)} · {parcel.vehicle || parcel.agent_name || parcel.origin} → {parcel.destination}

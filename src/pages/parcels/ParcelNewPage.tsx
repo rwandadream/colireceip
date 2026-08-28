@@ -169,7 +169,7 @@ export function ParcelNewPage() {
 
   const subTotal = items.reduce((sum, item) => sum + item.amount, 0);
   const totalAmount = subTotal + transportPriceNum + additionalFeesNum;
-  const balance = totalAmount - amountPaidNum;
+  const balance = form.payment_condition === 'paid_origin' ? 0 : Math.max(totalAmount - amountPaidNum, 0);
   const totalQuantity = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
   const updateItem = (id: string, changes: Partial<typeof items[number]>) => {
@@ -240,6 +240,10 @@ export function ParcelNewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.client_id || !form.package_type || items.length === 0 || items.some((item) => !item.designation || Number(item.quantity) <= 0)) return;
+    if (form.payment_condition === 'paid_origin' && amountPaidNum <= 0) {
+      addToast({ type: 'error', title: 'Montant payé requis', description: 'Un colis « Payé au départ » doit avoir un montant payé supérieur à 0.' });
+      return;
+    }
     if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
     if (!submitLockRef.current.acquire()) return;
     setSaving(true);

@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const status = error.message === 'Forbidden.' ? 403
       : error.code === 'IDEMPOTENCY_CONFLICT' || error.code === 'P2002' || error.code === 'P2003' || error.code === 'STATUS_CONFLICT' ? 409
       : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 400
-      : error.code === 'REQUIRED_CONFIG_MISSING' || error.message?.startsWith('Required server configuration') ? 503
+      : error.code === 'REQUIRED_CONFIG_MISSING' || error.code === 'P2034' || error.message?.startsWith('Required server configuration') ? 503
       : 400;
     const message = status === 403 ? 'Accès refusé.'
       : status === 409 ? error.code === 'P2003' ? 'Suppression impossible : des données liées existent.' : error.code === 'STATUS_CONFLICT' ? 'Conflit de statut : le colis a été modifié sur le serveur.' : 'Conflit d\'idempotence.'

@@ -58,6 +58,7 @@ jobs:
           npm run test-excel-exports
           npm run test-data-api
           npm run test-admin-auth
+          npm run test-user-api
           npm run test-tracking-collision
           npm run test-payment-idempotency
           npm run test-payment-persistence

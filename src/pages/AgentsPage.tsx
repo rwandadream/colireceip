@@ -36,6 +36,7 @@ export function AgentsPage() {
   const { addToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,9 +56,15 @@ export function AgentsPage() {
   });
 
   const loadUsers = async () => {
-    const data = await getUsers();
-    setUsers(data);
-    setLoading(false);
+    try {
+      const data = await getUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error('Chargement des utilisateurs échoué', error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -90,40 +97,56 @@ export function AgentsPage() {
       return;
     }
     setSaving(true);
-    if (editUser) {
-      const updates: Partial<User> = {
-        full_name: form.full_name,
-        phone: form.phone,
-        role: form.role,
-        active: form.active,
-      };
-      if (form.password) updates.password = form.password;
-      await updateUser(editUser.id, updates);
-      await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a modifié l'agent ${form.full_name}`, 'user', editUser.id, '');
-    } else {
-      const newUser = await createUser({
-        ...form,
-        role: form.role as UserRole,
-        active: true,
-      });
-      await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a créé le compte ${form.full_name}`, 'user', newUser.id, '');
+    try {
+      if (editUser) {
+        const updates: Partial<User> = {
+          full_name: form.full_name,
+          phone: form.phone,
+          role: form.role,
+          active: form.active,
+        };
+        if (form.password) updates.password = form.password;
+        await updateUser(editUser.id, updates);
+        await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a modifié l'agent ${form.full_name}`, 'user', editUser.id, '');
+      } else {
+        const newUser = await createUser({
+          ...form,
+          role: form.role as UserRole,
+          active: true,
+        });
+        await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a créé le compte ${form.full_name}`, 'user', newUser.id, '');
+      }
+      setModalOpen(false);
+      loadUsers();
+    } catch (error) {
+      console.error('Enregistrement de l\'agent échoué', error);
+      addToast({ type: 'error', title: 'Enregistrement impossible', description: 'Une erreur est survenue lors de l\'enregistrement de l\'agent.' });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setModalOpen(false);
-    loadUsers();
   };
 
   const handleToggleActive = async (u: User) => {
-    await updateUser(u.id, { active: !u.active });
-    await logActivity(currentUser?.id || '', currentUser?.full_name || '', `${!u.active ? 'a réactivé' : 'a désactivé'} l'agent ${u.full_name}`, 'user', u.id, '');
-    loadUsers();
+    try {
+      await updateUser(u.id, { active: !u.active });
+      await logActivity(currentUser?.id || '', currentUser?.full_name || '', `${!u.active ? 'a réactivé' : 'a désactivé'} l'agent ${u.full_name}`, 'user', u.id, '');
+      loadUsers();
+    } catch (error) {
+      console.error('Changement de statut échoué', error);
+      addToast({ type: 'error', title: 'Action impossible', description: 'Une erreur est survenue lors du changement de statut.' });
+    }
   };
 
   const handleDelete = async () => {
     if (!userToDelete) return;
-    await deleteUser(userToDelete.id);
-    await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a supprimé l'agent ${userToDelete.full_name}`, 'user', userToDelete.id, '');
-    loadUsers();
+    try {
+      await deleteUser(userToDelete.id);
+      await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a supprimé l'agent ${userToDelete.full_name}`, 'user', userToDelete.id, '');
+      loadUsers();
+    } catch (error) {
+      console.error('Suppression de l\'agent échouée', error);
+      addToast({ type: 'error', title: 'Suppression impossible', description: 'Une erreur est survenue lors de la suppression de l\'agent.' });
+    }
   };
 
   const handleResetPassword = async () => {
@@ -132,11 +155,16 @@ export function AgentsPage() {
       addToast({ type: 'error', title: 'Mot de passe trop court', description: 'Le mot de passe doit contenir au moins 8 caractères.' });
       return;
     }
-    await updateUser(userToReset.id, { password: newPassword });
-    await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a réinitialisé le mot de passe de ${userToReset.full_name}`, 'user', userToReset.id, '');
-    setResetOpen(false);
-    setNewPassword('');
-    setUserToReset(null);
+    try {
+      await updateUser(userToReset.id, { password: newPassword });
+      await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a réinitialisé le mot de passe de ${userToReset.full_name}`, 'user', userToReset.id, '');
+      setResetOpen(false);
+      setNewPassword('');
+      setUserToReset(null);
+    } catch (error) {
+      console.error('Réinitialisation du mot de passe échouée', error);
+      addToast({ type: 'error', title: 'Réinitialisation impossible', description: 'Une erreur est survenue lors de la réinitialisation du mot de passe.' });
+    }
   };
 
   return (
@@ -186,6 +214,13 @@ export function AgentsPage() {
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
           ))}
+        </Card>
+      ) : loadError ? (
+        <Card className="p-6 text-center">
+          <Shield size={28} className="mx-auto text-rose-500 mb-2" />
+          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger les utilisateurs</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
+          <Button variant="secondary" size="sm" onClick={() => { setLoading(true); setLoadError(false); loadUsers(); }}>Réessayer</Button>
         </Card>
       ) : filtered.length === 0 ? (
         <Card>

@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ScrollText, Search } from 'lucide-react';
+import { ScrollText, Search, AlertTriangle } from 'lucide-react';
 import { getActivityLogs, getUsers } from '../lib/data';
 import type { ActivityLog, User } from '../lib/types';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { OfflineNotice } from '../components/ui/OfflineNotice';
 import { EmptyState, Skeleton } from '../components/ui/Badge';
 import { Input, Select } from '../components/ui/Input';
@@ -12,6 +13,7 @@ export function LogsPage() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [userFilter, setUserFilter] = useState('all');
 
@@ -19,11 +21,17 @@ export function LogsPage() {
     let active = true;
 
     (async () => {
-      const [l, u] = await Promise.all([getActivityLogs(), getUsers()]);
-      if (!active) return;
-      setLogs(l);
-      setUsers(u);
-      setLoading(false);
+      try {
+        const [l, u] = await Promise.all([getActivityLogs(), getUsers()]);
+        if (!active) return;
+        setLogs(l);
+        setUsers(u);
+      } catch (error) {
+        console.error('Chargement du journal échoué', error);
+        if (active) setLoadError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
 
     return () => {
@@ -88,6 +96,13 @@ export function LogsPage() {
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
           ))}
+        </Card>
+      ) : loadError ? (
+        <Card className="p-6 text-center">
+          <AlertTriangle size={28} className="mx-auto text-rose-500 mb-2" />
+          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger le journal</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
+          <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Réessayer</Button>
         </Card>
       ) : filtered.length === 0 ? (
         <Card>

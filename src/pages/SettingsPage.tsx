@@ -34,6 +34,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [recentLogs, setRecentLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const savedTimeoutRef = useRef<number | null>(null);
@@ -42,15 +43,21 @@ export function SettingsPage() {
     let active = true;
 
     (async () => {
-      const [s, l] = await Promise.all([
-        getSettings(),
-        getActivityLogs(10),
-      ]);
+      try {
+        const [s, l] = await Promise.all([
+          getSettings(),
+          getActivityLogs(10),
+        ]);
 
-      if (!active) return;
-      setSettings(s);
-      setRecentLogs(l);
-      setLoading(false);
+        if (!active) return;
+        setSettings(s);
+        setRecentLogs(l);
+      } catch (error) {
+        console.error('Chargement des paramètres échoué', error);
+        if (active) setLoadError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
 
     return () => {
@@ -64,14 +71,20 @@ export function SettingsPage() {
   const handleSave = async () => {
     if (!settings) return;
     setSaving(true);
-    await updateSettings(settings);
-    await logActivity(user?.id || '', user?.full_name || '', 'a modifié les paramètres de l\'application', 'settings', '', '');
-    setSaving(false);
-    setSaved(true);
-    if (savedTimeoutRef.current) {
-      window.clearTimeout(savedTimeoutRef.current);
+    try {
+      await updateSettings(settings);
+      await logActivity(user?.id || '', user?.full_name || '', 'a modifié les paramètres de l\'application', 'settings', '', '');
+      setSaved(true);
+      if (savedTimeoutRef.current) {
+        window.clearTimeout(savedTimeoutRef.current);
+      }
+      savedTimeoutRef.current = window.setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error('Enregistrement des paramètres échoué', error);
+      setSaved(false);
+    } finally {
+      setSaving(false);
     }
-    savedTimeoutRef.current = window.setTimeout(() => setSaved(false), 2000);
   };
 
   // Function to return activity timeline icon and color
@@ -152,6 +165,19 @@ export function SettingsPage() {
         };
     }
   };
+
+  if (loadError) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4 p-4">
+        <Card className="p-6 text-center">
+          <AlertCircle size={28} className="mx-auto text-rose-500 mb-2" />
+          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger les paramètres</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
+          <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Réessayer</Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading || !settings) return <Skeleton className="h-96" />;
 

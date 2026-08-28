@@ -30,7 +30,7 @@ export function ExpenseTripDetailPage() {
         setExpenses(expenseData);
       } catch (err) {
         console.error('Failed to load trip expense detail', err);
-        setError('Impossible de charger le détail du voyage.');
+        setError('Impossible de charger le détail des dépenses.');
       } finally {
         setLoading(false);
       }
@@ -61,7 +61,7 @@ export function ExpenseTripDetailPage() {
   if (!parcel) {
     return (
       <div className="text-center py-16">
-        <p className="text-slate-500">Voyage introuvable</p>
+        <p className="text-slate-500">Colis introuvable</p>
         <Link to="/expenses" className="btn-primary mt-4">Retour aux dépenses</Link>
       </div>
     );
@@ -72,7 +72,7 @@ export function ExpenseTripDetailPage() {
       <OfflineNotice />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Détail du voyage</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Détail des dépenses</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-1">
             <TrackingBadge tracking={parcel.tracking_number} size="sm" /> · {parcel.origin} → {parcel.destination}
           </p>
@@ -87,10 +87,10 @@ export function ExpenseTripDetailPage() {
 
       <Card className="p-5 grid gap-4 lg:grid-cols-2">
         <div>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Informations du voyage</h2>
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Informations</h2>
           <div className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
             <div className="flex justify-between items-center">
-              <span>Numéro du voyage</span>
+              <span>N° Colis</span>
               <TrackingBadge tracking={parcel.tracking_number} size="sm" />
             </div>
             <div className="flex justify-between">
@@ -144,7 +144,7 @@ export function ExpenseTripDetailPage() {
         </div>
 
         {expenses.length === 0 ? (
-          <div className="text-center py-16 text-slate-500 dark:text-slate-400">Aucune dépense enregistrée pour ce voyage.</div>
+          <div className="text-center py-16 text-slate-500 dark:text-slate-400">Aucune dépense enregistrée pour ce colis.</div>
         ) : (
           <div className="overflow-x-auto">
             <div className="min-w-[860px]">

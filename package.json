@@ -15,6 +15,7 @@
     "generate-icons": "node scripts/generate-icons.js",
     "bootstrap-admin": "node scripts/bootstrap-admin.mjs",
     "test-admin-auth": "node scripts/test-admin-auth.mjs",
+    "test-user-api": "node scripts/test-user-api.mjs",
     "test-data-api": "node scripts/test-data-api.mjs",
     "test-payment-idempotency": "node scripts/test-payment-idempotency.mjs",
     "test-payment-persistence": "node scripts/test-payment-persistence.mjs",

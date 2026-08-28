@@ -33,6 +33,7 @@ export function ReportsPage() {
   const [rawClients, setRawClients] = useState<Client[]>([]);
   const [rawLogs, setRawLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -40,17 +41,23 @@ export function ReportsPage() {
 
   useEffect(() => {
     (async () => {
-      const [p, pays, c, l] = await Promise.all([
-        getParcels(),
-        getPayments(),
-        getClients(),
-        getActivityLogs(),
-      ]);
-      setRawParcels(p);
-      setRawPayments(pays);
-      setRawClients(c);
-      setRawLogs(l);
-      setLoading(false);
+      try {
+        const [p, pays, c, l] = await Promise.all([
+          getParcels(),
+          getPayments(),
+          getClients(),
+          getActivityLogs(),
+        ]);
+        setRawParcels(p);
+        setRawPayments(pays);
+        setRawClients(c);
+        setRawLogs(l);
+      } catch (error) {
+        console.error('Chargement des rapports échoué', error);
+        setLoadError(true);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -91,11 +98,23 @@ export function ReportsPage() {
   );
 
   const totals = useMemo(
-    () => ({
-      value: parcels.reduce((sum, p) => sum + (p.total_amount || 0), 0),
-      collected: payments.reduce((sum, p) => sum + p.amount, 0),
-      outstanding: parcels.reduce((sum, p) => sum + (p.balance || 0), 0),
-    }),
+    () => {
+      const paymentsByParcel = new Map<string, number>();
+      for (const payment of payments) {
+        paymentsByParcel.set(payment.parcel_id, (paymentsByParcel.get(payment.parcel_id) || 0) + payment.amount);
+      }
+      // "Payé au départ" parcels carry an origin amount with no payment row;
+      // contribute max(amount_paid - payments, 0) so it is never double-counted
+      // nor silently dropped when runtime payments exist.
+      const originCollected = parcels
+        .filter((p) => p.payment_condition === 'paid_origin' && (p.amount_paid || 0) > 0)
+        .reduce((sum, p) => sum + Math.max((p.amount_paid || 0) - (paymentsByParcel.get(p.id) || 0), 0), 0);
+      return {
+        value: parcels.reduce((sum, p) => sum + (p.total_amount || 0), 0),
+        collected: payments.reduce((sum, p) => sum + p.amount, 0) + originCollected,
+        outstanding: parcels.reduce((sum, p) => sum + (p.balance || 0), 0),
+      };
+    },
     [parcels, payments]
   );
 
@@ -351,6 +370,24 @@ export function ReportsPage() {
   };
 
   if (loading) return <div className="animate-pulse"><div className="skeleton h-96 rounded-xl" /></div>;
+
+  if (loadError) {
+    return (
+      <div className="space-y-4">
+        <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Rapports & Exports</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Générez et exportez vos rapports métiers en formats PDF et Excel
+          </p>
+        </div>
+        <Card className="p-6 text-center">
+          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger les rapports</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
+          <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Réessayer</Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

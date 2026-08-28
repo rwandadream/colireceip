@@ -32,6 +32,25 @@ const idempotencyConflict = () => { const error = new Error('Idempotency key con
 const statusConflict = () => { const error = new Error('Le colis a été modifié sur le serveur.'); error.code = 'STATUS_CONFLICT'; return error; };
 const missingIdempotencyKey = () => { const error = new Error('Missing Idempotency-Key.'); error.code = 'MISSING_IDEMPOTENCY_KEY'; return error; };
 const resolveExistingPayment = (existing, user, fingerprint) => { if (existing.idempotencyFingerprint !== fingerprint) throw idempotencyConflict(); return publicValue(existing); };
+const MAX_TX_RETRIES = 3;
+// Retries a serializable transaction when PostgreSQL detects a write skew /
+// serialization failure (P2034). The failed transaction re-runs against the
+// latest committed state, so concurrent updates to the same parcel's financial
+// fields are never lost.
+const withTxRetry = async (operation) => {
+  for (let attempt = 0; attempt < MAX_TX_RETRIES; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error?.code === 'P2034' && attempt < MAX_TX_RETRIES - 1) {
+        await new Promise((resolveSleep) => setTimeout(resolveSleep, 25 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Transaction retry limit exceeded.');
+};
 
 export async function list(resource, user, query = {}) {
   switch (resource) {
@@ -87,6 +106,7 @@ export async function create(resource, input, user, options = {}) {
     const items = Array.isArray(input.items) ? input.items : []; if (!items.length) throw new Error('Missing items.');
     if (input.id) { const existing = await prisma.parcel.findUnique({ where: { id: clean(input.id) }, include: { items: true } }); if (existing) return publicValue(existing); }
     const subTotal = items.reduce((sum, item) => sum + amount(item.quantity, 'quantity') * amount(item.unitPrice, 'unitPrice'), 0); const transportPrice = amount(input.transportPrice ?? 0, 'transportPrice'); const additionalFees = amount(input.additionalFees ?? 0, 'additionalFees'); const amountPaid = amount(input.amountPaid ?? 0, 'amountPaid'); const condition = allowed(input.paymentCondition ?? 'unpaid', paymentConditions, 'paymentCondition'); const totalAmount = subTotal + transportPrice + additionalFees;
+    if (condition === 'paid_origin' && amountPaid <= 0) throw new Error('Un colis payé au départ doit avoir un montant payé supérieur à zéro.');
     const origin = clean(input.origin) || 'Bamako';
     const destination = clean(input.destination) || 'Abidjan';
     const count = await prisma.parcel.count();
@@ -117,12 +137,14 @@ export async function create(resource, input, user, options = {}) {
     if (existing) return resolveExistingPayment(existing, user, fingerprint);
     if (input.id) { const byId = await prisma.payment.findUnique({ where: { id: clean(input.id) } }); if (byId) return publicValue(byId); }
     try {
-      return publicValue(await prisma.$transaction(async (tx) => {
-        const payment = await tx.payment.create({ data: { ...(input.id ? { id: clean(input.id) } : {}), parcelId: parcel.id, parcelTracking: parcel.trackingNumber, clientId: parcel.clientId, clientName: parcel.clientName, amount: paymentAmount, paymentMethod, paymentDate, recordedById: user.id, recordedByName: user.full_name, note, idempotencyKey, idempotencyFingerprint: fingerprint } });
-        const nextPaid = Number(parcel.amountPaid) + paymentAmount;
-        await tx.parcel.update({ where: { id: parcel.id }, data: { amountPaid: nextPaid, balance: parcel.paymentCondition === 'paid_origin' ? 0 : Math.max(Number(parcel.totalAmount) - nextPaid, 0) } });
+      return publicValue(await withTxRetry(() => prisma.$transaction(async (tx) => {
+        const currentParcel = await tx.parcel.findUnique({ where: { id: parcel.id } });
+        if (!currentParcel) throw new Error('Colis introuvable.');
+        const payment = await tx.payment.create({ data: { ...(input.id ? { id: clean(input.id) } : {}), parcelId: currentParcel.id, parcelTracking: currentParcel.trackingNumber, clientId: currentParcel.clientId, clientName: currentParcel.clientName, amount: paymentAmount, paymentMethod, paymentDate, recordedById: user.id, recordedByName: user.full_name, note, idempotencyKey, idempotencyFingerprint: fingerprint } });
+        const nextPaid = Number(currentParcel.amountPaid) + paymentAmount;
+        await tx.parcel.update({ where: { id: currentParcel.id }, data: { amountPaid: nextPaid, balance: currentParcel.paymentCondition === 'paid_origin' ? 0 : Math.max(Number(currentParcel.totalAmount) - nextPaid, 0) } });
         return payment;
-      }));
+      }, { isolationLevel: 'Serializable' })));
     } catch (error) {
       if (error.code === 'P2002' || error.code === 'P2028') {
         const replay = await prisma.payment.findUnique({ where: { idempotencyKey } });
@@ -147,19 +169,27 @@ export async function remove(resource, id, user) {
     if (!record) return null;
     const parcel = await prisma.parcel.findUnique({ where: { id: record.parcelId } });
     if (!parcel || !canEditPayment(user, record, parcel)) throw new Error('Forbidden.');
-    return publicValue(await prisma.$transaction(async (tx) => {
+    return publicValue(await withTxRetry(() => prisma.$transaction(async (tx) => {
+      const currentParcel = await tx.parcel.findUnique({ where: { id: parcel.id } });
+      if (!currentParcel) throw new Error('Colis introuvable.');
       const deleted = await tx.payment.delete({ where: { id } });
       const remaining = await tx.payment.aggregate({ where: { parcelId: parcel.id }, _sum: { amount: true } });
-      const remainingPaid = Number(remaining._sum.amount ?? 0);
+      // For a "paid at origin" parcel the origin amount is not represented by a
+      // payment row, so recomputing from the remaining payments would wipe it.
+      // Decrement by the removed payment instead; normal parcels are recomputed
+      // from the remaining rows (self-healing).
+      const amountPaid = currentParcel.paymentCondition === 'paid_origin'
+        ? Math.max(Number(currentParcel.amountPaid) - Number(deleted.amount), 0)
+        : Math.max(Number(remaining._sum.amount ?? 0), 0);
       await tx.parcel.update({
         where: { id: parcel.id },
         data: {
-          amountPaid: remainingPaid,
-          balance: parcel.paymentCondition === 'paid_origin' ? 0 : Math.max(Number(parcel.totalAmount) - remainingPaid, 0),
+          amountPaid,
+          balance: currentParcel.paymentCondition === 'paid_origin' ? 0 : Math.max(Number(currentParcel.totalAmount) - amountPaid, 0),
         },
       });
       return deleted;
-    }));
+    }, { isolationLevel: 'Serializable' })));
   }
   const model = resource === 'clients' ? prisma.client : resource === 'trips' ? prisma.trip : resource === 'parcels' ? prisma.parcel : null; if (!model) throw new Error('Unknown resource.'); const record = await model.findUnique({ where: { id } }); if (!record) return null; if (!owned(user, record)) throw new Error('Forbidden.');
   if (resource === 'trips') {
