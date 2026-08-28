@@ -22,6 +22,7 @@
     "test-payment-persistence": "node scripts/test-payment-persistence.mjs",
     "test-sync-logic": "node --experimental-strip-types scripts/test-sync-logic.mjs",
     "test-sync-engine": "node scripts/test-sync-engine.mjs",
+    "test-transient-http": "node scripts/test-transient-http.mjs",
     "test-tracking-collision": "node scripts/test-tracking-collision.mjs",
     "test-payment-double-submit": "node --experimental-strip-types scripts/test-payment-double-submit.mjs",
     "test-parcel-create-local-first": "node scripts/test-parcel-create-local-first.mjs",

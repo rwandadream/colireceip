@@ -50,6 +50,7 @@ jobs:
         run: |
           npm run test-sync-logic
           npm run test-sync-engine
+          npm run test-transient-http
           npm run test-reconnect-sync
           npm run test-payment-double-submit
           npm run test-parcel-create-local-first

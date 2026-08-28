@@ -357,6 +357,37 @@ try {
   const localAfterDismiss = await db.get('clients', 'client-dismiss');
   record('dismissFailedClearsAndPullsServerTruth', counts.failedCount === failedFloor && counts.pendingCount === 0 && localAfterDismiss?.full_name === 'Still On Server', { counts, local: localAfterDismiss?.full_name ?? null });
   globalThis.fetch = prevFetchP;
+
+  // --- R. HTTP 503 is a retryable status (root-cause contract) -------------
+  const syncApi = await vite.ssrLoadModule('/src/lib/api.ts');
+  const syncLogic = await vite.ssrLoadModule('/src/lib/syncLogic.ts');
+  record('status503IsTransientApiClass', syncApi.isTransientApiError(new syncApi.ApiError(503, 'API_503')) === true);
+  record('status503IsRetryableStatus', syncLogic.isRetryableStatus(503) === true);
+
+  // --- S. a DELETE answered 503 is transient: retried, then the mutation is
+  //        removed after the successful retry -------------------------------
+  store.clients.set('client-503', { id: 'client-503', fullName: 'Will Be Deleted', phone: '+22379', companyName: null, email: null, city: 'Bamako', neighborhood: null, address: '', reference: null, notes: '', createdAt: new Date(0).toISOString() });
+  await upsertClient({ id: 'client-503', full_name: 'Will Be Deleted', phone: '+22379', company_name: null, email: null, city: 'Bamako', neighborhood: null, address: '', reference: null, notes: '', created_by: 'u', created_by_name: 'U', created_at: isoNow, updated_at: isoNow });
+  await enqueueMutation({ entity: 'clients', entityId: 'client-503', action: 'delete', payload: {} });
+  let deny503Delete = true;
+  const prevFetchS = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const parsed = new URL(String(url), 'http://test.local');
+    if (init.method === 'DELETE' && parsed.searchParams.get('resource') === 'clients' && parsed.searchParams.get('id') === 'client-503' && deny503Delete) return errorRes(503, 'Service indisponible.');
+    return prevFetchS(url, init);
+  };
+  await requestSync();
+  counts = await countSyncedState();
+  const localAfter503 = await db.get('clients', 'client-503');
+  record('delete503NotMarkedFailed', counts.failedCount === failedFloor && store.clients.has('client-503') && localAfter503 !== undefined, { counts, localKept: localAfter503 !== undefined });
+  record('delete503StaysPendingForRetry', counts.pendingCount === 1, { counts });
+  deny503Delete = false;
+  await new Promise((resolve) => setTimeout(resolve, 2200)); // backoff (2s) elapses
+  await requestSync();
+  counts = await countSyncedState();
+  const localAfter503Retry = await db.get('clients', 'client-503');
+  record('delete503RetriedThenRemoved', !store.clients.has('client-503') && localAfter503Retry === undefined && counts.pendingCount === 0 && counts.failedCount === failedFloor, { counts, local: localAfter503Retry ?? null });
+  globalThis.fetch = prevFetchS;
 } catch (error) {
   console.error('Engine test crashed:', error);
   record('cleanRun', false);
