@@ -13,7 +13,7 @@ jobs:
     name: Typecheck, lint, build & tests
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gaff_ci
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gaff_ci?sslmode=disable
       INITIAL_ADMIN_EMAIL: admin@groupe-gaff-ci.invalid
       INITIAL_ADMIN_PASSWORD: ci-temporary-admin-password
       INITIAL_ADMIN_PHONE: "+22399999999"
@@ -43,6 +43,8 @@ jobs:
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - run: npm run build
+      - name: Bootstrap initial administrator (idempotent)
+        run: npm run bootstrap-admin
       - name: Run unit / engine suites
         run: |
           npm run test-sync-logic
