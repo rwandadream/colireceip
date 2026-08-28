@@ -28,7 +28,8 @@
     "test-parcel-financials": "node scripts/test-parcel-financials.mjs",
     "test-settings-sync": "node scripts/test-settings-sync.mjs",
     "test-excel-exports": "node scripts/test-excel-exports.mjs",
-    "test-reconnect-sync": "node scripts/test-reconnect-sync.mjs"
+    "test-reconnect-sync": "node scripts/test-reconnect-sync.mjs",
+    "test-crud-persistence": "node scripts/test-crud-persistence.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

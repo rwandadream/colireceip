@@ -63,3 +63,4 @@ jobs:
           npm run test-payment-idempotency
           npm run test-payment-persistence
           npm run test-payment-deletion
+          npm run test-crud-persistence

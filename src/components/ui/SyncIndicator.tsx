@@ -10,6 +10,7 @@ const entityLabels: Record<SyncEntity, string> = {
   trips: 'Voyage',
   'trip-vehicles': 'Véhicule',
   settings: 'Paramètres',
+  expenses: 'Dépense',
 };
 
 const actionLabels: Record<SyncAction, string> = {

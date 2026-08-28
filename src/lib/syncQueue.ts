@@ -100,7 +100,7 @@ export async function listProtectedTargets(): Promise<Map<string, PendingRecord>
   const db = await getDB();
   const all = await db.getAll('sync_queue');
   const map = new Map<string, PendingRecord>();
-  const syncedEntities = new Set<SyncEntity>(['clients', 'products', 'parcels', 'payments', 'trips', 'trip-vehicles', 'settings']);
+  const syncedEntities = new Set<SyncEntity>(['clients', 'products', 'parcels', 'payments', 'trips', 'trip-vehicles', 'settings', 'expenses']);
   for (const m of all) {
     if (m.status === 'synced' || !syncedEntities.has(m.entity)) continue;
     map.set(`${m.entity}:${m.entityId}`, { entity: m.entity, entityId: m.entityId, action: m.action });

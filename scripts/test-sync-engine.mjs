@@ -25,6 +25,7 @@ const store = {
   parcels: new Map(),
   'status-history': new Map(),
   payments: new Map(),
+  expenses: new Map(),
 };
 
 store.clients.set('client-srv-2', { id: 'client-srv-2', fullName: 'Server Client Two', phone: '+22370000001', companyName: null, email: null, city: 'Bamako', neighborhood: null, address: 'Addr', reference: null, notes: '', createdAt: new Date(0).toISOString() });
@@ -80,6 +81,12 @@ globalThis.fetch = async (url, init = {}) => {
       const trip = { id: body.id || `srv-trip`, tripNumber: body.tripNumber, tripDate: body.tripDate, origin: body.origin, destination: body.destination, status: body.status ?? 'planned', createdAt: new Date().toISOString() };
       store.trips.set(trip.id, trip);
       return json(trip);
+    }
+    if (resource === 'expenses') {
+      if (store.expenses.has(body.id)) return json(store.expenses.get(body.id));
+      const expense = { id: body.id, parcelId: body.parcelId, categoryName: body.categoryName, label: body.label, amount: body.amount, expenseDate: body.expenseDate, location: body.location ?? '', notes: body.notes ?? '', createdAt: new Date().toISOString() };
+      store.expenses.set(expense.id, expense);
+      return json(expense);
     }
     if (resource === 'trip-vehicles') {
       if (!store.trips.has(body.tripId)) return errorRes(400, 'Voyage introuvable.');
@@ -287,6 +294,21 @@ try {
   counts = await countSyncedState();
   record('keepLocalRequeuesAndClearsConflict', counts.conflictCount === 0 && counts.pendingCount === 0, { counts });
   record('keepLocalReappliesToServer', store.parcels.get('parcel-srv-1')?.status === 'arrived', { status: store.parcels.get('parcel-srv-1')?.status });
+
+  // --- M. a local delete propagates and the record never resurrects ------
+  // The local mirror holds client-srv-2 (it was refreshed during earlier
+  // pulls). Deleting it locally must reach the server AND survive the next
+  // pull (the server list no longer contains it).
+  await enqueueMutation({ entity: 'clients', entityId: 'client-srv-2', action: 'delete', payload: {} });
+  await requestSync();
+  counts = await countSyncedState();
+  const localAfterDelete = await db.get('clients', 'client-srv-2');
+  const deleteRequest = requestLog.find((r) => r.method === 'DELETE' && r.resource === 'clients' && r.id === 'client-srv-2');
+  record('offlineDeleteReachesServer', !store.clients.has('client-srv-2') && deleteRequest !== undefined, { serverStillHas: store.clients.has('client-srv-2'), counts });
+  record('localRecordGoneAfterDeleteSync', localAfterDelete === undefined, { local: localAfterDelete ?? null });
+  await requestSync(); // a further pull must not restore a deleted record
+  const localAfterPull = await db.get('clients', 'client-srv-2');
+  record('deletedRecordNeverResurrects', !store.clients.has('client-srv-2') && localAfterPull === undefined && counts.pendingCount === 0, { serverStillHas: store.clients.has('client-srv-2'), local: localAfterPull ?? null });
 } catch (error) {
   console.error('Engine test crashed:', error);
   record('cleanRun', false);

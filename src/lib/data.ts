@@ -29,9 +29,10 @@ import { canUsePaymentApi, isPaymentApiUnavailable, listOnlinePayments } from '.
 import { canUseParcelApi, isParcelApiUnavailable, listOnlineParcels, listOnlineStatusHistory } from './parcelPersistence';
 import { canUseUserApi, createOnlineUser, deleteOnlineUser, isUserApiUnavailable, listOnlineUsers, updateOnlineUser } from './userPersistence';
 import { canUseSettingsApi, isSettingsApiUnavailable, listOnlineSettings, settingsToApi } from './settingsPersistence';
+import { canUseExpenseApi, isExpenseApiUnavailable, listOnlineExpenses } from './expensePersistence';
 import { enqueueMutation, hasProtectedMutation, listProtectedTargets, mergeLocalPending } from './syncQueue';
 import { requestSync } from './syncEngine';
-import { refreshClients, refreshParcels, refreshPayments, refreshProducts, refreshSettings, refreshTrips, reconcileParcelFromPayments } from './localCache';
+import { refreshClients, refreshExpenses, refreshParcels, refreshPayments, refreshProducts, refreshSettings, refreshTrips, reconcileParcelFromPayments } from './localCache';
 import type { SyncEntity } from './syncTypes';
 
 export async function ensureSeed(): Promise<void> {
@@ -464,6 +465,16 @@ export async function createExpenseCategory(
 
 export async function getTripExpenses(): Promise<TripExpense[]> {
   requireDirectorAccess();
+  if (canUseExpenseApi()) {
+    try {
+      const server = await listOnlineExpenses();
+      await refreshExpenses(server);
+      const db = await getDB();
+      const local = await db.getAll('trip_expenses');
+      const protectedIds = await collectProtectedIds('expenses', local.map((e) => e.id));
+      return mergeLocalPending(server, local, protectedIds).sort((a, b) => (b.expense_date || '').localeCompare(a.expense_date || ''));
+    } catch (error) { if (!isExpenseApiUnavailable(error)) throw error; }
+  }
   const db = await getDB();
   const all = await db.getAll('trip_expenses');
   return all.sort((a, b) => (b.expense_date || '').localeCompare(a.expense_date || ''));
@@ -471,15 +482,17 @@ export async function getTripExpenses(): Promise<TripExpense[]> {
 
 export async function getExpensesByParcelId(parcelId: string): Promise<TripExpense[]> {
   requireDirectorAccess();
-  const db = await getDB();
-  const items = await db.getAllFromIndex('trip_expenses', 'by-parcel', parcelId);
-  return items.sort((a, b) => (b.expense_date || '').localeCompare(a.expense_date || ''));
+  const all = await getTripExpenses();
+  return all.filter((expense) => expense.parcel_id === parcelId);
 }
 
 export async function getTripExpenseById(id: string): Promise<TripExpense | undefined> {
   requireDirectorAccess();
   const db = await getDB();
-  return db.get('trip_expenses', id);
+  const cached = await db.get('trip_expenses', id);
+  if (cached) return cached;
+  const all = await getTripExpenses();
+  return all.find((expense) => expense.id === id);
 }
 
 export async function createTripExpense(
@@ -490,6 +503,8 @@ export async function createTripExpense(
   const now = toISO();
   const expense: TripExpense = { ...data, id: generateId(), created_at: now, updated_at: now };
   await db.put('trip_expenses', expense);
+  await enqueueMutation({ entity: 'expenses', entityId: expense.id, action: 'create', payload: { ...expense } });
+  notifySync();
   return expense;
 }
 
@@ -500,6 +515,11 @@ export async function updateTripExpense(id: string, data: Partial<TripExpense>):
   if (!existing) return undefined;
   const updatedExpense: TripExpense = { ...existing, ...data, id, updated_at: toISO() } as TripExpense;
   await db.put('trip_expenses', updatedExpense);
+  const changed = pickChanged(existing, updatedExpense, ['parcel_id', 'trip_id', 'trip_vehicle_id', 'category_id', 'category_name', 'label', 'amount', 'expense_date', 'location', 'notes']);
+  if (Object.keys(changed).length > 0) {
+    await enqueueMutation({ entity: 'expenses', entityId: id, action: 'update', payload: changed });
+    notifySync();
+  }
   return updatedExpense;
 }
 
@@ -507,6 +527,8 @@ export async function deleteTripExpense(id: string): Promise<void> {
   requireDirectorAccess();
   const db = await getDB();
   await db.delete('trip_expenses', id);
+  await enqueueMutation({ entity: 'expenses', entityId: id, action: 'delete', payload: {} });
+  notifySync();
   const attachments = await getAttachmentsByEntity('expense', id);
   for (const attachment of attachments) {
     await db.delete('attachments', attachment.id);

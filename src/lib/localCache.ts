@@ -7,6 +7,7 @@ import type {
   Payment,
   Product,
   Trip,
+  TripExpense,
   TripVehicle,
 } from './types';
 import type { SyncEntity } from './syncTypes';
@@ -30,7 +31,7 @@ function isProtected(map: ProtectedMap, entity: SyncEntity, id: string): boolean
 
 const STORE_BY_ENTITY: Record<
   SyncEntity,
-  'clients' | 'products' | 'parcels' | 'payments' | 'trips' | 'trip_vehicles' | 'settings'
+  'clients' | 'products' | 'parcels' | 'payments' | 'trips' | 'trip_vehicles' | 'settings' | 'trip_expenses'
 > = {
   clients: 'clients',
   products: 'products',
@@ -39,6 +40,7 @@ const STORE_BY_ENTITY: Record<
   trips: 'trips',
   'trip-vehicles': 'trip_vehicles',
   settings: 'settings',
+  expenses: 'trip_expenses',
 };
 
 // Removes local records of `entity` that the server snapshot no longer
@@ -115,6 +117,17 @@ export async function refreshPayments(server: Payment[]): Promise<void> {
   await gcMissingFromServer('payments', serverIds, new Date().toISOString());
 }
 
+export async function refreshExpenses(server: TripExpense[]): Promise<void> {
+  const protectedMap = await protectedKeys();
+  const serverIds = new Set<string>();
+  for (const expense of server) {
+    serverIds.add(expense.id);
+    if (isProtected(protectedMap, 'expenses', expense.id)) continue;
+    await upsertExpense(expense);
+  }
+  await gcMissingFromServer('expenses', serverIds, new Date().toISOString());
+}
+
 export async function refreshTrips(server: Trip[], allVehicles: TripVehicle[]): Promise<void> {
   const protectedMap = await protectedKeys();
   const serverIds = new Set<string>();
@@ -183,6 +196,11 @@ export async function upsertPayment(payment: Payment): Promise<void> {
   await db.put('payments', payment);
 }
 
+export async function upsertExpense(expense: TripExpense): Promise<void> {
+  const db = await getDB();
+  await db.put('trip_expenses', expense);
+}
+
 export async function upsertTrip(trip: Trip, vehicles: TripVehicle[] = []): Promise<void> {
   const db = await getDB();
   await db.put('trips', trip);
@@ -206,6 +224,8 @@ export async function removeFromLocal(entity: SyncEntity, id: string): Promise<v
     const payment = await db.get('payments', id);
     await db.delete('payments', id);
     if (payment?.parcel_id) await reconcileParcelFromPayments(payment.parcel_id, Number(payment.amount) || 0);
+  } else if (entity === 'expenses') {
+    await db.delete('trip_expenses', id);
   } else if (entity === 'trips') {
     const vehicles = await db.getAllFromIndex('trip_vehicles', 'by-trip', id);
     for (const vehicle of vehicles) await db.delete('trip_vehicles', vehicle.id);

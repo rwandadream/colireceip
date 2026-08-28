@@ -38,6 +38,7 @@ const store = {
   'trip-vehicles': new Map(),
   trips: new Map(),
   products: new Map(),
+  expenses: new Map(),
 };
 
 store.clients.set('client-rc-1', { id: 'client-rc-1', fullName: 'Client Reconnect', phone: '+22370000002', companyName: null, email: null, city: 'Bamako', neighborhood: null, address: '', reference: null, notes: '', createdAt: new Date(0).toISOString() });
@@ -77,7 +78,7 @@ globalThis.fetch = async (url, init = {}) => {
     return json(parcel);
   }
   if (init.method === 'POST') {
-    if (resource === 'clients' || resource === 'products' || resource === 'trips' || resource === 'trip-vehicles' || resource === 'payments') return json(body);
+    if (resource === 'clients' || resource === 'products' || resource === 'trips' || resource === 'trip-vehicles' || resource === 'payments' || resource === 'expenses') return json(body);
     return errorRes(400, 'Unknown resource.');
   }
   if (init.method === 'DELETE') return json(null);

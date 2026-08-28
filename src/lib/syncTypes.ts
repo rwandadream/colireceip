@@ -4,6 +4,7 @@ import type {
   Payment,
   Product,
   Trip,
+  TripExpense,
   TripVehicle,
 } from './types';
 
@@ -17,7 +18,8 @@ export type SyncEntity =
   | 'payments'
   | 'trips'
   | 'trip-vehicles'
-  | 'settings';
+  | 'settings'
+  | 'expenses';
 
 export type SyncAction = 'create' | 'update' | 'delete';
 
@@ -65,6 +67,7 @@ export type SyncCreatePayload =
   | Trip
   | TripVehicle
   | Payment
+  | TripExpense
   | SyncParcelPayload;
 
 export interface SyncUpdatePayload {

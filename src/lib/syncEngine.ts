@@ -6,6 +6,7 @@ import type {
   Payment,
   Product,
   Trip,
+  TripExpense,
   TripVehicle,
 } from './types';
 import type { SyncEngineState, SyncEntity, SyncMutation } from './syncTypes';
@@ -26,6 +27,7 @@ import {
 } from './syncQueue';
 import {
   refreshClients,
+  refreshExpenses,
   refreshParcels,
   refreshPayments,
   refreshProducts,
@@ -33,6 +35,7 @@ import {
   refreshTrips,
   removeFromLocal,
   upsertClient,
+  upsertExpense,
   upsertParcel,
   upsertPayment,
   upsertProduct,
@@ -73,6 +76,12 @@ import {
   listOnlinePayments,
   updateOnlinePayment,
 } from './paymentPersistence';
+import {
+  createOnlineExpense,
+  deleteOnlineExpense,
+  listOnlineExpenses,
+  updateOnlineExpense,
+} from './expensePersistence';
 import {
   listOnlineSettings,
   updateOnlineSettings,
@@ -221,6 +230,28 @@ async function runMutation(mutation: SyncMutation): Promise<Outcome> {
         }
         break;
       }
+      case 'expenses': {
+        const payload = mutation.payload as unknown as TripExpense;
+        if (mutation.action === 'create') {
+          value = await createOnlineExpense({
+            parcel_id: payload.parcel_id,
+            trip_id: payload.trip_id,
+            trip_vehicle_id: payload.trip_vehicle_id,
+            category_id: payload.category_id,
+            category_name: payload.category_name,
+            label: payload.label,
+            amount: payload.amount,
+            expense_date: payload.expense_date,
+            location: payload.location,
+            notes: payload.notes,
+          }, mutation.entityId);
+        } else if (mutation.action === 'update') {
+          value = await updateOnlineExpense(mutation.entityId, mutation.payload as Partial<TripExpense>);
+        } else {
+          await deleteOnlineExpense(mutation.entityId);
+        }
+        break;
+      }
       case 'settings': {
         // Settings is a singleton resource: it is enqueued as an update and
         // never created or deleted from a device.
@@ -268,6 +299,10 @@ async function verifyExists(mutation: SyncMutation): Promise<Outcome> {
         const found = (await listOnlinePayments()).find((p) => p.id === mutation.entityId);
         return found ? { kind: 'success', value: found } : { kind: 'conflict', message: 'Création impossible : le serveur a refusé la mutation.' };
       }
+      case 'expenses': {
+        const found = (await listOnlineExpenses()).find((e) => e.id === mutation.entityId);
+        return found ? { kind: 'success', value: found } : { kind: 'conflict', message: 'Création impossible : le serveur a refusé la mutation.' };
+      }
     }
     return { kind: 'conflict', message: 'Création impossible.' };
   } catch (error) {
@@ -307,6 +342,9 @@ async function applySynced(mutation: SyncMutation, value: unknown): Promise<void
       }
       case 'payments':
         if (value) await upsertPayment(value as Payment);
+        break;
+      case 'expenses':
+        if (value) await upsertExpense(value as TripExpense);
         break;
       case 'settings':
         if (value) await upsertSettings(value as AppSettings);
@@ -386,6 +424,8 @@ async function pullAll(): Promise<boolean> {
     await refreshParcels(parcels);
     const payments = await listOnlinePayments();
     await refreshPayments(payments);
+    const expenses = await listOnlineExpenses();
+    await refreshExpenses(expenses);
     const settings = await listOnlineSettings();
     await refreshSettings(settings);
     return true;

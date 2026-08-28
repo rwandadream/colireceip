@@ -69,6 +69,10 @@ export async function list(resource, user, query = {}) {
     case 'parcels': return publicValue(await prisma.parcel.findMany({ include: { items: true }, orderBy: { createdAt: 'desc' } }));
     case 'status-history': { const parcel = await prisma.parcel.findUnique({ where: { id: required(query.parcelId, 'parcelId') } }); if (!parcel) throw new Error('Colis introuvable.'); return publicValue(await prisma.statusHistory.findMany({ where: { parcelId: parcel.id }, orderBy: { createdAt: 'asc' } })); }
     case 'payments': return publicValue(await prisma.payment.findMany({ orderBy: { paymentDate: 'desc' } }));
+    case 'expenses': {
+      if (!isAdmin(user)) throw new Error('Forbidden.');
+      return publicValue(await prisma.tripExpense.findMany({ orderBy: { expenseDate: 'desc' } }));
+    }
     case 'settings': {
       const settingsRow = await prisma.appSettings.findFirst();
       return settingsRow ? [publicValue(settingsRow)] : [];
@@ -161,6 +165,29 @@ export async function create(resource, input, user, options = {}) {
       throw error;
     }
   }
+  if (resource === 'expenses') {
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    if (input.id) { const existing = await prisma.tripExpense.findUnique({ where: { id: clean(input.id) } }); if (existing) return publicValue(existing); }
+    const expenseParcel = await prisma.parcel.findUnique({ where: { id: required(input.parcelId, 'parcelId') } });
+    if (!expenseParcel) throw new Error('Colis introuvable.');
+    const expenseAmount = amount(input.amount, 'amount');
+    if (expenseAmount <= 0) throw new Error('Invalid amount.');
+    return publicValue(await prisma.tripExpense.create({ data: {
+      ...(input.id ? { id: clean(input.id) } : {}),
+      parcelId: expenseParcel.id,
+      tripId: clean(input.tripId) || null,
+      tripVehicleId: clean(input.tripVehicleId) || null,
+      categoryId: clean(input.categoryId) || null,
+      categoryName: required(input.categoryName, 'categoryName'),
+      label: required(input.label, 'label'),
+      amount: expenseAmount,
+      expenseDate: date(input.expenseDate || input.expense_date || new Date(), 'expenseDate'),
+      location: clean(input.location) || '',
+      notes: clean(input.notes) || '',
+      createdById: user.id,
+      createdByName: user.full_name,
+    } }));
+  }
   throw new Error('Unknown resource.');
 }
 
@@ -198,6 +225,12 @@ export async function remove(resource, id, user) {
       });
       return deleted;
     }, { isolationLevel: 'Serializable' })));
+  }
+  if (resource === 'expenses') {
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    const expense = await prisma.tripExpense.findUnique({ where: { id } });
+    if (!expense) return null;
+    return publicValue(await prisma.tripExpense.delete({ where: { id } }));
   }
   const model = resource === 'clients' ? prisma.client : resource === 'trips' ? prisma.trip : resource === 'parcels' ? prisma.parcel : null; if (!model) throw new Error('Unknown resource.'); const record = await model.findUnique({ where: { id } }); if (!record) return null; if (!owned(user, record)) throw new Error('Forbidden.');
   if (resource === 'trips') {
@@ -318,6 +351,31 @@ if (!owned(user, record)) throw new Error('Forbidden.');
     }));
   }
   if (resource === 'payments') { const record = await prisma.payment.findUnique({ where: { id } }); if (!record) throw new Error('Paiement introuvable.'); const parcel = await prisma.parcel.findUnique({ where: { id: record.parcelId } }); if (!parcel || !canEditPayment(user, record, parcel)) throw new Error('Forbidden.'); return publicValue(await prisma.payment.update({ where: { id }, data: { ...(input.note !== undefined ? { note: clean(input.note) || '' } : {}), ...(input.paymentMethod !== undefined ? { paymentMethod: allowed(input.paymentMethod, paymentMethods, 'paymentMethod') } : {}) } })); }
+  if (resource === 'expenses') {
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    const record = await prisma.tripExpense.findUnique({ where: { id } });
+    if (!record) throw new Error('Dépense introuvable.');
+    const updateData = {};
+    if (input.parcelId !== undefined) {
+      const expenseParcel = await prisma.parcel.findUnique({ where: { id: required(input.parcelId, 'parcelId') } });
+      if (!expenseParcel) throw new Error('Colis introuvable.');
+      updateData.parcelId = expenseParcel.id;
+    }
+    if (input.categoryName !== undefined) updateData.categoryName = required(input.categoryName, 'categoryName');
+    if (input.label !== undefined) updateData.label = required(input.label, 'label');
+    if (input.amount !== undefined) {
+      const newAmount = amount(input.amount, 'amount');
+      if (newAmount <= 0) throw new Error('Invalid amount.');
+      updateData.amount = newAmount;
+    }
+    if (input.expenseDate !== undefined) updateData.expenseDate = date(input.expenseDate, 'expenseDate');
+    if (input.location !== undefined) updateData.location = clean(input.location) || '';
+    if (input.notes !== undefined) updateData.notes = clean(input.notes) || '';
+    if (input.tripId !== undefined) updateData.tripId = clean(input.tripId) || null;
+    if (input.tripVehicleId !== undefined) updateData.tripVehicleId = clean(input.tripVehicleId) || null;
+    if (input.categoryId !== undefined) updateData.categoryId = clean(input.categoryId) || null;
+    return publicValue(await prisma.tripExpense.update({ where: { id }, data: updateData }));
+  }
   throw new Error('Unknown resource.');
 }
 
