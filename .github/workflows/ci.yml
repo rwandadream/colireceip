@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gaff_ci?sslmode=disable
+      JWT_SECRET: ci-temporary-jwt-secret-for-github-actions-tests
       INITIAL_ADMIN_EMAIL: admin@groupe-gaff-ci.invalid
       INITIAL_ADMIN_PASSWORD: ci-temporary-admin-password
       INITIAL_ADMIN_PHONE: "+22399999999"
