@@ -141,13 +141,13 @@ try {
   process.exitCode = 1;
 } finally {
   try {
-    if (director && adminCookie) await dataHandler({ method: 'DELETE', query: { resource: 'users', id: director.id }, headers: { cookie: adminCookie } }, makeRes()).catch(() => undefined);
-    if (agent && adminCookie) await dataHandler({ method: 'DELETE', query: { resource: 'users', id: agent.id }, headers: { cookie: adminCookie } }, makeRes()).catch(() => undefined);
     for (const id of createdClientIds) {
       if (id && adminCookie) {
         await dataHandler({ method: 'DELETE', query: { resource: 'clients', id }, headers: { cookie: adminCookie } }, makeRes()).catch(() => undefined);
       }
     }
+    if (director && adminCookie) await dataHandler({ method: 'DELETE', query: { resource: 'users', id: director.id }, headers: { cookie: adminCookie } }, makeRes()).catch(() => undefined);
+    if (agent && adminCookie) await dataHandler({ method: 'DELETE', query: { resource: 'users', id: agent.id }, headers: { cookie: adminCookie } }, makeRes()).catch(() => undefined);
   } catch { /* best-effort cleanup */ }
   await prisma.$disconnect();
 }
