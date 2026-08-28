@@ -20,6 +20,9 @@
     "test-tracking-collision": "node scripts/test-tracking-collision.mjs",
     "test-payment-double-submit": "node --experimental-strip-types scripts/test-payment-double-submit.mjs",
     "test-parcel-create-local-first": "node scripts/test-parcel-create-local-first.mjs",
+    "test-parcel-financials": "node scripts/test-parcel-financials.mjs",
+    "test-settings-sync": "node scripts/test-settings-sync.mjs",
+    "test-excel-exports": "node scripts/test-excel-exports.mjs",
     "test-reconnect-sync": "node scripts/test-reconnect-sync.mjs"
   },
   "dependencies": {

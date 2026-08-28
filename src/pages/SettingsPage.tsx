@@ -142,7 +142,7 @@ export function SettingsPage() {
         return {
           icon: <Settings size={16} />,
           bg: 'bg-slate-50 dark:bg-slate-900/30 text-slate-600 dark:text-slate-400',
-          border: 'border-slate-100 dark:border-slate-805'
+          border: 'border-slate-100 dark:border-slate-700'
         };
       default:
         return {
@@ -326,7 +326,7 @@ export function SettingsPage() {
                       </p>
                     </div>
 
-                    <p className="text-sm text-slate-805 dark:text-slate-205 font-bold leading-snug">
+                    <p className="text-sm text-slate-900 dark:text-slate-100 font-bold leading-snug">
                       {log.action}
                     </p>
 

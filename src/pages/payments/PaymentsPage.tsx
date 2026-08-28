@@ -221,6 +221,7 @@ export function PaymentNewPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { state: syncState } = useSync();
+  const { addToast } = useToast();
   const [searchParams] = useSearchParams();
   const parcelIdParam = searchParams.get('parcel');
   const submitLockRef = useRef<SubmitLock | null>(null);
@@ -344,7 +345,13 @@ export function PaymentNewPage() {
       })();
 
       setTimeout(() => {
-        generateReceiptPDF(refreshedParcel, [payment]);
+        void generateReceiptPDF(refreshedParcel, [payment]).catch(() => {
+          addToast({
+            type: 'error',
+            title: 'Impression impossible',
+            description: 'Le reçu du paiement n\'a pas pu être généré. Vous pouvez le réimprimer depuis la fiche colis.',
+          });
+        });
       }, 0);
     } catch (error) {
       console.error('Erreur d’enregistrement du paiement', error);

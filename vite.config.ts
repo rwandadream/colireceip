@@ -90,4 +90,18 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-date': ['date-fns'],
+          pdf: ['jspdf', 'jspdf-autotable'],
+          excel: ['xlsx'],
+          icons: ['lucide-react'],
+        },
+      },
+    },
+  },
 });

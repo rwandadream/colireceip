@@ -165,8 +165,20 @@ export function ParcelDetailPage() {
     }
   };
 
+  const [printing, setPrinting] = useState(false);
+
   const handlePrint = () => {
-    if (parcel) generateReceiptPDF({ ...parcel, items }, payments);
+    if (!parcel || printing) return;
+    setPrinting(true);
+    generateReceiptPDF({ ...parcel, items }, payments)
+      .catch(() =>
+        addToast({
+          type: 'error',
+          title: 'Impression impossible',
+          description: 'Le reçu n\'a pas pu être généré. Réessayez.',
+        })
+      )
+      .finally(() => setPrinting(false));
   };
 
   if (loading) {
@@ -231,9 +243,9 @@ export function ParcelDetailPage() {
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" onClick={handlePrint}>
+        <Button variant="secondary" size="sm" onClick={handlePrint} disabled={printing}>
           <Printer size={16} />
-          Imprimer le reçu
+          {printing ? 'Préparation…' : 'Imprimer le reçu'}
         </Button>
         <Button variant="secondary" size="sm" onClick={() => setStatusModalOpen(true)}>
           <Clock size={16} />

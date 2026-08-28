@@ -1,5 +1,6 @@
 import { getDB } from './db';
 import type {
+  AppSettings,
   Client,
   Parcel,
   ParcelItem,
@@ -29,7 +30,7 @@ function isProtected(map: ProtectedMap, entity: SyncEntity, id: string): boolean
 
 const STORE_BY_ENTITY: Record<
   SyncEntity,
-  'clients' | 'products' | 'parcels' | 'payments' | 'trips' | 'trip_vehicles'
+  'clients' | 'products' | 'parcels' | 'payments' | 'trips' | 'trip_vehicles' | 'settings'
 > = {
   clients: 'clients',
   products: 'products',
@@ -37,6 +38,7 @@ const STORE_BY_ENTITY: Record<
   payments: 'payments',
   trips: 'trips',
   'trip-vehicles': 'trip_vehicles',
+  settings: 'settings',
 };
 
 // Removes local records of `entity` that the server snapshot no longer
@@ -126,6 +128,24 @@ export async function refreshTrips(server: Trip[], allVehicles: TripVehicle[]): 
   await gcMissingFromServer('trips', serverIds, serverFetchedAt);
   // Vehicles of trips that vanished from the server snapshot are swept too.
   await gcMissingFromServer('trip-vehicles', new Set(allVehicles.map((vehicle) => vehicle.id)), serverFetchedAt);
+}
+
+// Settings is a singleton resource owned by the server. A pull refreshes the
+// local mirror but never garbage-collects it: a fresh server (or an API
+// outage) must never wipe the device-side defaults the app was seeded with.
+// The protection check is performed live per record (not against a snapshot)
+// so a local settings edit enqueued while a pull is already running is never
+// clobbered by that pull.
+export async function refreshSettings(server: AppSettings[]): Promise<void> {
+  for (const settings of server) {
+    if (await hasProtectedMutation('settings', settings.id)) continue;
+    await upsertSettings(settings);
+  }
+}
+
+export async function upsertSettings(settings: AppSettings): Promise<void> {
+  const db = await getDB();
+  await db.put('settings', settings);
 }
 
 export async function protectedUpsert(entity: SyncEntity, id: string, write: () => Promise<void>): Promise<boolean> {

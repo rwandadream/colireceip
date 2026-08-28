@@ -16,7 +16,8 @@ export type SyncEntity =
   | 'parcels'
   | 'payments'
   | 'trips'
-  | 'trip-vehicles';
+  | 'trip-vehicles'
+  | 'settings';
 
 export type SyncAction = 'create' | 'update' | 'delete';
 

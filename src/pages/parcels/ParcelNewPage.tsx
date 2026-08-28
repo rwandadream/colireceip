@@ -118,6 +118,7 @@ export function ParcelNewPage() {
             destination: appSettings.default_destination || 'Abidjan',
             departure_branch: appSettings.default_origin || 'Bamako',
             arrival_branch: appSettings.default_destination || 'Abidjan',
+            transport_price: appSettings.default_transport_price || prev.transport_price,
           }));
         } else {
           setForm((prev) => ({
@@ -631,6 +632,48 @@ export function ParcelNewPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <h2 className="font-bold text-slate-900 dark:text-white mb-4">Tarification & Paiement</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Input
+                  label="Prix de transport (FCFA)"
+                  type="number"
+                  min={0}
+                  value={form.transport_price === '' ? '' : Number(form.transport_price)}
+                  onChange={(e) => setForm({ ...form, transport_price: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="0"
+                />
+                <Input
+                  label="Frais supplémentaires (FCFA)"
+                  type="number"
+                  min={0}
+                  value={form.additional_fees === '' ? '' : Number(form.additional_fees)}
+                  onChange={(e) => setForm({ ...form, additional_fees: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="0"
+                />
+                <Input
+                  label="Montant payé au départ (FCFA)"
+                  type="number"
+                  min={0}
+                  value={form.amount_paid === '' ? '' : Number(form.amount_paid)}
+                  onChange={(e) => setForm({ ...form, amount_paid: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="0"
+                />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-sm border border-slate-200/60 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">
+                  Total estimé :{' '}
+                  <span className="font-bold text-slate-900 dark:text-white tabular-nums">{formatCurrency(totalAmount)}</span>
+                </span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  Reste à payer :{' '}
+                  <span className={`font-bold tabular-nums ${balance > 0 ? 'text-error-600 dark:text-error-400' : 'text-success-600 dark:text-success-400'}`}>
+                    {formatCurrency(Math.max(balance, 0))}
+                  </span>
+                </span>
               </div>
             </Card>
           </>

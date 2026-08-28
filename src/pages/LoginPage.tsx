@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Phone, Lock, Eye, EyeOff, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { LogoBrand } from '../components/ui/Logo';
 
 export function LoginPage() {
   const { login } = useAuth();
+  const { addToast } = useToast();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -80,7 +82,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-9.5 p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="absolute right-3 top-10 p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -92,7 +94,11 @@ export function LoginPage() {
                 href="#forgot"
                 onClick={(e) => {
                   e.preventDefault();
-                  alert('Veuillez contacter votre administrateur pour réinitialiser votre mot de passe.');
+                  addToast({
+                    type: 'info',
+                    title: 'Réinitialisation du mot de passe',
+                    description: 'La réinitialisation n\'est pas encore automatique. Contactez votre administrateur : il pourra définir un nouveau mot de passe pour votre compte.',
+                  });
                 }}
                 className="font-semibold text-[#2563EB] dark:text-brand-400 hover:underline"
               >
@@ -114,7 +120,7 @@ export function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8">
-          © 2025 Groupe-Gaff. Tous droits réservés.
+          © {new Date().getFullYear()} Groupe-Gaff. Tous droits réservés.
         </p>
       </div>
     </div>

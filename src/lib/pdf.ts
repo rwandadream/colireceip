@@ -3,10 +3,32 @@ import autoTable from 'jspdf-autotable';
 import type { Parcel, ParcelItem, Payment, TripExpense } from './types';
 import { PARCEL_STATUS_LABELS, PAYMENT_METHOD_LABELS } from './types';
 import { formatCurrency, formatDate, formatDateTime, formatTrackingNumber } from './format';
+import { getSettings } from './data';
 
 type LastAutoTableInfo = { lastAutoTable: { finalY: number } };
 
-export function generateReceiptPDF(parcel: Parcel & { items?: ParcelItem[] }, payments: Payment[]): void {
+// Company identity is taken from the shared settings resource (id "1") so the
+// printed documents never carry a stale hardcoded brand/contact block. The
+// settings read can never reject in practice (the local mirror is always
+// seeded), so a null fallback is kept as a defensive default only.
+async function getCompanyIdentity(): Promise<{
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+}> {
+  const settings = await getSettings().catch(() => null);
+  const address = [settings?.bamako_address, settings?.abidjan_address].filter(Boolean).join(' / ');
+  return {
+    name: settings?.company_name || 'Groupe-Gaff',
+    phone: settings?.company_phone || '+223 76 00 00 00',
+    email: settings?.company_email || 'contact@groupe-gaff.com',
+    address,
+  };
+}
+
+export async function generateReceiptPDF(parcel: Parcel & { items?: ParcelItem[] }, payments: Payment[]): Promise<void> {
+  const company = await getCompanyIdentity();
   const doc = new jsPDF({ unit: 'mm', format: 'a5' });
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 15;
@@ -14,14 +36,24 @@ export function generateReceiptPDF(parcel: Parcel & { items?: ParcelItem[] }, pa
   // Header
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('GROUPE-GAFF', pageWidth / 2, y, { align: 'center' });
+  doc.text(company.name, pageWidth / 2, y, { align: 'center' });
   y += 6;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text('Logistique & Transit Bamako - Abidjan - Bouaké', pageWidth / 2, y, { align: 'center' });
   y += 5;
-  doc.text('Tél: +223 76 00 00 00 | Email: contact@groupe-gaff.com', pageWidth / 2, y, { align: 'center' });
-  y += 8;
+  const contactLine = company.phone && company.email
+    ? `Tél: ${company.phone} | Email: ${company.email}`
+    : company.phone || company.email;
+  if (contactLine) {
+    doc.text(contactLine, pageWidth / 2, y, { align: 'center' });
+    y += 5;
+  }
+  if (company.address) {
+    doc.text(company.address, pageWidth / 2, y, { align: 'center' });
+    y += 5;
+  }
+  y += 3;
 
   doc.setLineWidth(0.3);
   doc.line(10, y, pageWidth - 10, y);
@@ -123,7 +155,7 @@ export function generateReceiptPDF(parcel: Parcel & { items?: ParcelItem[] }, pa
   doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
   doc.text(
-    `Reçu généré le ${formatDateTime(new Date().toISOString())} - Groupe-Gaff`,
+    `Reçu généré le ${formatDateTime(new Date().toISOString())} - ${company.name}`,
     pageWidth / 2,
     doc.internal.pageSize.getHeight() - 10,
     { align: 'center' }

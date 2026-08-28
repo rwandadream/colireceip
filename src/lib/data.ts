@@ -28,9 +28,10 @@ import { canUseTripApi, isTripApiUnavailable, listOnlineTripVehicles, listOnline
 import { canUsePaymentApi, isPaymentApiUnavailable, listOnlinePayments } from './paymentPersistence';
 import { canUseParcelApi, isParcelApiUnavailable, listOnlineParcels, listOnlineStatusHistory } from './parcelPersistence';
 import { canUseUserApi, createOnlineUser, deleteOnlineUser, isUserApiUnavailable, listOnlineUsers, updateOnlineUser } from './userPersistence';
+import { canUseSettingsApi, isSettingsApiUnavailable, listOnlineSettings, settingsToApi } from './settingsPersistence';
 import { enqueueMutation, hasProtectedMutation, listProtectedTargets, mergeLocalPending } from './syncQueue';
 import { requestSync } from './syncEngine';
-import { refreshClients, refreshParcels, refreshPayments, refreshProducts, refreshTrips, reconcileParcelFromPayments } from './localCache';
+import { refreshClients, refreshParcels, refreshPayments, refreshProducts, refreshSettings, refreshTrips, reconcileParcelFromPayments } from './localCache';
 import type { SyncEntity } from './syncTypes';
 
 export async function ensureSeed(): Promise<void> {
@@ -929,7 +930,20 @@ export async function logActivity(
 // ============================================================
 // SETTINGS
 // ============================================================
+// Settings is a singleton resource (id "1"). Reads are local-first and are
+// refreshed from the server when online; writes persist locally then enqueue a
+// server update through the standard offline sync queue. A pull never
+// overwrites a pending local settings edit (protected-record rule) and never
+// garbage-collects the local mirror, so the app always has usable defaults.
 export async function getSettings(): Promise<AppSettings> {
+  if (canUseSettingsApi()) {
+    try {
+      const serverSettings = await listOnlineSettings();
+      await refreshSettings(serverSettings);
+    } catch (error) {
+      if (!isSettingsApiUnavailable(error)) throw error;
+    }
+  }
   const db = await getDB();
   const s = await db.get('settings', '1');
   if (s) return s;
@@ -941,7 +955,15 @@ export async function updateSettings(data: Partial<AppSettings>): Promise<void> 
   const db = await getDB();
   const existing = await db.get('settings', '1');
   if (!existing) return;
-  await db.put('settings', { ...existing, ...data, id: '1' });
+  const next = { ...existing, ...data, id: '1' };
+  await db.put('settings', next);
+  await enqueueMutation({
+    entity: 'settings',
+    entityId: '1',
+    action: 'update',
+    payload: settingsToApi(next),
+  });
+  notifySync();
 }
 
 // ============================================================

@@ -76,7 +76,7 @@ export async function authenticate(identifier, password) {
 }
 
 export function createSessionToken(user) {
-  return jwt.sign({ sub: user.id }, sessionSecret(), { expiresIn: SESSION_MAX_AGE_SECONDS, issuer: 'groupe-gaff' });
+  return jwt.sign({ sub: user.id }, sessionSecret(), { expiresIn: SESSION_MAX_AGE_SECONDS, issuer: 'groupe-gaff', algorithm: 'HS256' });
 }
 
 export function setSessionCookie(res, token) {
@@ -94,7 +94,7 @@ export async function requireAuthenticatedUser(req) {
   if (!cookie) return null;
   try {
     const token = decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1));
-    const payload = jwt.verify(token, sessionSecret(), { issuer: 'groupe-gaff' });
+    const payload = jwt.verify(token, sessionSecret(), { issuer: 'groupe-gaff', algorithms: ['HS256'] });
     if (typeof payload === 'string' || !payload.sub) return null;
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
     return user?.active ? publicUser(user) : null;

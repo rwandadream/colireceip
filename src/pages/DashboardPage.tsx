@@ -180,9 +180,11 @@ export function DashboardPage() {
       </div>
 
       {/* 2. Main KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <StatCard label="Total colis" value={stats.total_parcels} icon={<Package size={16} />} />
         <StatCard label="Reçus aujourd'hui" value={stats.received_today} icon={<PackageCheck size={16} />} />
+        <StatCard label="En transit" value={stats.in_transit} icon={<Truck size={16} />} />
+        <StatCard label="Livrés" value={stats.delivered} icon={<PackageCheck size={16} />} />
         <StatCard label="Total clients" value={stats.total_clients} icon={<Users size={16} />} />
         <StatCard label="Encaissé aujourd'hui" value={formatCurrency(stats.collected_today)} icon={<Wallet size={16} />} />
       </div>

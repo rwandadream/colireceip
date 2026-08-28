@@ -100,7 +100,7 @@ export async function listProtectedTargets(): Promise<Map<string, PendingRecord>
   const db = await getDB();
   const all = await db.getAll('sync_queue');
   const map = new Map<string, PendingRecord>();
-  const syncedEntities = new Set<SyncEntity>(['clients', 'products', 'parcels', 'payments', 'trips', 'trip-vehicles']);
+  const syncedEntities = new Set<SyncEntity>(['clients', 'products', 'parcels', 'payments', 'trips', 'trip-vehicles', 'settings']);
   for (const m of all) {
     if (m.status === 'synced' || !syncedEntities.has(m.entity)) continue;
     map.set(`${m.entity}:${m.entityId}`, { entity: m.entity, entityId: m.entityId, action: m.action });
@@ -175,6 +175,19 @@ export async function registerTransientFailure(mutation: SyncMutation, message: 
 export async function discardMutation(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('sync_queue', id);
+}
+
+// Re-queues a conflict mutation as pending: it is retried on the next drain.
+export async function requeueMutation(id: string): Promise<void> {
+  const db = await getDB();
+  const mutations = await db.getAllFromIndex('sync_queue', 'by-status', 'conflict');
+  const mutation = mutations.find((m) => m.id === id);
+  if (!mutation) return;
+  mutation.status = 'pending';
+  mutation.retryCount = 0;
+  mutation.updatedAt = toISO();
+  mutation.lastError = undefined;
+  await put(mutation);
 }
 
 // Earliest absolute timestamp (ms) at which a pending mutation may be retried,

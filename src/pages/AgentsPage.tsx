@@ -22,6 +22,7 @@ import {
 } from '../lib/data';
 import type { User, UserRole } from '../lib/types';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Card } from '../components/ui/Card';
 import { OfflineNotice } from '../components/ui/OfflineNotice';
 import { Badge, EmptyState, Skeleton } from '../components/ui/Badge';
@@ -32,6 +33,7 @@ import { formatDate } from '../lib/format';
 
 export function AgentsPage() {
   const { user: currentUser } = useAuth();
+  const { addToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -83,6 +85,10 @@ export function AgentsPage() {
 
   const handleSave = async () => {
     if (!form.full_name || !form.phone || !form.role || (!editUser && !form.password)) return;
+    if (form.password && form.password.length < 8) {
+      addToast({ type: 'error', title: 'Mot de passe trop court', description: 'Le mot de passe doit contenir au moins 8 caractères.' });
+      return;
+    }
     setSaving(true);
     if (editUser) {
       const updates: Partial<User> = {
@@ -122,6 +128,10 @@ export function AgentsPage() {
 
   const handleResetPassword = async () => {
     if (!userToReset || !newPassword) return;
+    if (newPassword.length < 8) {
+      addToast({ type: 'error', title: 'Mot de passe trop court', description: 'Le mot de passe doit contenir au moins 8 caractères.' });
+      return;
+    }
     await updateUser(userToReset.id, { password: newPassword });
     await logActivity(currentUser?.id || '', currentUser?.full_name || '', `a réinitialisé le mot de passe de ${userToReset.full_name}`, 'user', userToReset.id, '');
     setResetOpen(false);
@@ -306,6 +316,7 @@ export function AgentsPage() {
           <Input
             label={editUser ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe *'}
             type="password"
+            minLength={8}
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required={!editUser}
@@ -338,10 +349,12 @@ export function AgentsPage() {
           <Input
             label="Nouveau mot de passe"
             type="password"
+            minLength={8}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
           />
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">Minimum 8 caractères.</p>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setResetOpen(false)} className="btn-secondary">Annuler</button>
             <button onClick={handleResetPassword} className="btn-primary">Enregistrer</button>

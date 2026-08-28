@@ -39,6 +39,10 @@ const navItems: NavItem[] = [
   { to: '/settings', label: 'Paramètres', icon: <Settings size={20} />, adminOnly: true },
 ];
 
+// The five destinations every field agent needs one-tap access to on a phone.
+// The remaining entries keep living in the hamburger drawer.
+const coreMobilePaths = new Set(['/', '/parcels', '/clients', '/payments', '/trips']);
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -133,11 +137,31 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
-          <div key={location.pathname} className="page-enter p-3 sm:p-4 lg:p-6 max-w-full mx-auto pb-16 lg:pb-6 space-y-4">
+          <div key={location.pathname} className="page-enter p-3 sm:p-4 lg:p-6 max-w-full mx-auto pb-24 lg:pb-6 space-y-4">
             {children}
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation: the one-tap destinations stay reachable
+          without opening the drawer; the rest of the entries remain in it. */}
+      <nav aria-label="Navigation principale mobile" className="lg:hidden fixed inset-x-0 bottom-0 z-40 flex bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-bottom">
+        {filteredNav
+          .filter((item) => coreMobilePaths.has(item.to))
+          .map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'}`
+              }
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+      </nav>
     </div>
   );
 }

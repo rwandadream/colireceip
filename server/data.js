@@ -50,6 +50,10 @@ export async function list(resource, user, query = {}) {
     case 'parcels': return publicValue(await prisma.parcel.findMany({ include: { items: true }, orderBy: { createdAt: 'desc' } }));
     case 'status-history': { const parcel = await prisma.parcel.findUnique({ where: { id: required(query.parcelId, 'parcelId') } }); if (!parcel) throw new Error('Colis introuvable.'); return publicValue(await prisma.statusHistory.findMany({ where: { parcelId: parcel.id }, orderBy: { createdAt: 'asc' } })); }
     case 'payments': return publicValue(await prisma.payment.findMany({ orderBy: { paymentDate: 'desc' } }));
+    case 'settings': {
+      const settingsRow = await prisma.appSettings.findFirst();
+      return settingsRow ? [publicValue(settingsRow)] : [];
+    }
     default: throw new Error('Unknown resource.');
   }
 }
@@ -60,6 +64,7 @@ export async function create(resource, input, user, options = {}) {
     const fullName = required(input.fullName || input.full_name, 'fullName');
     const phone = required(input.phone, 'phone');
     const password = required(input.password, 'password');
+    if (password.length < 8) throw new Error('Le mot de passe doit contenir au moins 8 caractères.');
     const role = allowed(input.role, userRoles, 'role');
     const active = input.active !== undefined ? Boolean(input.active) : true;
     const email = clean(input.email)?.toLowerCase() || null;
@@ -188,10 +193,45 @@ export async function update(resource, id, input, user) {
     if (input.role !== undefined) updateData.role = allowed(input.role, userRoles, 'role');
     if (input.active !== undefined) updateData.active = Boolean(input.active);
     if (input.password && typeof input.password === 'string' && input.password.trim()) {
-      updateData.passwordHash = await bcrypt.hash(input.password.trim(), 12);
+      const passwordValue = input.password.trim();
+      if (passwordValue.length < 8) throw new Error('Le mot de passe doit contenir au moins 8 caractères.');
+      updateData.passwordHash = await bcrypt.hash(passwordValue, 12);
     }
     const updatedUser = await prisma.user.update({ where: { id }, data: updateData });
     return publicUser(updatedUser);
+  }
+  if (resource === 'settings') {
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    const settingsFields = {
+      ...(input.companyName !== undefined ? { companyName: clean(input.companyName) || 'Groupe-Gaff' } : {}),
+      ...(input.companyPhone !== undefined ? { companyPhone: clean(input.companyPhone) || '' } : {}),
+      ...(input.companyEmail !== undefined ? { companyEmail: clean(input.companyEmail)?.toLowerCase() || '' } : {}),
+      ...(input.bamakoAddress !== undefined ? { bamakoAddress: clean(input.bamakoAddress) || '' } : {}),
+      ...(input.abidjanAddress !== undefined ? { abidjanAddress: clean(input.abidjanAddress) || '' } : {}),
+      ...(input.defaultTransportPrice !== undefined ? { defaultTransportPrice: amount(input.defaultTransportPrice, 'defaultTransportPrice') } : {}),
+      ...(input.currency !== undefined ? { currency: clean(input.currency) || 'FCFA' } : {}),
+      ...(input.defaultOrigin !== undefined ? { defaultOrigin: clean(input.defaultOrigin) || null } : {}),
+      ...(input.defaultDestination !== undefined ? { defaultDestination: clean(input.defaultDestination) || null } : {}),
+    };
+    const existing = await prisma.appSettings.findFirst();
+    const settingsRecord = existing
+      ? await prisma.appSettings.update({ where: { id: existing.id }, data: { ...settingsFields, updatedById: user.id } })
+      : await prisma.appSettings.create({
+          data: {
+            id: '1',
+            companyName: clean(input.companyName) || 'Groupe-Gaff',
+            companyPhone: clean(input.companyPhone) || '',
+            companyEmail: clean(input.companyEmail)?.toLowerCase() || '',
+            bamakoAddress: clean(input.bamakoAddress) || '',
+            abidjanAddress: clean(input.abidjanAddress) || '',
+            defaultTransportPrice: amount(input.defaultTransportPrice ?? 0, 'defaultTransportPrice'),
+            currency: clean(input.currency) || 'FCFA',
+            defaultOrigin: clean(input.defaultOrigin) || null,
+            defaultDestination: clean(input.defaultDestination) || null,
+            updatedById: user.id,
+          },
+        });
+    return publicValue(settingsRecord);
   }
   if (resource === 'products') { if (!isAdmin(user)) throw new Error('Forbidden.'); return publicValue(await prisma.product.update({ where: { id }, data: { ...(input.name !== undefined ? { name: required(input.name, 'name') } : {}), ...(input.category !== undefined ? { category: required(input.category, 'category') } : {}), ...(input.defaultPrice !== undefined ? { defaultPrice: amount(input.defaultPrice, 'defaultPrice') } : {}) } })); }
   if (resource === 'clients') { const record = await prisma.client.findUnique({ where: { id } }); if (!record) throw new Error('Client introuvable.'); if (!owned(user, record)) throw new Error('Forbidden.'); return publicValue(await prisma.client.update({ where: { id }, data: { ...(input.fullName !== undefined ? { fullName: required(input.fullName, 'fullName') } : {}), ...(input.phone !== undefined ? { phone: clean(input.phone) || '' } : {}), ...(input.companyName !== undefined ? { companyName: clean(input.companyName) || null } : {}), ...(input.email !== undefined ? { email: clean(input.email)?.toLowerCase() || null } : {}), ...(input.city !== undefined ? { city: clean(input.city) || '' } : {}), ...(input.neighborhood !== undefined ? { neighborhood: clean(input.neighborhood) || null } : {}), ...(input.address !== undefined ? { address: clean(input.address) || '' } : {}), ...(input.reference !== undefined ? { reference: clean(input.reference) || null } : {}), ...(input.notes !== undefined ? { notes: clean(input.notes) || '' } : {}) } })); }

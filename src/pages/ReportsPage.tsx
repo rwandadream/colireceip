@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Package,
   CheckCircle2,
@@ -8,6 +8,8 @@ import {
   UserCog,
   FileSpreadsheet,
   FileDown,
+  CalendarRange,
+  RotateCcw,
 } from 'lucide-react';
 import {
   getParcels,
@@ -26,11 +28,15 @@ import * as XLSX from 'xlsx';
 type ReportType = 'all_parcels' | 'delivered' | 'pending' | 'payments' | 'clients' | 'agent_activity';
 
 export function ReportsPage() {
-  const [parcels, setParcels] = useState<Parcel[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [rawParcels, setRawParcels] = useState<Parcel[]>([]);
+  const [rawPayments, setRawPayments] = useState<Payment[]>([]);
+  const [rawClients, setRawClients] = useState<Client[]>([]);
+  const [rawLogs, setRawLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [agentFilter, setAgentFilter] = useState('all');
 
   useEffect(() => {
     (async () => {
@@ -40,13 +46,67 @@ export function ReportsPage() {
         getClients(),
         getActivityLogs(),
       ]);
-      setParcels(p);
-      setPayments(pays);
-      setClients(c);
-      setLogs(l);
+      setRawParcels(p);
+      setRawPayments(pays);
+      setRawClients(c);
+      setRawLogs(l);
       setLoading(false);
     })();
   }, []);
+
+  const agents = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of rawParcels) if (p.registered_by_name) set.add(p.registered_by_name);
+    for (const p of rawPayments) if (p.recorded_by_name) set.add(p.recorded_by_name);
+    for (const l of rawLogs) if (l.user_name) set.add(l.user_name);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [rawParcels, rawPayments, rawLogs]);
+
+  const inRange = useCallback((dateStr: string | null): boolean => {
+    if (!dateStr) return true;
+    const t = new Date(dateStr).getTime();
+    if (from && t < new Date(`${from}T00:00:00`).getTime()) return false;
+    if (to && t > new Date(`${to}T23:59:59.999`).getTime()) return false;
+    return true;
+  }, [from, to]);
+
+  const parcels = useMemo(
+    () => rawParcels.filter((p) => (statusFilter === 'all' || p.status === statusFilter) && (agentFilter === 'all' || p.registered_by_name === agentFilter) && inRange(p.received_date)),
+    [rawParcels, statusFilter, agentFilter, inRange]
+  );
+
+  const payments = useMemo(
+    () => rawPayments.filter((p) => (agentFilter === 'all' || p.recorded_by_name === agentFilter) && inRange(p.payment_date)),
+    [rawPayments, agentFilter, inRange]
+  );
+
+  const clients = useMemo(
+    () => rawClients.filter((c) => inRange(c.created_at)),
+    [rawClients, inRange]
+  );
+
+  const logs = useMemo(
+    () => rawLogs.filter((l) => (agentFilter === 'all' || l.user_name === agentFilter) && inRange(l.created_at)),
+    [rawLogs, agentFilter, inRange]
+  );
+
+  const totals = useMemo(
+    () => ({
+      value: parcels.reduce((sum, p) => sum + (p.total_amount || 0), 0),
+      collected: payments.reduce((sum, p) => sum + p.amount, 0),
+      outstanding: parcels.reduce((sum, p) => sum + (p.balance || 0), 0),
+    }),
+    [parcels, payments]
+  );
+
+  const resetFilters = () => {
+    setFrom('');
+    setTo('');
+    setStatusFilter('all');
+    setAgentFilter('all');
+  };
+
+  const hasFilters = Boolean(from || to || statusFilter !== 'all' || agentFilter !== 'all');
 
   const exportPDF = (type: ReportType) => {
     const now = formatDate(new Date(), "dd/MM/yyyy à HH:mm");
@@ -300,6 +360,90 @@ export function ReportsPage() {
           Générez et exportez vos rapports métiers en formats PDF et Excel
         </p>
       </div>
+
+      {/* Totals respecting the active filters */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="p-4">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Colis</p>
+          <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{parcels.length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Valorisation colis</p>
+          <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{formatCurrency(totals.value)}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Encaissé</p>
+          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 tabular-nums">{formatCurrency(totals.collected)}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Reste à encaisser</p>
+          <p className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1 tabular-nums">{formatCurrency(totals.outstanding)}</p>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+            <CalendarRange size={16} className="text-slate-400" />
+            Filtres
+          </div>
+          <div className="w-40">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Du</label>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100"
+            />
+          </div>
+          <div className="w-40">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Au</label>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100"
+            />
+          </div>
+          <div className="w-44">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Statut colis</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100"
+            >
+              <option value="all">Tous les statuts</option>
+              {Object.entries(PARCEL_STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="w-48">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Agent</label>
+            <select
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100"
+            >
+              <option value="all">Tous les agents</option>
+              {agents.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </div>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={resetFilters}>
+              <RotateCcw size={14} /> Réinitialiser
+            </Button>
+          )}
+        </div>
+        {hasFilters && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
+            {parcels.length} colis · {payments.length} paiements · {logs.length} actions correspondent aux filtres actifs.
+          </p>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {reports.map((report) => (

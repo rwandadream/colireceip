@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { getConflicts, requestSync, resolveConflict, setOnlineState, subscribeSyncState } from '../lib/syncEngine';
+import { getConflicts, requestSync, resolveConflict, resolveConflictKeepingLocal, setOnlineState, subscribeSyncState } from '../lib/syncEngine';
 import type { SyncEngineState, SyncMutation } from '../lib/syncTypes';
 
 interface SyncContextValue {
@@ -8,6 +8,7 @@ interface SyncContextValue {
   conflicts: SyncMutation[];
   syncNow: () => Promise<void>;
   resolveConflict: (id: string) => Promise<void>;
+  resolveConflictKeepingLocal: (id: string) => Promise<void>;
   loadConflicts: () => Promise<void>;
 }
 
@@ -42,6 +43,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     await loadConflicts();
   }, [loadConflicts]);
 
+  const resolveConflictKeepingLocalId = useCallback(async (id: string) => {
+    await resolveConflictKeepingLocal(id);
+    await loadConflicts();
+  }, [loadConflicts]);
+
   useEffect(() => {
     const unsubscribe = subscribeSyncState((next) => {
       setState(next);
@@ -64,8 +70,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, [loadConflicts]);
 
   const value = useMemo<SyncContextValue>(
-    () => ({ state, conflicts, syncNow, resolveConflict: resolveConflictId, loadConflicts }),
-    [state, conflicts, syncNow, resolveConflictId, loadConflicts]
+    () => ({ state, conflicts, syncNow, resolveConflict: resolveConflictId, resolveConflictKeepingLocal: resolveConflictKeepingLocalId, loadConflicts }),
+    [state, conflicts, syncNow, resolveConflictId, resolveConflictKeepingLocalId, loadConflicts]
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

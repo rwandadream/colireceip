@@ -4,6 +4,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { User } from '../lib/types';
@@ -53,6 +54,10 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const userRef = useRef<User | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     let active = true;
@@ -87,6 +92,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
+    };
+  }, []);
+
+  // Session & role freshness: the server is authoritative. Re-check /me on
+  // reconnect, on tab focus and periodically so a revoked/deactivated account
+  // or a role change is reflected without a full reload. A 401 (or an
+  // inactive account) clears the local session; an API outage keeps it.
+  useEffect(() => {
+    const refresh = async () => {
+      if (!navigator.onLine || !userRef.current) return;
+      try {
+        const serverUser = await requestServerSession();
+        if (serverUser) {
+          await cacheAuthenticatedUser(serverUser);
+          writeStorageJson('groupe-gaff-auth', serverUser);
+          setUser(serverUser);
+        } else {
+          setUser(null);
+          clearStorageKeys(AUTH_STORAGE_KEYS);
+        }
+      } catch {
+        // API unavailable (Vite without the serverless API, temporary outage).
+      }
+    };
+
+    const onOnline = () => {
+      void refresh();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(interval);
     };
   }, []);
 

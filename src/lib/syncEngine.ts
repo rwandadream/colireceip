@@ -1,4 +1,5 @@
 import type {
+  AppSettings,
   Client,
   Parcel,
   ParcelItem,
@@ -21,18 +22,21 @@ import {
   nextPendingMutation,
   nextPendingRetryDeadlineMs,
   registerTransientFailure,
+  requeueMutation,
 } from './syncQueue';
 import {
   refreshClients,
   refreshParcels,
   refreshPayments,
   refreshProducts,
+  refreshSettings,
   refreshTrips,
   removeFromLocal,
   upsertClient,
   upsertParcel,
   upsertPayment,
   upsertProduct,
+  upsertSettings,
   upsertTrip,
   upsertTripVehicle,
 } from './localCache';
@@ -69,6 +73,10 @@ import {
   listOnlinePayments,
   updateOnlinePayment,
 } from './paymentPersistence';
+import {
+  listOnlineSettings,
+  updateOnlineSettings,
+} from './settingsPersistence';
 
 // ---------------------------------------------------------------
 // Outcomes
@@ -213,6 +221,15 @@ async function runMutation(mutation: SyncMutation): Promise<Outcome> {
         }
         break;
       }
+      case 'settings': {
+        // Settings is a singleton resource: it is enqueued as an update and
+        // never created or deleted from a device.
+        if (mutation.action !== 'update') {
+          return { kind: 'permanent', code: 400, message: 'Une mutation non prise en charge a été rejetée.' };
+        }
+        value = await updateOnlineSettings(mutation.payload as Partial<AppSettings>);
+        break;
+      }
     }
     return { kind: 'success', value };
   } catch (error) {
@@ -291,6 +308,9 @@ async function applySynced(mutation: SyncMutation, value: unknown): Promise<void
       case 'payments':
         if (value) await upsertPayment(value as Payment);
         break;
+      case 'settings':
+        if (value) await upsertSettings(value as AppSettings);
+        break;
     }
     if (mutation.action === 'delete') {
       await removeFromLocal(mutation.entity, mutation.entityId);
@@ -366,6 +386,8 @@ async function pullAll(): Promise<boolean> {
     await refreshParcels(parcels);
     const payments = await listOnlinePayments();
     await refreshPayments(payments);
+    const settings = await listOnlineSettings();
+    await refreshSettings(settings);
     return true;
   } catch (error) {
     if (isTransientApiError(error)) return false;
@@ -498,6 +520,13 @@ export async function getConflicts(): Promise<SyncMutation[]> {
 // restores the server truth into the local cache.
 export async function resolveConflict(id: string): Promise<void> {
   await discardMutation(id);
+  void requestSync();
+}
+
+// Manual conflict resolution keeping the local version: re-queues the mutation
+// as pending so the next drain re-applies it against the server.
+export async function resolveConflictKeepingLocal(id: string): Promise<void> {
+  await requeueMutation(id);
   void requestSync();
 }
 

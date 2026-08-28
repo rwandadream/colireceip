@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CloudOff, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CloudOff, Loader2, RefreshCw, Send } from 'lucide-react';
 import { useSync } from '../../context/SyncContext';
 import type { SyncAction, SyncEntity } from '../../lib/syncTypes';
 
@@ -9,6 +9,7 @@ const entityLabels: Record<SyncEntity, string> = {
   payments: 'Paiement',
   trips: 'Voyage',
   'trip-vehicles': 'Véhicule',
+  settings: 'Paramètres',
 };
 
 const actionLabels: Record<SyncAction, string> = {
@@ -18,7 +19,7 @@ const actionLabels: Record<SyncAction, string> = {
 };
 
 export function SyncIndicator({ compact = false }: { compact?: boolean }) {
-  const { state, conflicts, syncNow, resolveConflict } = useSync();
+  const { state, conflicts, syncNow, resolveConflict, resolveConflictKeepingLocal } = useSync();
 
   const resolving = state.running;
   const offline = !state.online;
@@ -90,14 +91,25 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
                 <span className="truncate text-slate-700 dark:text-slate-300">
                   {entityLabels[mutation.entity]} · {actionLabels[mutation.action]}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => void resolveConflict(mutation.id)}
-                  className="flex-shrink-0 rounded-md bg-error-600 hover:bg-error-700 text-white px-2 py-0.5 text-[11px] font-medium transition-colors"
-                  title="Ignorer la version locale et garder la version serveur"
-                >
-                  Garder serveur
-                </button>
+                <div className="flex flex-row-reverse items-center gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void resolveConflict(mutation.id)}
+                    className="rounded-md bg-slate-600 hover:bg-slate-700 text-white px-2 py-0.5 text-[11px] font-medium transition-colors"
+                    title="Abandonner la version locale et garder la version serveur"
+                  >
+                    Garder serveur
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void resolveConflictKeepingLocal(mutation.id)}
+                    className="flex items-center gap-1 rounded-md bg-error-600 hover:bg-error-700 text-white px-2 py-0.5 text-[11px] font-medium transition-colors"
+                    title="Ré-appliquer la version locale après la version serveur"
+                  >
+                    <Send size={10} />
+                    Garder local
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

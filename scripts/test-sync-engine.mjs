@@ -268,9 +268,25 @@ try {
   record('conflictIsListable', conflictsBefore.length === 1 && conflictsBefore[0].entity === 'parcels', { conflicts: conflictsBefore.map((m) => ({ id: m.id, entity: m.entity, action: m.action, status: m.status })) });
   const conflictId = conflictsBefore[0]?.id;
   await syncEngineModule.resolveConflict(conflictId);
+  await new Promise((resolve) => setTimeout(resolve, 120)); // let the internal void requestSync() settle
   await requestSync();
   counts = await countSyncedState();
   record('resolveConflictClearsQueue', counts.conflictCount === 0 && counts.pendingCount === 0, { counts });
+
+  // --- L. conflict resolution keeping the local version re-applies it -----
+  store.parcels.get('parcel-srv-1').status = 'delivered'; // provoke a conflict
+  await enqueueMutation({ entity: 'parcels', entityId: 'parcel-srv-1', action: 'update', payload: { status: 'arrived', expectedStatus: 'in_transit' } });
+  await requestSync();
+  await new Promise((resolve) => setTimeout(resolve, 120)); // drain + applySynced are async after fetch
+  const conflictBeforeL = await syncQueue.listConflicts();
+  record('keepLocalConflictCreatesConflict', conflictBeforeL.length === 1, { conflicts: conflictBeforeL.map((m) => m.id) });
+  const keepLocalId = conflictBeforeL[0]?.id;
+  store.parcels.get('parcel-srv-1').status = 'in_transit'; // let the re-send become acceptable
+  await syncEngineModule.resolveConflictKeepingLocal(keepLocalId);
+  await new Promise((resolve) => setTimeout(resolve, 120)); // the internal requestSync re-applies the mutation
+  counts = await countSyncedState();
+  record('keepLocalRequeuesAndClearsConflict', counts.conflictCount === 0 && counts.pendingCount === 0, { counts });
+  record('keepLocalReappliesToServer', store.parcels.get('parcel-srv-1')?.status === 'arrived', { status: store.parcels.get('parcel-srv-1')?.status });
 } catch (error) {
   console.error('Engine test crashed:', error);
   record('cleanRun', false);
