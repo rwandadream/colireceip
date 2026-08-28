@@ -309,6 +309,54 @@ try {
   await requestSync(); // a further pull must not restore a deleted record
   const localAfterPull = await db.get('clients', 'client-srv-2');
   record('deletedRecordNeverResurrects', !store.clients.has('client-srv-2') && localAfterPull === undefined && counts.pendingCount === 0, { serverStillHas: store.clients.has('client-srv-2'), local: localAfterPull ?? null });
+
+  // --- N. permanent failures are terminal: never blind-retried ------------
+  const failedFloor = counts.failedCount;
+  let allowRetryCreate = false;
+  const prevFetchN = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === 'POST' && (init.body ?? '').includes('"client-retry"') && !allowRetryCreate) return errorRes(400, 'Rejeté');
+    return prevFetchN(url, init);
+  };
+  await enqueueMutation({ entity: 'clients', entityId: 'client-retry', action: 'create', payload: clientRecord('client-retry', 'retry-me') });
+  await requestSync();
+  counts = await countSyncedState();
+  record('permanentFailureIsTerminal', counts.failedCount === failedFloor + 1 && !store.clients.has('client-retry'), { counts });
+  await requestSync(); // an extra cycle must not blind-retry a failed mutation
+  counts = await countSyncedState();
+  record('failedMutationNeverAutoRetried', counts.failedCount === failedFloor + 1 && !store.clients.has('client-retry'), { counts });
+
+  // --- O. a user-driven retry re-applies the failed mutation ---------------
+  const retryTarget = (await syncQueue.listFailed()).find((m) => m.entityId === 'client-retry');
+  record('failedMutationIsListable', retryTarget !== undefined && retryTarget.status === 'failed', { listed: retryTarget?.lastError ?? null });
+  allowRetryCreate = true; // the obstacle is removed
+  await syncEngineModule.retryFailedMutation(retryTarget.id);
+  await new Promise((resolve) => setTimeout(resolve, 200)); // let the internal requestSync settle
+  counts = await countSyncedState();
+  record('retryFailedReappliesToServer', store.clients.has('client-retry') && counts.failedCount === failedFloor && counts.pendingCount === 0, { counts });
+
+  // --- P. dismissing a stale failed delete restores server truth ----------
+  store.clients.set('client-dismiss', { id: 'client-dismiss', fullName: 'Still On Server', phone: '+2236', companyName: null, email: null, city: 'Bamako', neighborhood: null, address: '', reference: null, notes: '', createdAt: new Date(0).toISOString() });
+  await upsertClient({ id: 'client-dismiss', full_name: 'Still On Server', phone: '+2236', company_name: null, email: null, city: 'Bamako', neighborhood: null, address: '', reference: null, notes: '', created_by: 'u', created_by_name: 'U', created_at: isoNow, updated_at: isoNow });
+  let denyDismissDelete = true;
+  const prevFetchP = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const parsed = new URL(String(url), 'http://test.local');
+    if (init.method === 'DELETE' && parsed.searchParams.get('resource') === 'clients' && parsed.searchParams.get('id') === 'client-dismiss' && denyDismissDelete) return errorRes(401, 'Non autorisé.');
+    return prevFetchP(url, init);
+  };
+  await enqueueMutation({ entity: 'clients', entityId: 'client-dismiss', action: 'delete', payload: {} });
+  await requestSync();
+  counts = await countSyncedState();
+  const staleFailedId = (await syncQueue.listFailed()).find((m) => m.entityId === 'client-dismiss')?.id;
+  record('staleFailedDeleteIsListable', staleFailedId !== undefined && counts.failedCount === failedFloor + 1 && store.clients.has('client-dismiss'), { serverHas: store.clients.has('client-dismiss'), counts });
+  denyDismissDelete = false;
+  await syncEngineModule.dismissFailedMutation(staleFailedId);
+  await new Promise((resolve) => setTimeout(resolve, 200)); // discard + pull settle
+  counts = await countSyncedState();
+  const localAfterDismiss = await db.get('clients', 'client-dismiss');
+  record('dismissFailedClearsAndPullsServerTruth', counts.failedCount === failedFloor && counts.pendingCount === 0 && localAfterDismiss?.full_name === 'Still On Server', { counts, local: localAfterDismiss?.full_name ?? null });
+  globalThis.fetch = prevFetchP;
 } catch (error) {
   console.error('Engine test crashed:', error);
   record('cleanRun', false);

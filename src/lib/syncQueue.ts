@@ -177,11 +177,13 @@ export async function discardMutation(id: string): Promise<void> {
   await db.delete('sync_queue', id);
 }
 
-// Re-queues a conflict mutation as pending: it is retried on the next drain.
+// Re-queues a conflict/failed mutation as pending: it is retried on the next
+// drain. Both terminal states expose user-driven recovery, so a re-queue is
+// valid for either of them.
 export async function requeueMutation(id: string): Promise<void> {
   const db = await getDB();
-  const mutations = await db.getAllFromIndex('sync_queue', 'by-status', 'conflict');
-  const mutation = mutations.find((m) => m.id === id);
+  const all = await db.getAll('sync_queue');
+  const mutation = all.find((m) => m.id === id && (m.status === 'conflict' || m.status === 'failed'));
   if (!mutation) return;
   mutation.status = 'pending';
   mutation.retryCount = 0;
@@ -229,5 +231,11 @@ export async function countByIdempotencyKey(key: string): Promise<number> {
 export async function listConflicts(): Promise<SyncMutation[]> {
   const db = await getDB();
   const all = await db.getAllFromIndex('sync_queue', 'by-status', 'conflict');
+  return all.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+}
+
+export async function listFailed(): Promise<SyncMutation[]> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('sync_queue', 'by-status', 'failed');
   return all.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 }

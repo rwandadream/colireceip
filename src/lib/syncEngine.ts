@@ -18,6 +18,7 @@ import {
   countSyncedState,
   discardMutation,
   listConflicts,
+  listFailed,
   markConflict,
   markFailed,
   nextPendingMutation,
@@ -556,6 +557,10 @@ export async function getConflicts(): Promise<SyncMutation[]> {
   return listConflicts();
 }
 
+export async function getFailedMutations(): Promise<SyncMutation[]> {
+  return listFailed();
+}
+
 // Manual conflict resolution: drop the offline mutation, then the next pull
 // restores the server truth into the local cache.
 export async function resolveConflict(id: string): Promise<void> {
@@ -567,6 +572,20 @@ export async function resolveConflict(id: string): Promise<void> {
 // as pending so the next drain re-applies it against the server.
 export async function resolveConflictKeepingLocal(id: string): Promise<void> {
   await requeueMutation(id);
+  void requestSync();
+}
+
+// User-driven retry of a permanently failed mutation: re-queues it as pending
+// so the next drain re-applies it (the obstacle may have been removed).
+export async function retryFailedMutation(id: string): Promise<void> {
+  await requeueMutation(id);
+  void requestSync();
+}
+
+// User-driven dismissal of a permanently failed mutation: drops it, then the
+// next pull reconciles the local cache with the server truth.
+export async function dismissFailedMutation(id: string): Promise<void> {
+  await discardMutation(id);
   void requestSync();
 }
 

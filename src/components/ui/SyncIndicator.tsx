@@ -20,7 +20,7 @@ const actionLabels: Record<SyncAction, string> = {
 };
 
 export function SyncIndicator({ compact = false }: { compact?: boolean }) {
-  const { state, conflicts, syncNow, resolveConflict, resolveConflictKeepingLocal } = useSync();
+  const { state, conflicts, failed: failedMutations, syncNow, resolveConflict, resolveConflictKeepingLocal, retryFailed, dismissFailed } = useSync();
 
   const resolving = state.running;
   const offline = !state.online;
@@ -109,6 +109,49 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
                   >
                     <Send size={10} />
                     Garder local
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!compact && failedMutations.length > 0 && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/40 p-2 animate-fade-in">
+          <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-1">
+            Échecs de synchronisation
+          </div>
+          <ul className="space-y-1">
+            {failedMutations.map((mutation) => (
+              <li
+                key={mutation.id}
+                className="flex items-center justify-between gap-2 rounded-md bg-white dark:bg-slate-900/80 px-2 py-1.5 text-xs border border-slate-200/70 dark:border-slate-700/70"
+              >
+                <div className="min-w-0 truncate">
+                  <span className="truncate text-slate-700 dark:text-slate-300">
+                    {entityLabels[mutation.entity]} · {actionLabels[mutation.action]}
+                  </span>
+                  {mutation.lastError && (
+                    <span className="block truncate text-[10px] text-amber-600 dark:text-amber-500">{mutation.lastError}</span>
+                  )}
+                </div>
+                <div className="flex flex-row-reverse items-center gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void retryFailed(mutation.id)}
+                    className="rounded-md bg-amber-500 hover:bg-amber-600 text-white px-2 py-0.5 text-[11px] font-medium transition-colors"
+                    title="Ré-appliquer cette modification"
+                  >
+                    Réessayer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void dismissFailed(mutation.id)}
+                    className="rounded-md bg-slate-600 hover:bg-slate-700 text-white px-2 py-0.5 text-[11px] font-medium transition-colors"
+                    title="Abandonner cette modification et garder la version serveur"
+                  >
+                    Ignorer
                   </button>
                 </div>
               </li>
