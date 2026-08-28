@@ -132,7 +132,7 @@ try {
   record('clients.updatePersists', clientPatch.statusCode === 200 && dbClient2?.fullName === `${marker}-client-v2` && dbClient2?.neighborhood === 'Hamdallaye', { status: clientPatch.statusCode });
 
   const clientRefresh = await invokeApi({ method: 'GET', resource: 'clients', cookie: adminCookie });
-  record('clients.refreshSeesUpdate', (clientRefresh.payload?.data ?? []).some((c) => c.id === created.clientBase?.id && c.full_name === `${marker}-client-v2`));
+  record('clients.refreshSeesUpdate', (clientRefresh.payload?.data ?? []).some((c) => c.id === created.clientBase?.id && c.fullName === `${marker}-client-v2` && c.neighborhood === 'Hamdallaye'));
 
   // ================================================================
   // TRIPS + TRIP-VEHICLES — full CRUD (vehicle created with the trip,
@@ -342,7 +342,7 @@ try {
   const dbSettings = await prisma.appSettings.findFirst();
   record('settings.updatePersists', settingsPatch.statusCode === 200 && dbSettings?.companyName === `${marker}-company` && Number(dbSettings?.defaultTransportPrice) === 5000, { status: settingsPatch.statusCode });
   const settingsRefresh = await invokeApi({ method: 'GET', resource: 'settings', cookie: adminCookie });
-  record('settings.refreshSeesUpdate', (settingsRefresh.payload?.data ?? []).some((s) => s.company_name === `${marker}-company` && Number(s.default_transport_price) === 5000));
+  record('settings.refreshSeesUpdate', (settingsRefresh.payload?.data ?? []).some((s) => s.companyName === `${marker}-company` && Number(s.defaultTransportPrice) === 5000));
 
   // Products deletion (straight DB delete path).
   const productDelete = await invokeApi({ method: 'DELETE', resource: 'products', id: created.product?.id, cookie: adminCookie });
