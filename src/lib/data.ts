@@ -31,7 +31,7 @@ import { canUseParcelApi, isParcelApiUnavailable, listOnlineParcels, listOnlineS
 import { canUseUserApi, createOnlineUser, deleteOnlineUser, isUserApiUnavailable, listOnlineUsers, updateOnlineUser } from './userPersistence';
 import { canUseSettingsApi, isSettingsApiUnavailable, listOnlineSettings, settingsToApi } from './settingsPersistence';
 import { canUseExpenseApi, isExpenseApiUnavailable, listOnlineExpenses } from './expensePersistence';
-import { enqueueMutation, hasProtectedMutation, listProtectedTargets, mergeLocalPending } from './syncQueue';
+import { cancelMutations, enqueueMutation, hasProtectedMutation, listProtectedTargets, mergeLocalPending } from './syncQueue';
 import { requestSync } from './syncEngine';
 import { refreshClients, refreshExpenses, refreshParcels, refreshPayments, refreshProducts, refreshSettings, refreshTrips, reconcileParcelFromPayments } from './localCache';
 import type { SyncEntity } from './syncTypes';
@@ -415,6 +415,9 @@ export async function deleteClient(id: string): Promise<{ pendingSync: boolean }
       // success. A permanent rejection (401/403/400/409) is surfaced to the
       // user instead of presenting a local-only deletion as successful.
       await deleteOnlineClient(id);
+      // Purge offline-edited mutations for the deleted record so they are never
+      // replayed against the now-removed server row (client-not-found 400s).
+      await cancelMutations('clients', id);
     } catch (error) {
       if (isApiUnavailable(error)) {
         await db.delete('clients', id);

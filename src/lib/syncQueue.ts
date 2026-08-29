@@ -177,6 +177,18 @@ export async function discardMutation(id: string): Promise<void> {
   await db.delete('sync_queue', id);
 }
 
+// Removes every queued mutation for a target. Used after an online-first delete
+// succeeds so previously queued offline edits for the now-deleted record are
+// never replayed against the server (they would otherwise fail as client-not-found
+// HTTP 400s). Mutations for any other target are left untouched.
+export async function cancelMutations(entity: SyncEntity, entityId: string): Promise<void> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('sync_queue', 'by-target', [entity, entityId]);
+  for (const mutation of all) {
+    await db.delete('sync_queue', mutation.id);
+  }
+}
+
 // Re-queues a conflict/failed mutation as pending: it is retried on the next
 // drain. Both terminal states expose user-driven recovery, so a re-queue is
 // valid for either of them.

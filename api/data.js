@@ -12,11 +12,12 @@ const body = (req) => { if (req.body && typeof req.body === 'object') return req
 // must surface as HTTP 503 (retryable) instead of the generic 400 catch-all,
 // otherwise a single infrastructure hiccup permanently fails a queued mutation
 // and sticks it in the UI's failed state forever.
-const TRANSIENT_PRISMA_CODES = new Set(['P1000', 'P1001', 'P1002', 'P1008', 'P1017', 'P2024']);
+const TRANSIENT_PRISMA_CODES = new Set(['P1000', 'P1001', 'P1002', 'P1004', 'P1008', 'P1017', 'P2024']);
 const TRANSIENT_NETWORK_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EPIPE', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNABORTED', 'ENETDOWN']);
-// PostgreSQL connection-exception class (08xxx) and "cannot connect" states.
+// PostgreSQL connection-exception class (08xxx), "cannot connect" states, and
+// statement/lock/serialization failures (57014, 40001, 55P03, 40P01).
 const TRANSIENT_SQLSTATE = /^08/;
-const TRANSIENT_SQLSTATE_CODES = new Set(['57P01', '57P02', '57P03', '53300']);
+const TRANSIENT_SQLSTATE_CODES = new Set(['57P01', '57P02', '57P03', '53300', '57014', '40001', '55P03', '40P01']);
 
 export function isTransientServiceError(error) {
   if (!(error instanceof Error)) return false;

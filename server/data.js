@@ -52,6 +52,19 @@ const withTxRetry = async (operation) => {
   throw new Error('Transaction retry limit exceeded.');
 };
 
+// Deletes are idempotent: if the row disappears between the existence check and
+// the delete below (e.g. another device deleted it concurrently), Prisma raises
+// P2025. The end state the caller wants is already true, so such a delete must
+// answer success (HTTP 204) instead of surfacing as a permanent 400.
+const deleteIdempotent = async (deletePromise) => {
+  try {
+    return await deletePromise;
+  } catch (error) {
+    if (error && error.code === 'P2025') return null;
+    throw error;
+  }
+};
+
 export async function list(resource, user, query = {}) {
   switch (resource) {
     case 'users': {
@@ -234,20 +247,20 @@ export async function remove(resource, id, user) {
   }
   const model = resource === 'clients' ? prisma.client : resource === 'trips' ? prisma.trip : resource === 'parcels' ? prisma.parcel : null; if (!model) throw new Error('Unknown resource.'); const record = await model.findUnique({ where: { id } }); if (!record) return null; if (!owned(user, record)) throw new Error('Forbidden.');
   if (resource === 'trips') {
-    return publicValue(await prisma.$transaction(async (tx) => {
+    return publicValue(await deleteIdempotent(prisma.$transaction(async (tx) => {
       await tx.tripVehicle.deleteMany({ where: { tripId: record.id } });
       return tx.trip.delete({ where: { id: record.id } });
-    }));
+    })));
   }
   if (resource === 'parcels') {
-    return publicValue(await prisma.$transaction(async (tx) => {
+    return publicValue(await deleteIdempotent(prisma.$transaction(async (tx) => {
       await tx.statusHistory.deleteMany({ where: { parcelId: record.id } });
       await tx.parcelItem.deleteMany({ where: { parcelId: record.id } });
       await tx.payment.deleteMany({ where: { parcelId: record.id } });
       return tx.parcel.delete({ where: { id: record.id } });
-    }));
+    })));
   }
-  return model.delete({ where: { id: record.id } });
+  return deleteIdempotent(model.delete({ where: { id: record.id } }));
 }
 
 export async function update(resource, id, input, user) {

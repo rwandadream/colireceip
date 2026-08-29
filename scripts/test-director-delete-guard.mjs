@@ -58,6 +58,7 @@ let adminCookie;
 let directorCookie;
 let agentCookie;
 const createdClientIds = [];
+const createdParcelIds = [];
 
 try {
   const admin = await authenticate(process.env.INITIAL_ADMIN_EMAIL, process.env.INITIAL_ADMIN_PASSWORD);
@@ -129,6 +130,40 @@ try {
   record('unauthenticatedDeleteIs401', unauthenticated.statusCode === 401, `status=${unauthenticated.statusCode}`);
   record('unauthenticatedDoesNotDelete', dbUnauthRows === 1, `rows=${dbUnauthRows}`);
 
+  console.log('--- F. P2025 delete race resolves 204 (never 400) ---');
+  const raceClient = await invokeApi({ method: 'POST', resource: 'clients', cookie: directorCookie, body: { fullName: `Race ${marker}`, phone: `+22376${String(Date.now()).slice(-7)}` } });
+  const raceClientId = raceClient.payload?.data?.id;
+  createdClientIds.push(raceClientId);
+  // Simulate the TOCTOU window: the existence check passes, then the row is
+  // gone by the time the delete finally executes (a concurrent device deleted
+  // it). The server must answer 204, not the permanent 400 the frontend stuck.
+  const originalClientDelete = prisma.client.delete;
+  Object.defineProperty(prisma.client, 'delete', {
+    configurable: true,
+    writable: true,
+    value: async () => { throw Object.assign(new Error('Failed to delete the record: record does not exist (P2025).'), { code: 'P2025' }); },
+  });
+  try {
+    const raceDelete = await invokeApi({ method: 'DELETE', resource: 'clients', id: raceClientId, cookie: directorCookie });
+    record('p2025RaceDeleteIs204', raceDelete.statusCode === 204, `status=${raceDelete.statusCode}`);
+  } finally {
+    Object.defineProperty(prisma.client, 'delete', { configurable: true, writable: true, value: originalClientDelete });
+  }
+  const raceRowAfter = await prisma.client.count({ where: { id: raceClientId } });
+  record('p2025RaceLeavesRowForRealCleanup', raceRowAfter === 1, `rows=${raceRowAfter}`);
+
+  console.log('--- G. Client with related parcel -> 409 unchanged ---');
+  const linkedClient = await invokeApi({ method: 'POST', resource: 'clients', cookie: directorCookie, body: { fullName: `Lié ${marker}`, phone: `+22377${String(Date.now()).slice(-7)}` } });
+  const linkedClientId = linkedClient.payload?.data?.id;
+  createdClientIds.push(linkedClientId);
+  const linkedParcel = await invokeApi({ method: 'POST', resource: 'parcels', cookie: directorCookie, body: { clientId: linkedClientId, items: [{ designation: 'Carton test', quantity: 1, unitPrice: 500 }] } });
+  const linkedParcelId = linkedParcel.payload?.data?.id;
+  createdParcelIds.push(linkedParcelId);
+  record('linkedParcelCreateSucceeds', linkedParcel.statusCode === 201 && Boolean(linkedParcelId), `status=${linkedParcel.statusCode}`);
+  const deleteLinked = await invokeApi({ method: 'DELETE', resource: 'clients', id: linkedClientId, cookie: directorCookie });
+  const linkedRows = await prisma.client.count({ where: { id: linkedClientId } });
+  record('clientWithRelatedParcelIs409', deleteLinked.statusCode === 409 && linkedRows === 1, `status=${deleteLinked.statusCode} rows=${linkedRows}`);
+
   console.log('\n--- SUMMARY ---');
   let allPass = true;
   for (const [name, passed] of Object.entries(results)) {
@@ -141,6 +176,11 @@ try {
   process.exitCode = 1;
 } finally {
   try {
+    for (const id of createdParcelIds) {
+      if (id && adminCookie) {
+        await dataHandler({ method: 'DELETE', query: { resource: 'parcels', id }, headers: { cookie: adminCookie } }, makeRes()).catch(() => undefined);
+      }
+    }
     for (const id of createdClientIds) {
       if (id && adminCookie) {
         await dataHandler({ method: 'DELETE', query: { resource: 'clients', id }, headers: { cookie: adminCookie } }, makeRes()).catch(() => undefined);

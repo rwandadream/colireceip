@@ -388,6 +388,62 @@ try {
   const localAfter503Retry = await db.get('clients', 'client-503');
   record('delete503RetriedThenRemoved', !store.clients.has('client-503') && localAfter503Retry === undefined && counts.pendingCount === 0 && counts.failedCount === failedFloor, { counts, local: localAfter503Retry ?? null });
   globalThis.fetch = prevFetchS;
+
+  // --- T. online-success delete purges stale queued mutations ---------------
+  // A client edited/created while offline keeps queued mutations. If the client
+  // is then deleted online (the server confirms 204), those mutations must not
+  // be replayed afterwards (they would fail as client-not-found HTTP 400s), and
+  // mutations for OTHER targets must remain untouched.
+  if (typeof globalThis.localStorage === 'undefined') {
+    const memoryStorage = new Map();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key) => (memoryStorage.has(key) ? memoryStorage.get(key) : null),
+        setItem: (key, value) => { memoryStorage.set(key, String(value)); },
+        removeItem: (key) => { memoryStorage.delete(key); },
+        clear: () => { memoryStorage.clear(); },
+      },
+    });
+  }
+  const authUser = { id: 'u-admin', role: 'admin', full_name: 'Admin', phone: '+22370000000', email: 'admin@groupe-gaff.test', active: true, created_at: isoNow, updated_at: isoNow };
+  globalThis.localStorage.setItem('groupe-gaff-auth', JSON.stringify(authUser));
+
+  const staleClient = { id: 'client-stale', full_name: 'Stale Client', phone: '+111', company_name: null, email: null, city: 'Bamako', neighborhood: null, address: '', reference: null, notes: '', created_by: 'u-admin', created_by_name: 'Admin', created_at: isoNow, updated_at: isoNow };
+  await db.put('clients', staleClient);
+
+  // Queued while offline: an update AND a create for the same client, plus an
+  // unrelated mutation that must survive the purge untouched.
+  await enqueueMutation({ entity: 'clients', entityId: 'client-stale', action: 'update', payload: { full_name: 'Edited Offline' } });
+  await enqueueMutation({ entity: 'clients', entityId: 'client-stale', action: 'create', payload: staleClient });
+  await enqueueMutation({ entity: 'clients', entityId: 'client-other', action: 'update', payload: { full_name: 'Other Client Edit' } });
+
+  const dataModule = await vite.ssrLoadModule('/src/lib/data.ts');
+  const deleteRequests = [];
+  const prevFetchT = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const parsed = new URL(String(url), 'http://test.local');
+    deleteRequests.push({ method: init.method, resource: parsed.searchParams.get('resource'), id: parsed.searchParams.get('id') ?? undefined });
+    if (init.method === 'DELETE' && parsed.searchParams.get('resource') === 'clients' && parsed.searchParams.get('id') === 'client-stale') return json(null);
+    return prevFetchT(url, init);
+  };
+  const deleteResult = await dataModule.deleteClient('client-stale');
+  const staleLeft = await db.getAllFromIndex('sync_queue', 'by-target', ['clients', 'client-stale']);
+  const otherLeft = await db.getAllFromIndex('sync_queue', 'by-target', ['clients', 'client-other']);
+  const localStaleLeft = await db.get('clients', 'client-stale');
+  record('onlineDeleteIsQueuedFreeDelete', deleteResult?.pendingSync === false && deleteRequests.some((r) => r.method === 'DELETE' && r.resource === 'clients' && r.id === 'client-stale'), { result: deleteResult ?? null, requests: deleteRequests });
+  record('onlineDeletePurgesStaleMutations', staleLeft.length === 0, { remaining: staleLeft.map((m) => `${m.action}:${m.status}`) });
+  record('onlineDeleteRemovesLocalRecord', localStaleLeft === undefined, { local: localStaleLeft ?? null });
+  record('purgeKeepsUnrelatedMutations', otherLeft.length === 1 && otherLeft[0].entityId === 'client-other', { remaining: otherLeft.map((m) => `${m.action}:${m.status}`) });
+
+  // A real sync cycle afterwards must only touch the unrelated mutation.
+  await requestSync();
+  const staleReplay = deleteRequests.some((r) => r.id === 'client-stale' && (r.method === 'PATCH' || r.method === 'POST'));
+  const otherReplay = deleteRequests.some((r) => r.id === 'client-other' && (r.method === 'PATCH' || r.method === 'POST'));
+  const recreatedOnServer = store.clients.has('client-stale');
+  record('staleMutationsNeverReplayedOnNextSync', staleReplay === false && recreatedOnServer === false, { requests: deleteRequests.filter((r) => r.id?.startsWith('client')) });
+  record('unrelatedMutationStillReplays', otherReplay === true, { requests: deleteRequests.filter((r) => r.id?.startsWith('client')) });
+  globalThis.fetch = prevFetchT;
 } catch (error) {
   console.error('Engine test crashed:', error);
   record('cleanRun', false);
