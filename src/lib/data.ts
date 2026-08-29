@@ -186,6 +186,10 @@ export async function createTripVehicle(
 
 export async function deleteTripVehicle(id: string): Promise<void> {
   const db = await getDB();
+  const vehicle = await db.get('trip_vehicles', id);
+  if (!vehicle) return;
+  const trip = vehicle.trip_id ? await db.get('trips', vehicle.trip_id) : undefined;
+  requireOwnedAccess(trip?.created_by);
   await db.delete('trip_vehicles', id);
   await enqueueMutation({ entity: 'trip-vehicles', entityId: id, action: 'delete', payload: {} });
   notifySync();
@@ -253,6 +257,15 @@ function requireOwnedAccess(ownerId: string | undefined): void {
   }
 }
 
+// Mirrors the server's canEditPayment: admin, the agent who recorded the
+// payment, or the owner of the parcel the payment belongs to.
+function canEditPaymentLocal(payment: Payment | undefined, parcel: Parcel | undefined): boolean {
+  const user = getAuthenticatedUser();
+  return canAccessOwnedRecord(user, payment?.recorded_by)
+    || canAccessOwnedRecord(user, parcel?.registered_by)
+    || canAccessOwnedRecord(user, parcel?.agent_id);
+}
+
 export async function getUserById(id: string): Promise<User | undefined> {
   const db = await getDB();
   return db.get('users', id);
@@ -261,6 +274,7 @@ export async function getUserById(id: string): Promise<User | undefined> {
 export async function createUser(
   data: Omit<User, 'id' | 'created_at' | 'updated_at'>
 ): Promise<User> {
+  requireDirectorAccess();
   const password = typeof data.password === 'string' ? data.password.trim() : '';
   let createdUser: User | undefined;
   if (canUseUserApi()) {
@@ -292,6 +306,7 @@ export async function createUser(
 }
 
 export async function updateUser(id: string, data: Partial<User>): Promise<void> {
+  requireDirectorAccess();
   const password = typeof data.password === 'string' ? data.password.trim() : '';
   if (canUseUserApi()) {
     try {
@@ -323,6 +338,7 @@ function toStoredUser(user: User): User {
 }
 
 export async function deleteUser(id: string): Promise<void> {
+  requireDirectorAccess();
   if (canUseUserApi()) {
     try {
       await deleteOnlineUser(id);
@@ -634,6 +650,7 @@ export async function getProductByName(name: string): Promise<Product | undefine
 export async function createProduct(
   data: Omit<Product, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Product> {
+  requireDirectorAccess();
   const db = await getDB();
   const now = toISO();
   const product: Product = { ...data, id: generateId(), created_at: now, updated_at: now };
@@ -644,6 +661,7 @@ export async function createProduct(
 }
 
 export async function updateProduct(id: string, data: Partial<Product>): Promise<Product | undefined> {
+  requireDirectorAccess();
   const db = await getDB();
   const existing = await db.get('products', id);
   if (!existing) return undefined;
@@ -658,6 +676,7 @@ export async function updateProduct(id: string, data: Partial<Product>): Promise
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  requireDirectorAccess();
   const db = await getDB();
   await db.delete('products', id);
   await enqueueMutation({ entity: 'products', entityId: id, action: 'delete', payload: {} });
@@ -914,6 +933,10 @@ export async function updatePayment(id: string, data: { note?: string; payment_m
   const db = await getDB();
   const existing = await db.get('payments', id);
   if (!existing) return;
+  const parcel = await db.get('parcels', existing.parcel_id);
+  if (!canEditPaymentLocal(existing, parcel)) {
+    throw new Error('Accès refusé. Cet enregistrement appartient à un autre utilisateur.');
+  }
   const updated = { ...existing, ...data };
   await db.put('payments', updated);
   const payload: Record<string, unknown> = {};
@@ -929,6 +952,10 @@ export async function deletePayment(id: string): Promise<void> {
   const db = await getDB();
   const existing = await db.get('payments', id);
   if (!existing) return;
+  const parcel = await db.get('parcels', existing.parcel_id);
+  if (!canEditPaymentLocal(existing, parcel)) {
+    throw new Error('Accès refusé. Cet enregistrement appartient à un autre utilisateur.');
+  }
   await db.delete('payments', id);
   if (existing.parcel_id) await reconcileParcelFromPayments(existing.parcel_id, Number(existing.amount) || 0);
   await enqueueMutation({ entity: 'payments', entityId: id, action: 'delete', payload: {} });
@@ -1006,6 +1033,7 @@ export async function getSettings(): Promise<AppSettings> {
 }
 
 export async function updateSettings(data: Partial<AppSettings>): Promise<void> {
+  requireDirectorAccess();
   const db = await getDB();
   const existing = await db.get('settings', '1');
   if (!existing) return;
