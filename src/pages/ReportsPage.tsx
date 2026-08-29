@@ -375,13 +375,14 @@ export function ReportsPage() {
     return (
       <div className="space-y-4">
         <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">Rapports & exports</p>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Rapports & Exports</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Générez et exportez vos rapports métiers en formats PDF et Excel
           </p>
         </div>
         <Card className="p-6 text-center">
-          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger les rapports</p>
+          <p className="text-sm font-semibold text-error-600 dark:text-error-400 mb-1">Impossible de charger les rapports</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
           <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Réessayer</Button>
         </Card>
@@ -392,6 +393,7 @@ export function ReportsPage() {
   return (
     <div className="space-y-4">
       <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+        <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">Rapports & exports</p>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Rapports & Exports</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
           Générez et exportez vos rapports métiers en formats PDF et Excel
@@ -414,7 +416,7 @@ export function ReportsPage() {
         </Card>
         <Card className="p-4">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Reste à encaisser</p>
-          <p className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1 tabular-nums">{formatCurrency(totals.outstanding)}</p>
+          <p className="text-xl font-bold text-error-600 dark:text-error-400 mt-1 tabular-nums">{formatCurrency(totals.outstanding)}</p>
         </Card>
       </div>
 

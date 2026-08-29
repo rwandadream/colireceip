@@ -178,6 +178,9 @@ export function AgentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
+            Gestion des utilisateurs
+          </p>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Gestion des Utilisateurs & Agents
           </h1>
@@ -222,8 +225,8 @@ export function AgentsPage() {
         </Card>
       ) : loadError ? (
         <Card className="p-6 text-center">
-          <Shield size={28} className="mx-auto text-rose-500 mb-2" />
-          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger les utilisateurs</p>
+          <Shield size={28} className="mx-auto text-error-500 mb-2" />
+          <p className="text-sm font-semibold text-error-600 dark:text-error-400 mb-1">Impossible de charger les utilisateurs</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
           <Button variant="secondary" size="sm" onClick={() => { setLoading(true); setLoadError(false); loadUsers(); }}>Réessayer</Button>
         </Card>
@@ -291,7 +294,7 @@ export function AgentsPage() {
                           <CheckCircle2 size={11} /> Actif
                         </Badge>
                       ) : (
-                        <Badge className="bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                        <Badge className="bg-error-100 text-error-700 dark:bg-error-900/40 dark:text-error-300">
                           <XCircle size={11} /> Désactivé
                         </Badge>
                       )}
@@ -315,7 +318,7 @@ export function AgentsPage() {
                               <Power size={14} className={u.active ? 'text-amber-600' : 'text-emerald-600'} />
                             </Button>
                             {u.role !== 'admin' && (
-                              <Button variant="ghost" size="sm" className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30" onClick={() => { setUserToDelete(u); setDeleteOpen(true); }} title="Supprimer">
+                              <Button variant="ghost" size="sm" className="text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20" onClick={() => { setUserToDelete(u); setDeleteOpen(true); }} title="Supprimer">
                                 <Trash2 size={14} />
                               </Button>
                             )}
@@ -372,8 +375,8 @@ export function AgentsPage() {
             </Select>
           )}
           <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setModalOpen(false)} className="btn-secondary">Annuler</button>
-            <button onClick={handleSave} disabled={saving} className="btn-primary">
+            <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Annuler</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="btn-primary">
               <Save size={16} /> {editUser ? 'Enregistrer' : 'Créer'}
             </button>
           </div>
@@ -396,8 +399,8 @@ export function AgentsPage() {
           />
           <p className="text-[11px] text-slate-500 dark:text-slate-400">Minimum 8 caractères.</p>
           <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setResetOpen(false)} className="btn-secondary">Annuler</button>
-            <button onClick={handleResetPassword} className="btn-primary">Enregistrer</button>
+            <button type="button" onClick={() => setResetOpen(false)} className="btn-secondary">Annuler</button>
+            <button type="button" onClick={handleResetPassword} className="btn-primary">Enregistrer</button>
           </div>
         </div>
       </Modal>

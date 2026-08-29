@@ -310,8 +310,15 @@ export function ExpensesPage() {
       <OfflineNotice />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dépenses</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Suivi des dépenses et rapports.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
+            Dépenses
+          </p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Dépenses
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Suivi des dépenses et rapports.
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <Button variant="secondary" size="sm" onClick={handlePrint} className="w-full sm:w-auto">
@@ -397,35 +404,37 @@ export function ExpensesPage() {
               <p className="text-sm text-slate-500 dark:text-slate-400">Aucune dépense ne correspond aux critères.</p>
             </div>
           ) : (
-            <div className="grid gap-3">
-              <div className="grid grid-cols-12 gap-3 text-xs text-slate-500 uppercase tracking-wide border-b border-slate-200 dark:border-slate-700 py-3">
-                <div className="col-span-1">Date</div>
-                <div className="col-span-2">Catégorie</div>
-                <div className="col-span-3">Libellé</div>
-                <div className="col-span-2">Lieu</div>
-                <div className="col-span-1 text-right">Montant</div>
-                <div className="col-span-2">Observation</div>
-                <div className="col-span-1 text-right">Actions</div>
-              </div>
-              {filteredExpenses.map((expense) => (
-                <div key={expense.id} className="grid grid-cols-12 gap-3 items-center py-4 border-b border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200">
-                  <div className="col-span-1">{formatDate(expense.expense_date)}</div>
-                  <div className="col-span-2 font-medium">{expense.category_name}</div>
-                  <div className="col-span-3 truncate">{expense.label}</div>
-                  <div className="col-span-2 truncate">{expense.location}</div>
-                  <div className="col-span-1 text-right font-semibold">{formatCurrency(expense.amount)}</div>
-                  <div className="col-span-2 truncate">{expense.notes || '—'}</div>
-                  <div className="col-span-1 text-right space-x-1">
-                    <Link to={`/expenses/trip/${expense.parcel_id}`} className="btn-secondary btn-sm px-2 py-1">Détail</Link>
-                    <button onClick={() => openEditExpense(expense)} className="btn-secondary btn-sm px-2 py-1">
-                      <Edit2 size={14} />
-                    </button>
-                    <button onClick={() => { setSelectedExpense(expense); setShowDelete(true); }} className="btn-danger btn-sm px-2 py-1">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+            <div className="overflow-x-auto">
+              <div className="grid min-w-[1080px] gap-3">
+                <div className="grid grid-cols-12 gap-3 text-xs text-slate-500 uppercase tracking-wide border-b border-slate-200 dark:border-slate-700 py-3">
+                  <div className="col-span-2">Date</div>
+                  <div className="col-span-2">Catégorie</div>
+                  <div className="col-span-2">Libellé</div>
+                  <div className="col-span-1">Lieu</div>
+                  <div className="col-span-2 text-right">Montant</div>
+                  <div className="col-span-1">Observation</div>
+                  <div className="col-span-2 text-right">Actions</div>
                 </div>
-              ))}
+                {filteredExpenses.map((expense) => (
+                  <div key={expense.id} className="grid grid-cols-12 gap-3 items-center py-4 border-b border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200">
+                    <div className="col-span-2">{formatDate(expense.expense_date)}</div>
+                    <div className="col-span-2 font-medium">{expense.category_name}</div>
+                    <div className="col-span-2 truncate">{expense.label}</div>
+                    <div className="col-span-1 truncate">{expense.location}</div>
+                    <div className="col-span-2 text-right font-semibold tabular-nums">{formatCurrency(expense.amount)}</div>
+                    <div className="col-span-1 truncate">{expense.notes || '—'}</div>
+                    <div className="col-span-2 text-right space-x-1">
+                      <Link to={`/expenses/trip/${expense.parcel_id}`} className="btn-secondary btn-sm px-2 py-1">Détail</Link>
+                      <button type="button" onClick={() => openEditExpense(expense)} className="btn-secondary btn-sm px-2 py-1">
+                        <Edit2 size={14} />
+                      </button>
+                      <button type="button" onClick={() => { setSelectedExpense(expense); setShowDelete(true); }} className="btn-danger btn-sm px-2 py-1">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </Card>

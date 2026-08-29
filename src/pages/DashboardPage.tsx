@@ -297,7 +297,7 @@ export function DashboardPage() {
           <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40">
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Reste à encaisser</p>
-              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span className="w-2 h-2 rounded-full bg-error-500" />
             </div>
             <p className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
               {formatCurrency(stats.total_outstanding)}
@@ -379,7 +379,7 @@ export function DashboardPage() {
                           {isFullyPaid ? (
                             <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Payé</span>
                           ) : (
-                            <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                            <span className="text-[11px] font-medium text-error-600 dark:text-error-400">
                               Reste: {formatCurrency(parcel.balance)}
                             </span>
                           )}
@@ -430,11 +430,11 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-4 p-3.5 rounded-lg border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 text-xs">
-            <p className="font-semibold text-rose-700 dark:text-rose-300">
+          <div className="mt-4 p-3.5 rounded-lg border border-error-200/80 dark:border-error-900/40 bg-error-50/50 dark:bg-error-900/20 text-xs">
+            <p className="font-semibold text-error-700 dark:text-error-300">
               {formatCurrency(stats.total_outstanding)}
             </p>
-            <p className="text-rose-600/80 dark:text-rose-400 mt-0.5">
+            <p className="text-error-600/80 dark:text-error-400 mt-0.5">
               Reste global à encaisser sur les colis ouverts.
             </p>
           </div>

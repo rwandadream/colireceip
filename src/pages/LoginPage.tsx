@@ -55,7 +55,7 @@ export function LoginPage() {
         </div>
 
         {/* Card Form */}
-        <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-3xl border border-slate-200/60 dark:border-slate-700/60 shadow-xl space-y-5 animate-slide-up">
+        <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-sm space-y-5 animate-slide-up">
           
           {error && (
             <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-error-50 dark:bg-error-950/20 text-error-700 dark:text-error-400 text-sm animate-fade-in border border-error-100 dark:border-error-900/30">
@@ -108,7 +108,7 @@ export function LoginPage() {
                     description: 'La réinitialisation n\'est pas encore automatique. Contactez votre administrateur : il pourra définir un nouveau mot de passe pour votre compte.',
                   });
                 }}
-                className="font-semibold text-[#2563EB] dark:text-brand-400 hover:underline"
+                className="font-semibold text-brand-600 dark:text-brand-400 hover:underline"
               >
                 Mot de passe oublié ?
               </a>
@@ -117,8 +117,9 @@ export function LoginPage() {
             <Button
               type="submit"
               loading={loading}
-              variant="ghost"
-              className="w-full mt-4 bg-[#F97316] hover:bg-[#EA580C] text-white px-6 py-3 font-semibold rounded-xl text-base shadow-md hover:shadow-lg focus:ring-2 focus:ring-orange-500/20 active:scale-95 transition-all duration-300 flex items-center justify-center gap-2"
+              variant="accent"
+              size="lg"
+              className="w-full mt-4 shadow-md hover:shadow-lg"
               icon={<LogIn size={18} />}
             >
               Se connecter

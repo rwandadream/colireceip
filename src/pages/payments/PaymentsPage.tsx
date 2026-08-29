@@ -129,6 +129,9 @@ export function PaymentsListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
+            Registre des paiements
+          </p>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Registre des Paiements
           </h1>

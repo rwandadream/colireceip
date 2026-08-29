@@ -56,6 +56,9 @@ export function LogsPage() {
       <OfflineNotice />
       {/* Header */}
       <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+        <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
+          Journal d'activité
+        </p>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
           Journal des Actions & Audit
         </h1>
@@ -99,8 +102,8 @@ export function LogsPage() {
         </Card>
       ) : loadError ? (
         <Card className="p-6 text-center">
-          <AlertTriangle size={28} className="mx-auto text-rose-500 mb-2" />
-          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger le journal</p>
+          <AlertTriangle size={28} className="mx-auto text-error-500 mb-2" />
+          <p className="text-sm font-semibold text-error-600 dark:text-error-400 mb-1">Impossible de charger le journal</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
           <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Réessayer</Button>
         </Card>

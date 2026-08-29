@@ -14,7 +14,7 @@ const TRIP_STATUS_COLORS: Record<TripStatus, string> = {
   in_transit: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300',
   arrived: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300',
   closed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
-  cancelled: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300',
+  cancelled: 'bg-error-100 text-error-700 dark:bg-error-900/50 dark:text-error-300',
 };
 
 export function TripsListPage() {
@@ -82,6 +82,9 @@ export function TripsListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
+            Gestion des voyages
+          </p>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Gestion des Voyages
           </h1>

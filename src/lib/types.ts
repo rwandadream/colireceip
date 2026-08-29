@@ -261,7 +261,7 @@ export const PARCEL_STATUS_COLORS: Record<ParcelStatus, string> = {
   in_transit: 'border border-violet-200 bg-violet-100 text-violet-800 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-300',
   arrived: 'border border-cyan-200 bg-cyan-100 text-cyan-800 dark:border-cyan-900/50 dark:bg-cyan-950/40 dark:text-cyan-300',
   delivered: 'border border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300',
-  cancelled: 'border border-rose-200 bg-rose-100 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300',
+  cancelled: 'border border-error-200 bg-error-100 text-error-700 dark:border-error-900/50 dark:bg-error-900/40 dark:text-error-300',
 };
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

@@ -107,8 +107,8 @@ export function SettingsPage() {
     if (act.includes('supprimé') || act.includes('désactivé')) {
       return {
         icon: <Trash2 size={16} />,
-        bg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400',
-        border: 'border-rose-100 dark:border-rose-900/30'
+        bg: 'bg-error-50 dark:bg-error-900/30 text-error-600 dark:text-error-400',
+        border: 'border-error-100 dark:border-error-900/30'
       };
     }
     if (act.includes('créé') || act.includes('ajouté')) {
@@ -170,8 +170,8 @@ export function SettingsPage() {
     return (
       <div className="max-w-4xl mx-auto space-y-4 p-4">
         <Card className="p-6 text-center">
-          <AlertCircle size={28} className="mx-auto text-rose-500 mb-2" />
-          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">Impossible de charger les paramètres</p>
+          <AlertCircle size={28} className="mx-auto text-error-500 mb-2" />
+          <p className="text-sm font-semibold text-error-600 dark:text-error-400 mb-1">Impossible de charger les paramètres</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données.</p>
           <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Réessayer</Button>
         </Card>
@@ -190,9 +190,9 @@ export function SettingsPage() {
       </div>
 
       {/* Profil & Préférences Card */}
-      <Card className="p-4">
-        <h2 className="font-bold text-sm text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-          <User size={16} />
+      <Card className="p-5">
+        <h2 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+          <User size={18} />
           Profil & Préférences
         </h2>
         <div className="space-y-3">
@@ -213,14 +213,18 @@ export function SettingsPage() {
               <p className="text-xs text-slate-500 dark:text-slate-400">Activer le thème sombre de l'application</p>
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={theme === 'dark'}
+              aria-label={theme === 'dark' ? 'Désactiver le mode sombre' : 'Activer le mode sombre'}
               onClick={toggleTheme}
-              className={`relative inline-flex h-6.5 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${
-                theme === 'dark' ? 'bg-[#2563EB]' : 'bg-slate-200 dark:bg-slate-700'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900 ${
+                theme === 'dark' ? 'bg-brand-600' : 'bg-slate-200 dark:bg-slate-700'
               }`}
             >
               <span
-                className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white transition-transform duration-300 ${
-                  theme === 'dark' ? 'translate-x-6' : 'translate-x-1.5'
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-300 ${
+                  theme === 'dark' ? 'translate-x-5' : 'translate-x-1'
                 }`}
               />
             </button>
@@ -228,9 +232,9 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      <Card className="p-4">
-        <h2 className="font-bold text-sm text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-          <Building2 size={16} />
+      <Card className="p-5">
+        <h2 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+          <Building2 size={18} />
           Informations de l'entreprise
         </h2>
         <div className="space-y-4">
@@ -274,6 +278,7 @@ export function SettingsPage() {
           <Input
             label="Prix de transport par défaut (FCFA)"
             type="number"
+            placeholder="Par ex. 15000"
             value={settings.default_transport_price === 0 ? '' : settings.default_transport_price}
             onChange={(e) => setSettings({ ...settings, default_transport_price: e.target.value === '' ? 0 : Number(e.target.value) })}
           />

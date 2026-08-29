@@ -70,10 +70,13 @@ export function ExpenseTripDetailPage() {
   return (
     <div className="space-y-6">
       <OfflineNotice />
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Détail des dépenses</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400 mb-0.5">
+            Détail des dépenses
+          </p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Détail des dépenses</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
             <TrackingBadge tracking={parcel.tracking_number} size="sm" /> · {parcel.origin} → {parcel.destination}
           </p>
         </div>

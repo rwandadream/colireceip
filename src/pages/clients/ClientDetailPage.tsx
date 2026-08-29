@@ -167,6 +167,7 @@ export function ClientDetailPage() {
         <div className="flex gap-3 justify-center mt-4">
           <Link to="/clients" className="btn-secondary">Retour aux clients</Link>
           <button
+            type="button"
             onClick={() => {
               setLoading(true);
               setLoadError(false);
@@ -350,8 +351,8 @@ export function ClientDetailPage() {
               />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setEditOpen(false)} className="btn-secondary">Annuler</button>
-              <button onClick={handleSaveEdit} className="btn-primary">
+              <button type="button" onClick={() => setEditOpen(false)} className="btn-secondary">Annuler</button>
+              <button type="button" onClick={handleSaveEdit} className="btn-primary">
                 <Save size={18} /> Enregistrer
               </button>
             </div>
