@@ -16,7 +16,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { LogoBrand } from '../ui/Logo';
+import { LogoBrand, LogoIcon } from '../ui/Logo';
 import { SyncIndicator } from '../ui/SyncIndicator';
 
 interface NavItem {
@@ -54,6 +54,41 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen h-screen bg-slate-50 dark:bg-slate-950 flex overflow-hidden">
+      {/* Tablet Icon Rail: persistent one-tap access for every entry between
+          768px and 1023px, where the desktop sidebar is hidden. Rendered from
+          the same filteredNav so role visibility is identical everywhere. */}
+      <aside className="hidden md:flex lg:hidden w-16 flex-shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen overflow-hidden">
+        <div className="flex items-center justify-center py-3.5 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
+          <LogoIcon size={24} />
+        </div>
+
+        <nav aria-label="Navigation rapide" className="flex-1 overflow-y-auto scrollbar-thin py-2 space-y-1">
+          {filteredNav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              aria-label={item.label}
+              title={item.label}
+              className={({ isActive }) => `nav-rail-link ${isActive ? 'nav-rail-link-active' : ''}`}
+            >
+              {item.icon}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="py-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+          <button
+            onClick={logout}
+            aria-label="Déconnexion"
+            title="Déconnexion"
+            className="nav-rail-link w-full text-slate-500 hover:text-error-600 dark:text-slate-400 dark:hover:text-error-400"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
+      </aside>
+
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-56 xl:w-64 flex-shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen overflow-hidden">
         <div className="flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
@@ -125,7 +160,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center justify-between px-4 py-2.5">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <Menu size={20} />
             </button>
@@ -145,7 +180,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile Bottom Navigation: the one-tap destinations stay reachable
           without opening the drawer; the rest of the entries remain in it. */}
-      <nav aria-label="Navigation principale mobile" className="lg:hidden fixed inset-x-0 bottom-0 z-40 flex bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-bottom">
+      <nav aria-label="Navigation principale mobile" className="md:hidden fixed inset-x-0 bottom-0 z-40 flex bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-bottom">
         {filteredNav
           .filter((item) => coreMobilePaths.has(item.to))
           .map((item) => (

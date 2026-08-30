@@ -260,7 +260,7 @@ export function ClientDetailPage() {
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card className="p-4 text-center">
           <Package size={20} className="mx-auto text-brand-500 mb-1" />
           <p className="text-2xl font-bold text-slate-900 dark:text-white">{parcels.length}</p>

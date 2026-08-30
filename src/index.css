@@ -121,6 +121,14 @@ svg {
     @apply bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 font-semibold border-l-2 border-brand-600 dark:border-brand-500 rounded-l-none;
   }
 
+  .nav-rail-link {
+    @apply flex items-center justify-center w-11 h-11 mx-auto rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40;
+  }
+
+  .nav-rail-link-active {
+    @apply bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 font-semibold;
+  }
+
   /* Data Table Component Standards */
   .data-table-container {
     @apply card overflow-hidden border border-slate-200/90 dark:border-slate-800/90;
