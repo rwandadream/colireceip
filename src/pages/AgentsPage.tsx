@@ -306,19 +306,19 @@ export function AgentsPage() {
 
                     <td className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(u)} title="Modifier">
+                        <Button variant="ghost" size="sm" className="h-10 w-10" onClick={() => openEdit(u)} title="Modifier" aria-label={`Modifier le compte de ${u.full_name}`}>
                           <Edit size={14} />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => { setUserToReset(u); setResetOpen(true); }} title="Mot de passe">
+                        <Button variant="ghost" size="sm" className="h-10 w-10" onClick={() => { setUserToReset(u); setResetOpen(true); }} title="Mot de passe" aria-label={`Réinitialiser le mot de passe de ${u.full_name}`}>
                           <KeyRound size={14} />
                         </Button>
                         {u.id !== currentUser?.id && (
                           <>
-                            <Button variant="ghost" size="sm" onClick={() => handleToggleActive(u)} title={u.active ? 'Désactiver' : 'Activer'}>
+                            <Button variant="ghost" size="sm" className="h-10 w-10" onClick={() => handleToggleActive(u)} title={u.active ? 'Désactiver' : 'Activer'} aria-label={u.active ? `Désactiver le compte de ${u.full_name}` : `Activer le compte de ${u.full_name}`}>
                               <Power size={14} className={u.active ? 'text-amber-600' : 'text-emerald-600'} />
                             </Button>
                             {u.role !== 'admin' && (
-                              <Button variant="ghost" size="sm" className="text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20" onClick={() => { setUserToDelete(u); setDeleteOpen(true); }} title="Supprimer">
+                              <Button variant="ghost" size="sm" className="h-10 w-10 text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20" onClick={() => { setUserToDelete(u); setDeleteOpen(true); }} title="Supprimer" aria-label={`Supprimer le compte de ${u.full_name}`}>
                                 <Trash2 size={14} />
                               </Button>
                             )}

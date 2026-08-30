@@ -43,6 +43,15 @@ import { generateReceiptPDF } from '../../lib/pdf';
 import { userErrorMessage } from '../../lib/userMessage';
 import { OfflineNotice } from '../../components/ui/OfflineNotice';
 
+const STATUS_DOT_COLORS: Record<ParcelStatus, string> = {
+  pending: 'bg-slate-400',
+  received: 'bg-cyan-500',
+  in_transit: 'bg-purple-500',
+  arrived: 'bg-brand-500',
+  delivered: 'bg-success-500',
+  cancelled: 'bg-warning-500',
+};
+
 export function ParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -221,10 +230,11 @@ export function ParcelDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      <h1 className="sr-only">Détail du colis {parcel.tracking_number}</h1>
       <OfflineNotice />
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Link to="/parcels" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0">
+          <Link to="/parcels" aria-label="Retour aux colis" className="p-2.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0">
             <ArrowLeft size={20} />
           </Link>
           <div className="min-w-0">
@@ -251,12 +261,6 @@ export function ParcelDetailPage() {
           <Clock size={16} />
           Changer le statut
         </Button>
-        {parcel.balance > 0 && (
-          <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-secondary text-sm">
-            <CreditCard size={16} />
-            Enregistrer paiement
-          </Link>
-        )}
         {parcel.balance > 0 && (
           <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-primary text-sm">
             <CreditCard size={16} />
@@ -435,7 +439,7 @@ export function ParcelDetailPage() {
               {history.map((h) => (
                 <div key={h.id} className="flex items-start gap-3 text-sm">
                   <div className="flex flex-col items-center">
-                    <div className={`w-2 h-2 rounded-full ${PARCEL_STATUS_COLORS[h.new_status].includes('green') ? 'bg-success-500' : PARCEL_STATUS_COLORS[h.new_status].includes('amber') ? 'bg-warning-500' : PARCEL_STATUS_COLORS[h.new_status].includes('blue') ? 'bg-brand-500' : PARCEL_STATUS_COLORS[h.new_status].includes('purple') ? 'bg-purple-500' : PARCEL_STATUS_COLORS[h.new_status].includes('cyan') ? 'bg-cyan-500' : 'bg-error-500'}`} />
+                    <div className={`w-2 h-2 rounded-full ${STATUS_DOT_COLORS[h.new_status]}`} />
                     {history.indexOf(h) < history.length - 1 && <div className="w-0.5 h-6 bg-slate-200 dark:bg-slate-700 mt-1" />}
                   </div>
                   <div className="flex-1 pb-2">

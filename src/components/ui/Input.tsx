@@ -8,6 +8,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export function Input({ label, error, icon, className = '', ...props }: InputProps) {
   const controlId = useId();
+  const errorId = useId();
   return (
     <div>
       {label && <label htmlFor={controlId} className="label">{label}</label>}
@@ -19,11 +20,12 @@ export function Input({ label, error, icon, className = '', ...props }: InputPro
         )}
         <input
           id={label ? controlId : undefined}
+          aria-describedby={error ? errorId : undefined}
           className={`input ${icon ? 'pl-10' : ''} ${error ? 'border-error-500 focus:ring-error-500' : ''} ${className}`}
           {...props}
         />
       </div>
-      {error && <p className="mt-1 text-xs text-error-600 dark:text-error-400">{error}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs text-error-600 dark:text-error-400">{error}</p>}
     </div>
   );
 }
@@ -36,13 +38,14 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export function Select({ label, error, children, className = '', ...props }: SelectProps) {
   const controlId = useId();
+  const errorId = useId();
   return (
     <div>
       {label && <label htmlFor={controlId} className="label">{label}</label>}
-      <select id={label ? controlId : undefined} className={`input cursor-pointer ${error ? 'border-error-500' : ''} ${className}`} {...props}>
+      <select id={label ? controlId : undefined} aria-describedby={error ? errorId : undefined} className={`input cursor-pointer ${error ? 'border-error-500' : ''} ${className}`} {...props}>
         {children}
       </select>
-      {error && <p className="mt-1 text-xs text-error-600 dark:text-error-400">{error}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs text-error-600 dark:text-error-400">{error}</p>}
     </div>
   );
 }
@@ -54,11 +57,12 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 
 export function Textarea({ label, error, className = '', ...props }: TextareaProps) {
   const controlId = useId();
+  const errorId = useId();
   return (
     <div>
       {label && <label htmlFor={controlId} className="label">{label}</label>}
-      <textarea id={label ? controlId : undefined} className={`input resize-none ${error ? 'border-error-500' : ''} ${className}`} {...props} />
-      {error && <p className="mt-1 text-xs text-error-600 dark:text-error-400">{error}</p>}
+      <textarea id={label ? controlId : undefined} aria-describedby={error ? errorId : undefined} className={`input resize-none ${error ? 'border-error-500' : ''} ${className}`} {...props} />
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs text-error-600 dark:text-error-400">{error}</p>}
     </div>
   );
 }

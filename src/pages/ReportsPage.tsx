@@ -402,21 +402,21 @@ export function ReportsPage() {
 
       {/* Totals respecting the active filters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Colis</p>
           <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{parcels.length}</p>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Valorisation colis</p>
-          <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{formatCurrency(totals.value)}</p>
+          <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums break-words leading-tight">{formatCurrency(totals.value)}</p>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Encaissé</p>
-          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 tabular-nums">{formatCurrency(totals.collected)}</p>
+          <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 tabular-nums break-words leading-tight">{formatCurrency(totals.collected)}</p>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Reste à encaisser</p>
-          <p className="text-xl font-bold text-error-600 dark:text-error-400 mt-1 tabular-nums">{formatCurrency(totals.outstanding)}</p>
+          <p className="text-lg sm:text-xl font-bold text-error-600 dark:text-error-400 mt-1 tabular-nums break-words leading-tight">{formatCurrency(totals.outstanding)}</p>
         </Card>
       </div>
 
@@ -428,8 +428,9 @@ export function ReportsPage() {
             Filtres
           </div>
           <div className="w-40">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Du</label>
+            <label htmlFor="report-from" className="text-xs font-medium text-slate-500 dark:text-slate-400">Du</label>
             <input
+              id="report-from"
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
@@ -437,8 +438,9 @@ export function ReportsPage() {
             />
           </div>
           <div className="w-40">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Au</label>
+            <label htmlFor="report-to" className="text-xs font-medium text-slate-500 dark:text-slate-400">Au</label>
             <input
+              id="report-to"
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
@@ -446,8 +448,9 @@ export function ReportsPage() {
             />
           </div>
           <div className="w-44">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Statut colis</label>
+            <label htmlFor="report-status" className="text-xs font-medium text-slate-500 dark:text-slate-400">Statut colis</label>
             <select
+              id="report-status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100"
@@ -459,8 +462,9 @@ export function ReportsPage() {
             </select>
           </div>
           <div className="w-48">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Agent</label>
+            <label htmlFor="report-agent" className="text-xs font-medium text-slate-500 dark:text-slate-400">Agent</label>
             <select
+              id="report-agent"
               value={agentFilter}
               onChange={(e) => setAgentFilter(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-100"
@@ -492,7 +496,7 @@ export function ReportsPage() {
                 {report.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">{report.title}</h3>
+                <h2 className="font-bold text-sm text-slate-900 dark:text-white">{report.title}</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{report.description}</p>
                 <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mt-1">{report.count} enregistrements</p>
               </div>

@@ -383,7 +383,7 @@ export function ParcelNewPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center gap-3">
-        <Link to="/parcels" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
+        <Link to="/parcels" aria-label="Retour aux colis" className="p-2.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
           <ArrowLeft size={20} />
         </Link>
         <div>
@@ -402,10 +402,10 @@ export function ParcelNewPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setStep((prev) => Math.max(1, prev - 1))} className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" disabled={step === 1}>
+              <button type="button" onClick={() => setStep((prev) => Math.max(1, prev - 1))} aria-label="Étape précédente" className="rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" disabled={step === 1}>
                 <ChevronLeft size={16} />
               </button>
-              <button type="button" onClick={() => setStep((prev) => Math.min(3, prev + 1))} className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" disabled={step === 3}>
+              <button type="button" onClick={() => setStep((prev) => Math.min(3, prev + 1))} aria-label="Étape suivante" className="rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" disabled={step === 3}>
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -471,6 +471,12 @@ export function ParcelNewPage() {
                 </div>
               </div>
             </Card>
+            <div className="flex justify-end pb-4">
+              <Button type="button" onClick={() => setStep((prev) => Math.min(3, prev + 1))}>
+                Suivant
+                <ChevronRight size={16} />
+              </Button>
+            </div>
           </>
         )}
 
@@ -558,7 +564,7 @@ export function ParcelNewPage() {
                   Ajouter une ligne
                 </Button>
               </div>
-              <div className="overflow-x-auto">
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -624,18 +630,86 @@ export function ParcelNewPage() {
                         <td className="py-2 px-3">{formatCurrency(item.amount)}</td>
                         <td className="py-2 px-3">
                           <div className="flex gap-2">
-                            <Button type="button" variant="secondary" onClick={() => duplicateItem(item.id)}>
+                            <Button type="button" variant="secondary" aria-label="Dupliquer la ligne" onClick={() => duplicateItem(item.id)}>
                               <Copy size={16} />
                             </Button>
-                            <Button type="button" variant="danger" onClick={() => removeItem(item.id)}>
+                            <Button type="button" variant="danger" aria-label="Supprimer la ligne" onClick={() => removeItem(item.id)}>
                               <Trash2 size={16} />
                             </Button>
                           </div>
                         </td>
-                      </tr>
-                    ))}
-                  </tbody>
+</tr>
+                  ))}
+                </tbody>
                 </table>
+              </div>
+
+              <div className="space-y-3 sm:hidden">
+                {items.length === 0 && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Aucune marchandise. Cliquez sur « Ajouter une ligne ».
+                  </p>
+                )}
+                {items.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-3">
+                    <div className="relative">
+                      <Input
+                        label="Marchandise"
+                        value={item.designation}
+                        onChange={(e) => {
+                          updateItem(item.id, { designation: e.target.value, product_id: undefined });
+                          setActiveSuggestionItemId(item.id);
+                        }}
+                        onFocus={() => setActiveSuggestionItemId(item.id)}
+                        onBlur={() => window.setTimeout(() => setActiveSuggestionItemId(null), 120)}
+                        placeholder="Saisir une marchandise"
+                      />
+                      {activeSuggestionItemId === item.id && item.designation.trim() && getSuggestions(item.designation).length > 0 && (
+                        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-44 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                          {getSuggestions(item.designation).map((suggestion) => (
+                            <button
+                              key={suggestion.id}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => selectSuggestion(item.id, suggestion)}
+                              className="w-full text-left px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
+                            >
+                              {suggestion.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Quantité"
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(e) => updateItem(item.id, { quantity: e.target.value === '' ? '' : Number(e.target.value) })}
+                      />
+                      <Input
+                        label="Prix unitaire"
+                        type="number"
+                        min={0}
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(item.id, { unit_price: e.target.value === '' ? '' : Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500 dark:text-slate-400">Montant</span>
+                      <span className="font-semibold tabular-nums">{formatCurrency(item.amount)}</span>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="secondary" aria-label="Dupliquer la ligne" onClick={() => duplicateItem(item.id)}>
+                        <Copy size={16} />
+                      </Button>
+                      <Button type="button" variant="danger" aria-label="Supprimer la ligne" onClick={() => removeItem(item.id)}>
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
 
@@ -680,6 +754,16 @@ export function ParcelNewPage() {
                 </span>
               </div>
             </Card>
+            <div className="flex items-center justify-between pb-4">
+              <Button type="button" variant="secondary" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
+                <ChevronLeft size={16} />
+                Précédent
+              </Button>
+              <Button type="button" onClick={() => setStep((prev) => Math.min(3, prev + 1))}>
+                Suivant
+                <ChevronRight size={16} />
+              </Button>
+            </div>
           </>
         )}
 

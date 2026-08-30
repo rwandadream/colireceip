@@ -34,11 +34,13 @@ export function Button({
   children,
   className = '',
   disabled,
+  type = 'button',
   ...props
 }: ButtonProps) {
   return (
     <button
       className={`relative ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      type={type}
       disabled={disabled || loading}
       {...props}
     >

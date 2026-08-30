@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -17,14 +17,22 @@ const sizeClasses = {
 };
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [open]);
+    if (!open) return;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -33,19 +41,27 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
+        aria-hidden="true"
       />
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-t-[2rem] sm:rounded-2xl shadow-2xl animate-slide-up-sheet sm:animate-scale-in max-h-[92vh] sm:max-h-[90vh] flex flex-col`}
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-t-[2rem] sm:rounded-2xl shadow-2xl animate-slide-up-sheet sm:animate-scale-in max-h-[92vh] sm:max-h-[90vh] flex flex-col outline-none`}
       >
         {/* Mobile Drag Indicator */}
         <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mt-3.5 mb-1 sm:hidden flex-shrink-0" />
         
         {title && (
           <div className="flex items-center justify-between px-5 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-700/50">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
+            <h2 id={titleId} className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              aria-label="Fermer"
+              className="p-2.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <X size={20} />
             </button>

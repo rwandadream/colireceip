@@ -170,7 +170,7 @@ export function ClientsListPage() {
       ) : (
         <div className="data-table-container">
           <div className="overflow-x-auto">
-            <table className="data-table">
+            <table className="data-table min-w-[820px]">
               <thead>
                 <tr>
                   <th>Client</th>
@@ -210,11 +210,11 @@ export function ClientsListPage() {
                       </td>
 
                       <td>
-                        <div className="space-y-0.5 text-xs text-slate-600 dark:text-slate-300">
+                        <div className="space-y-0.5 text-xs text-slate-600 dark:text-slate-300 min-w-0">
                           {client.phone && (
                             <p className="flex items-center gap-1.5 font-medium">
                               <Phone size={12} className="text-slate-400" />
-                              {client.phone}
+                              <span className="truncate">{client.phone}</span>
                             </p>
                           )}
                           {client.email && (
@@ -224,9 +224,9 @@ export function ClientsListPage() {
                       </td>
 
                       <td>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 min-w-0">
                           <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-                          <span className="truncate">
+                          <span className="truncate min-w-0">
                             {client.city}
                             {client.neighborhood ? `, ${client.neighborhood}` : ''}
                           </span>

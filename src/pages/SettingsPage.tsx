@@ -380,7 +380,7 @@ export function SettingsPage() {
           Enregistrer
         </Button>
         {saved && (
-          <span className="text-sm text-success-600 dark:text-success-400 animate-fade-in">
+          <span role="status" className="text-sm text-success-600 dark:text-success-400 animate-fade-in">
             Paramètres enregistrés ✓
           </span>
         )}

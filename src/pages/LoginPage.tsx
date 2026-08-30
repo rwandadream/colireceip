@@ -35,7 +35,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 lg:p-8 transition-colors duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 lg:p-8 transition-colors duration-300">
       <div className="w-full max-w-md space-y-6">
         
         {/* Centered Logo & Welcome Header */}
@@ -58,7 +58,7 @@ export function LoginPage() {
         <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-sm space-y-5 animate-slide-up">
           
           {error && (
-            <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-error-50 dark:bg-error-950/20 text-error-700 dark:text-error-400 text-sm animate-fade-in border border-error-100 dark:border-error-900/30">
+            <div role="alert" className="flex items-center gap-2.5 p-3.5 rounded-xl bg-error-50 dark:bg-error-950/20 text-error-700 dark:text-error-400 text-sm animate-fade-in border border-error-100 dark:border-error-900/30">
               <AlertCircle size={18} className="flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -90,7 +90,9 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-10 p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                aria-pressed={showPassword}
+                className="absolute right-3 top-10 -translate-y-1/2 p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>

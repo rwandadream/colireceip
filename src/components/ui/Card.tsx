@@ -39,9 +39,9 @@ const STAT_COLORS: Record<string, string> = {
 export function StatCard({ label, value, icon, color, trend, className = '' }: StatCardProps) {
   const iconColor = color ? STAT_COLORS[color] || STAT_COLORS.brand : 'text-slate-400 dark:text-slate-500';
   return (
-    <div className={`card p-4 flex flex-col justify-between ${className}`}>
+    <div className={`card p-4 flex flex-col justify-between min-w-0 ${className}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">
           {label}
         </p>
         {icon && (
@@ -50,8 +50,8 @@ export function StatCard({ label, value, icon, color, trend, className = '' }: S
           </span>
         )}
       </div>
-      <div className="mt-3 flex items-baseline justify-between gap-2">
-        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+      <div className={`mt-3 flex items-baseline justify-between gap-2 ${trend ? '' : 'min-w-0'}`}>
+        <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-tight break-words">
           {value}
         </p>
         {trend && (

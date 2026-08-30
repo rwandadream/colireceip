@@ -180,7 +180,7 @@ export function ParcelsListPage() {
       ) : (
         <div className="data-table-container">
           <div className="overflow-x-auto">
-            <table className="data-table">
+            <table className="data-table min-w-[820px]">
               <thead>
                 <tr>
                   <th>N° Colis</th>
@@ -201,9 +201,9 @@ export function ParcelsListPage() {
                       </Link>
                     </td>
                     <td>
-                      <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 min-w-0">
                         <UserIcon size={13} className="text-slate-400 flex-shrink-0" />
-                        <span className="truncate">{parcel.client_name}</span>
+                        <span className="truncate min-w-0">{parcel.client_name}</span>
                       </div>
                       {parcel.client_phone && (
                         <p className="text-[11px] text-slate-400 pl-4">{parcel.client_phone}</p>

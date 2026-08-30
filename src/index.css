@@ -74,11 +74,11 @@ svg {
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 font-medium rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none select-none text-xs sm:text-sm;
+    @apply inline-flex items-center justify-center gap-1.5 font-medium rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none select-none text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2;
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm focus:ring-2 focus:ring-brand-500/20 active:scale-[0.98];
+    @apply btn bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm active:scale-[0.98];
   }
 
   .btn-secondary {
@@ -94,11 +94,11 @@ svg {
   }
 
   .btn-accent {
-    @apply btn bg-accent-600 hover:bg-accent-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm focus:ring-2 focus:ring-accent-500/20 active:scale-[0.98];
+    @apply btn bg-accent-600 hover:bg-accent-700 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm active:scale-[0.98];
   }
 
   .input {
-    @apply w-full px-3 py-1.5 sm:py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors duration-150 text-xs sm:text-sm;
+    @apply w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors duration-150 text-xs sm:text-sm;
   }
 
   .label {
@@ -114,7 +114,7 @@ svg {
   }
 
   .nav-link {
-    @apply flex items-center gap-2.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-150;
+    @apply flex items-center gap-2.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2;
   }
 
   .nav-link-active {
@@ -152,6 +152,21 @@ svg {
 
   .data-table tr:hover td {
     @apply bg-slate-50/70 dark:bg-slate-800/40 transition-colors;
+  }
+
+  .data-table th:first-child,
+  .data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+  }
+
+  .data-table th:first-child {
+    z-index: 3;
+  }
+
+  .data-table td:first-child {
+    background-color: var(--bg-primary);
   }
 }
 

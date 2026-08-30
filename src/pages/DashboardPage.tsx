@@ -39,6 +39,16 @@ function AgentDashboard({ stats, user }: { stats: DashboardStats; user: NonNulla
             Activité et enregistrements associés à votre compte.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/payments/new" className="btn-secondary">
+            <Wallet size={15} />
+            <span>Enregistrer paiement</span>
+          </Link>
+          <Link to="/parcels/new" className="btn-primary">
+            <Plus size={15} />
+            <span>Nouveau colis</span>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -53,7 +63,7 @@ function AgentDashboard({ stats, user }: { stats: DashboardStats; user: NonNulla
       <Card className="p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Montant de vos paiements enregistrés</p>
+            <h2 className="text-xs font-medium text-slate-500 dark:text-slate-400">Montant de vos paiements enregistrés</h2>
             <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">
               {formatCurrency(stats.total_revenue)}
             </p>

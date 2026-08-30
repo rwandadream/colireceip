@@ -413,7 +413,7 @@ export function ExpensesPage() {
                   <div className="col-span-1">Lieu</div>
                   <div className="col-span-2 text-right">Montant</div>
                   <div className="col-span-1">Observation</div>
-                  <div className="col-span-2 text-right">Actions</div>
+                  <div className="sticky right-0 z-10 col-span-2 text-right bg-white dark:bg-slate-900">Actions</div>
                 </div>
                 {filteredExpenses.map((expense) => (
                   <div key={expense.id} className="grid grid-cols-12 gap-3 items-center py-4 border-b border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200">
@@ -423,12 +423,12 @@ export function ExpensesPage() {
                     <div className="col-span-1 truncate">{expense.location}</div>
                     <div className="col-span-2 text-right font-semibold tabular-nums">{formatCurrency(expense.amount)}</div>
                     <div className="col-span-1 truncate">{expense.notes || '—'}</div>
-                    <div className="col-span-2 text-right space-x-1">
-                      <Link to={`/expenses/trip/${expense.parcel_id}`} className="btn-secondary btn-sm px-2 py-1">Détail</Link>
-                      <button type="button" onClick={() => openEditExpense(expense)} className="btn-secondary btn-sm px-2 py-1">
+                    <div className="sticky right-0 z-10 col-span-2 text-right space-x-1 bg-white dark:bg-slate-900">
+                      <Link to={`/expenses/trip/${expense.parcel_id}`} className="btn-secondary btn-sm px-2.5 py-2.5" aria-label={`Voir le détail de la dépense ${expense.label || ''}`}>Détail</Link>
+                      <button type="button" onClick={() => openEditExpense(expense)} aria-label="Modifier la dépense" className="btn-secondary btn-sm px-2.5 py-2.5">
                         <Edit2 size={14} />
                       </button>
-                      <button type="button" onClick={() => { setSelectedExpense(expense); setShowDelete(true); }} className="btn-danger btn-sm px-2 py-1">
+                      <button type="button" onClick={() => { setSelectedExpense(expense); setShowDelete(true); }} aria-label="Supprimer la dépense" className="btn-danger btn-sm px-2.5 py-2.5">
                         <Trash2 size={14} />
                       </button>
                     </div>

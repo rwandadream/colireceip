@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { LogoBrand, LogoIcon } from '../ui/Logo';
 import { SyncIndicator } from '../ui/SyncIndicator';
+import { ThemeToggleButton } from '../ui/ThemeToggleButton';
 
 interface NavItem {
   to: string;
@@ -52,12 +53,20 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   const closeSidebar = () => setSidebarOpen(false);
 
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    mainRef.current?.scrollTo({ top: 0 });
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   return (
-    <div className="min-h-screen h-screen bg-slate-50 dark:bg-slate-950 flex overflow-hidden">
+    <div className="min-h-dvh h-dvh bg-slate-50 dark:bg-slate-950 flex overflow-hidden">
       {/* Tablet Icon Rail: persistent one-tap access for every entry between
           768px and 1023px, where the desktop sidebar is hidden. Rendered from
           the same filteredNav so role visibility is identical everywhere. */}
-      <aside className="hidden md:flex lg:hidden w-16 flex-shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen overflow-hidden">
+      <aside className="hidden md:flex lg:hidden w-16 flex-shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-dvh overflow-hidden">
         <div className="flex items-center justify-center py-3.5 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
           <LogoIcon size={24} />
         </div>
@@ -77,7 +86,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="py-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+        <div className="py-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0 space-y-1">
+          <ThemeToggleButton />
           <button
             onClick={logout}
             aria-label="Déconnexion"
@@ -90,7 +100,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-56 xl:w-64 flex-shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen overflow-hidden">
+      <aside className="hidden lg:flex w-56 xl:w-64 flex-shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-dvh overflow-hidden">
         <div className="flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
           <LogoBrand size={26} />
         </div>
@@ -111,6 +121,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
         <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0 space-y-1">
           <SyncIndicator />
+          <ThemeToggleButton className="!mx-0" />
           <button onClick={logout} className="nav-link w-full text-slate-500 hover:text-error-600 dark:text-slate-400 dark:hover:text-error-400">
             <LogOut size={18} />
             <span>Déconnexion</span>
@@ -125,7 +136,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <aside className="relative w-64 max-w-[85vw] h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-10">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
               <LogoBrand size={26} />
-              <button onClick={closeSidebar} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+              <button onClick={closeSidebar} aria-label="Fermer le menu" className="p-2.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X size={18} />
               </button>
             </div>
@@ -143,7 +154,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 </NavLink>
               ))}
             </nav>
-            <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+            <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0 space-y-1">
+              <ThemeToggleButton className="!mx-0" />
               <button onClick={logout} className="nav-link w-full text-slate-500 hover:text-error-600 dark:text-slate-400 dark:hover:text-error-400">
                 <LogOut size={18} />
                 <span>Déconnexion</span>
@@ -154,13 +166,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-dvh overflow-hidden">
         {/* Mobile Header */}
         <header className="lg:hidden flex-shrink-0 sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 safe-top">
           <div className="flex items-center justify-between px-4 py-2.5">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              aria-label="Ouvrir le menu"
+              aria-expanded={sidebarOpen}
+              className="md:hidden p-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <Menu size={20} />
             </button>
@@ -171,8 +185,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
-          <div key={location.pathname} className="page-enter p-3 sm:p-4 lg:p-6 max-w-full mx-auto pb-24 lg:pb-6 space-y-4">
+        <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+          <div key={location.pathname} className="page-enter p-3 sm:p-4 lg:p-6 max-w-full mx-auto pb-24 md:pb-6 space-y-4">
             {children}
           </div>
         </main>
