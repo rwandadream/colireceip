@@ -54,6 +54,26 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const closeSidebar = () => setSidebarOpen(false);
 
   const mainRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const menuButton = menuButtonRef.current;
+    const closeButton = drawerCloseRef.current;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    closeButton?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      menuButton?.focus();
+    };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -133,11 +153,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-fade-in" onClick={closeSidebar} />
-          <aside className="relative w-64 max-w-[85vw] h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-10">
+          <aside role="dialog" aria-modal="true" aria-label="Menu de navigation" className="relative w-64 max-w-[85vw] h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-10">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
               <LogoBrand size={26} />
-              <button onClick={closeSidebar} aria-label="Fermer le menu" className="p-2.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <X size={18} />
+              <button ref={drawerCloseRef} onClick={closeSidebar} aria-label="Fermer le menu" className="p-3 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X size={20} />
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-0.5">
@@ -154,8 +174,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 </NavLink>
               ))}
             </nav>
-            <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0 space-y-1">
-              <ThemeToggleButton className="!mx-0" />
+            <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
               <button onClick={logout} className="nav-link w-full text-slate-500 hover:text-error-600 dark:text-slate-400 dark:hover:text-error-400">
                 <LogOut size={18} />
                 <span>Déconnexion</span>
@@ -172,15 +191,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center justify-between px-4 py-2.5">
             <button
               onClick={() => setSidebarOpen(true)}
+              ref={menuButtonRef}
               aria-label="Ouvrir le menu"
               aria-expanded={sidebarOpen}
-              className="md:hidden p-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              aria-haspopup="dialog"
+              className="md:hidden p-3 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <Menu size={20} />
             </button>
             <LogoBrand size={22} showSubtitle={false} />
-            <div className="w-auto">
-              <SyncIndicator compact />
+            <div className="flex items-center gap-1 min-w-0">
+              <div className="md:hidden flex-shrink-0">
+                <ThemeToggleButton />
+              </div>
+              <div className="w-auto min-w-0">
+                <SyncIndicator compact />
+              </div>
             </div>
           </div>
         </header>

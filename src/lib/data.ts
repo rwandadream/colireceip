@@ -621,6 +621,10 @@ export async function getParcelItems(parcelId: string): Promise<ParcelItem[]> {
   return items.sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
+export function normalizeProductName(value: string): string {
+  return value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 export async function getProducts(): Promise<Product[]> {
   if (canUseProductApi()) {
     try {
@@ -645,6 +649,80 @@ export async function getProductById(id: string): Promise<Product | undefined> {
 export async function getProductByName(name: string): Promise<Product | undefined> {
   const all = await getProducts();
   return all.find((product) => product.name === name);
+}
+
+// Distinct designations actually stored on real parcels, most recent first.
+// Pure history: no invented data, works offline, and makes suggestions work for
+// every role without touching the director-scoped product catalog.
+export async function getRecentDesignations(limit = 50): Promise<string[]> {
+  const db = await getDB();
+  const all = await db.getAll('parcel_items');
+  const byRecency = all.sort((a, b) =>
+    (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at)
+  );
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const item of byRecency) {
+    const name = item.designation?.trim();
+    if (!name) continue;
+    const key = normalizeProductName(name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+    if (names.length >= limit) break;
+  }
+  return names;
+}
+
+// Grows the product store from real, user-typed designations.
+//  - an admin (director) creates missing entries through the normal
+//    createProduct / sync path (server RBAC allows it);
+//  - other roles never enqueue server mutations: their suggestions come from
+//    getRecentDesignations instead, so no denied sync is ever created.
+export async function ensureProductsFromDesignations(
+  entries: Array<{ designation: string; unitPrice?: number }>
+): Promise<Product[]> {
+  const names = entries.map((entry) => entry.designation.trim()).filter(Boolean);
+  if (names.length === 0) return [];
+  const all = await getProducts();
+  const byName = new Map(all.map((product) => [normalizeProductName(product.name), product]));
+  const resolved: Product[] = [];
+  const isAdmin = getAuthenticatedUser()?.role === 'admin';
+  for (const name of names) {
+    const key = normalizeProductName(name);
+    const existing = byName.get(key);
+    if (existing) {
+      resolved.push(existing);
+      continue;
+    }
+    if (!isAdmin) continue;
+    const default_price = Math.max(Number(entries.find((entry) => entry.designation === name)?.unitPrice) || 0, 0);
+    try {
+      const product = await createProduct({ name, category: '', default_price });
+      byName.set(key, product);
+      resolved.push(product);
+    } catch (error) {
+      console.error('Impossible d’ajouter la marchandise au catalogue', error);
+    }
+  }
+  return resolved;
+}
+
+let backfillRan = false;
+
+// One-shot best-effort backfill (director only): indexes real parcel items so
+// suggestions are available for data entered before products existed. It only
+// ever derives from actual stored rows — never from invented data.
+export async function backfillProductsFromParcelItems(): Promise<void> {
+  if (backfillRan) return;
+  backfillRan = true;
+  if (getAuthenticatedUser()?.role !== 'admin') return;
+  try {
+    const names = await getRecentDesignations(200);
+    await ensureProductsFromDesignations(names.map((designation) => ({ designation })));
+  } catch (error) {
+    console.error('Indexation des marchandises existantes échouée', error);
+  }
 }
 
 export async function createProduct(

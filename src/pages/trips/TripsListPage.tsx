@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
+import { Pagination } from '../../components/ui/Pagination';
 import { formatCurrency, formatDate } from '../../lib/format';
 
 const TRIP_STATUS_COLORS: Record<TripStatus, string> = {
@@ -25,6 +26,8 @@ export function TripsListPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   useEffect(() => {
     void (async () => {
@@ -76,6 +79,14 @@ export function TripsListPage() {
       return matchesSearch && matchesStatus;
     });
   }, [trips, search, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedTrips = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return (
     <div className="space-y-4">
@@ -160,6 +171,7 @@ export function TripsListPage() {
           />
         </Card>
       ) : (
+        <>
         <div className="data-table-container">
           <div className="overflow-x-auto">
             <table className="data-table">
@@ -176,7 +188,7 @@ export function TripsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((trip) => {
+                {pagedTrips.map((trip) => {
                   const stat = stats[trip.id] || { vehicles: 0, parcels: 0, expenses: 0 };
                   return (
                     <tr key={trip.id}>
@@ -225,6 +237,14 @@ export function TripsListPage() {
             </table>
           </div>
         </div>
+        <Pagination
+          currentPage={safePage}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setCurrentPage}
+          onPerPageChange={setPerPage}
+        />
+        </>
       )}
     </div>
   );

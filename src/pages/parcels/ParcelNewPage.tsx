@@ -11,6 +11,9 @@ import {
   getTrips,
   getTripVehicles,
   saveAttachmentsForEntity,
+  getRecentDesignations,
+  ensureProductsFromDesignations,
+  backfillProductsFromParcelItems,
 } from '../../lib/data';
 import type { Attachment, Client, Product, PaymentCondition, Trip, TripVehicle } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
@@ -23,6 +26,12 @@ import { formatCurrency, generateId, formatTrackingNumber } from '../../lib/form
 import { useToast } from '../../context/ToastContext';
 import { SubmitLock } from '../../lib/submitLock';
 import { userErrorMessage } from '../../lib/userMessage';
+
+interface ItemSuggestion {
+  key: string;
+  name: string;
+  product?: Product;
+}
 
 export function ParcelNewPage() {
   const navigate = useNavigate();
@@ -79,38 +88,52 @@ export function ParcelNewPage() {
   ]);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [recentDesignations, setRecentDesignations] = useState<string[]>([]);
 
   const normalizeText = (value: string) => value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  const getSuggestions = (query: string) => {
-    const normalized = query.trim().toLowerCase();
+  const getSuggestions = (query: string): ItemSuggestion[] => {
+    const normalized = normalizeText(query.trim());
     if (!normalized) return [];
-    return products
-      .filter((product) => product.name.toLowerCase().includes(normalized))
-      .slice(0, 6);
+    const fromProducts: ItemSuggestion[] = products
+      .filter((product) => normalizeText(product.name).includes(normalized))
+      .slice(0, 6)
+      .map((product) => ({ key: `product:${product.id}`, name: product.name, product }));
+    const knownNames = new Set(fromProducts.map((suggestion) => normalizeText(suggestion.name)));
+    const fromHistory: ItemSuggestion[] = recentDesignations
+      .filter((name) => !knownNames.has(normalizeText(name)) && normalizeText(name).includes(normalized))
+      .slice(0, 6)
+      .map((name) => ({ key: `history:${name}`, name }));
+    return [...fromProducts, ...fromHistory].slice(0, 6);
   };
 
-  const selectSuggestion = (id: string, product: Product) => {
-    updateItem(id, {
-      product_id: product.id,
-      designation: product.name,
-      unit_price: product.default_price,
-    });
+  const selectSuggestion = (id: string, suggestion: ItemSuggestion) => {
+    if (suggestion.product) {
+      updateItem(id, {
+        product_id: suggestion.product.id,
+        designation: suggestion.product.name,
+        unit_price: suggestion.product.default_price,
+      });
+    } else {
+      updateItem(id, { designation: suggestion.name });
+    }
     setActiveSuggestionItemId(null);
   };
 
   useEffect(() => {
     (async () => {
       try {
-        const [clientsData, productsData, appSettings, tripsData] = await Promise.all([
+        const [clientsData, productsData, appSettings, tripsData, recentData] = await Promise.all([
           getClients(),
           getProducts(),
           getSettings(),
           getTrips(),
+          getRecentDesignations(50),
         ]);
         setClients(clientsData);
         setProducts(productsData);
         setTrips(tripsData);
+        setRecentDesignations(recentData);
         if (appSettings) {
           setForm((prev) => ({
             ...prev,
@@ -137,6 +160,7 @@ export function ParcelNewPage() {
         setLoading(false);
       }
     })();
+    void backfillProductsFromParcelItems();
   }, [addToast]);
 
   useEffect(() => {
@@ -311,6 +335,11 @@ export function ParcelNewPage() {
         title: 'Colis enregistré',
         description: `Le bordereau ${formatTrackingNumber(parcel.tracking_number)} a été créé avec succès.`,
       });
+      // Suggestions learn from real designations (best-effort, non-blocking).
+      // Admins grow the shared catalog; other roles keep local parcel-item history.
+      void ensureProductsFromDesignations(
+        formattedItems.map((item) => ({ designation: item.designation, unitPrice: item.unit_price }))
+      ).catch((error) => console.error('Apprentissage des marchandises échoué', error));
       navigate(`/parcels/${parcel.id}`);
     } catch (error) {
       console.error('Erreur d’enregistrement du colis', error);
@@ -596,7 +625,7 @@ export function ParcelNewPage() {
                               <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-44 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
                                 {getSuggestions(item.designation).map((suggestion) => (
                                   <button
-                                    key={suggestion.id}
+                                    key={suggestion.key}
                                     type="button"
                                     onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => selectSuggestion(item.id, suggestion)}
@@ -668,7 +697,7 @@ export function ParcelNewPage() {
                         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-44 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
                           {getSuggestions(item.designation).map((suggestion) => (
                             <button
-                              key={suggestion.id}
+                              key={suggestion.key}
                               type="button"
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => selectSuggestion(item.id, suggestion)}

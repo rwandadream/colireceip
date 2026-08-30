@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Save,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   getPayments,
@@ -29,6 +30,7 @@ import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
 import { OfflineNotice } from '../../components/ui/OfflineNotice';
+import { Pagination } from '../../components/ui/Pagination';
 import { formatCurrency, formatDateTime, isToday, formatTrackingNumber } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
 import { SubmitLock } from '../../lib/submitLock';
@@ -42,18 +44,25 @@ export function PaymentsListPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   useEffect(() => {
     (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const [paymentsData, parcelsData] = await Promise.all([getPayments(), getParcels()]);
         setPayments(paymentsData);
         setParcels(parcelsData);
       } catch (error) {
         console.error('Erreur lors du chargement des paiements:', error);
+        setLoadError(true);
         addToast({
           type: 'error',
           title: 'Erreur de chargement',
@@ -63,7 +72,9 @@ export function PaymentsListPage() {
         setLoading(false);
       }
     })();
-  }, [addToast]);
+  }, [addToast, refreshKey]);
+
+  const handleRetry = () => setRefreshKey((k) => k + 1);
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -91,6 +102,14 @@ export function PaymentsListPage() {
       return matchesSearch && matchesMethod && matchesDate;
     });
   }, [payments, search, methodFilter, dateFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, methodFilter, dateFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedPayments = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   // "Encaissé aujourd'hui" and "Total encaissé" must mirror getDashboardStats:
   // sums runtime payment rows PLUS the origin contribution of any "paid at
@@ -123,6 +142,8 @@ export function PaymentsListPage() {
   }, [payments, parcels, user?.id, user?.role]);
 
   const filteredTotal = filtered.reduce((s, p) => s + p.amount, 0);
+
+  const hasActiveFilters = search.trim() !== '' || methodFilter !== 'all' || dateFilter !== 'all';
 
   return (
     <div className="space-y-4">
@@ -184,13 +205,20 @@ export function PaymentsListPage() {
         <Card className="p-4 space-y-2">
           {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
         </Card>
+      ) : loadError ? (
+        <Card className="p-6 text-center">
+          <AlertTriangle size={28} className="mx-auto text-error-500 mb-2" />
+          <p className="text-sm font-semibold text-error-600 dark:text-error-400 mb-1">Impossible de charger les paiements</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données. Vérifiez votre connexion puis réessayez.</p>
+          <Button variant="secondary" size="sm" onClick={handleRetry}>Réessayer</Button>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState
             icon={<CreditCard size={32} />}
             title="Aucun paiement trouvé"
-            description={search || methodFilter !== 'all' ? 'Aucun paiement ne correspond à vos critères.' : 'Enregistrez votre premier paiement.'}
-            action={!search && methodFilter === 'all' ? (
+            description={hasActiveFilters ? 'Aucun paiement ne correspond à vos critères de recherche ou de filtre.' : 'Enregistrez votre premier paiement.'}
+            action={!hasActiveFilters ? (
               <Link to="/payments/new" className="btn-primary">
                 <Plus size={16} /> Nouveau paiement
               </Link>
@@ -198,6 +226,7 @@ export function PaymentsListPage() {
           />
         </Card>
       ) : (
+        <>
         <div className="data-table-container">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2 bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <span>{filtered.length} encaissements filtrés</span>
@@ -218,7 +247,7 @@ export function PaymentsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => (
+                {pagedPayments.map((p) => (
                   <tr key={p.id}>
                     <td className="font-semibold text-slate-900 dark:text-white">{p.client_name}</td>
                     <td className="whitespace-nowrap">
@@ -246,6 +275,14 @@ export function PaymentsListPage() {
             </table>
           </div>
         </div>
+        <Pagination
+          currentPage={safePage}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setCurrentPage}
+          onPerPageChange={setPerPage}
+        />
+        </>
       )}
     </div>
   );

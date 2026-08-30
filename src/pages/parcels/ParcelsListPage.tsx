@@ -6,13 +6,16 @@ import {
   Search,
   User as UserIcon,
   ArrowUpRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { getParcels } from '../../lib/data';
 import type { Parcel } from '../../lib/types';
 import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS, PARCEL_STATUSES } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
+import { Pagination } from '../../components/ui/Pagination';
 import { TrackingBadge } from '../../components/ui/TrackingBadge';
 import { formatCurrency } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
@@ -21,17 +24,24 @@ export function ParcelsListPage() {
   const { addToast } = useToast();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'outstanding' | 'paid' | 'paid_origin'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'balance' | 'amount'>('recent');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   useEffect(() => {
     (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const data = await getParcels();
         setParcels(data);
       } catch (err) {
+        setLoadError(true);
         const message =
           err instanceof Error && err.message
             ? err.message
@@ -41,7 +51,9 @@ export function ParcelsListPage() {
         setLoading(false);
       }
     })();
-  }, [addToast]);
+  }, [addToast, refreshKey]);
+
+  const handleRetry = () => setRefreshKey((k) => k + 1);
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -80,6 +92,14 @@ export function ParcelsListPage() {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [parcels, search, statusFilter, paymentFilter, sortBy]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, paymentFilter, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedParcels = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return (
     <div className="space-y-4">
@@ -157,6 +177,13 @@ export function ParcelsListPage() {
             <Skeleton key={i} className="h-10 w-full" />
           ))}
         </Card>
+      ) : loadError ? (
+        <Card className="p-6 text-center">
+          <AlertTriangle size={28} className="mx-auto text-error-500 mb-2" />
+          <p className="text-sm font-semibold text-error-600 dark:text-error-400 mb-1">Impossible de charger les colis</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Une erreur est survenue lors du chargement des données. Vérifiez votre connexion puis réessayez.</p>
+          <Button variant="secondary" size="sm" onClick={handleRetry}>Réessayer</Button>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <EmptyState
@@ -178,6 +205,7 @@ export function ParcelsListPage() {
           />
         </Card>
       ) : (
+        <>
         <div className="data-table-container">
           <div className="overflow-x-auto">
             <table className="data-table min-w-[820px]">
@@ -193,7 +221,7 @@ export function ParcelsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((parcel) => (
+                {pagedParcels.map((parcel) => (
                   <tr key={parcel.id}>
                     <td className="font-semibold whitespace-nowrap">
                       <Link to={`/parcels/${parcel.id}`}>
@@ -253,6 +281,14 @@ export function ParcelsListPage() {
             </table>
           </div>
         </div>
+        <Pagination
+          currentPage={safePage}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setCurrentPage}
+          onPerPageChange={setPerPage}
+        />
+        </>
       )}
     </div>
   );

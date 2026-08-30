@@ -44,12 +44,12 @@ import { userErrorMessage } from '../../lib/userMessage';
 import { OfflineNotice } from '../../components/ui/OfflineNotice';
 
 const STATUS_DOT_COLORS: Record<ParcelStatus, string> = {
-  pending: 'bg-slate-400',
-  received: 'bg-cyan-500',
-  in_transit: 'bg-purple-500',
-  arrived: 'bg-brand-500',
-  delivered: 'bg-success-500',
-  cancelled: 'bg-warning-500',
+  pending: 'bg-amber-500',
+  received: 'bg-blue-500',
+  in_transit: 'bg-violet-500',
+  arrived: 'bg-cyan-500',
+  delivered: 'bg-emerald-500',
+  cancelled: 'bg-error-500',
 };
 
 export function ParcelDetailPage() {
@@ -96,25 +96,28 @@ export function ParcelDetailPage() {
     })();
   }, [id, addToast, reloadKey]);
 
-  const handleStatusChange = async () => {
+  const handleStatusChange = async (target?: ParcelStatus) => {
     if (statusLoading) return;
-    if (!parcel || !user || parcel.status === newStatus) return;
+    if (!parcel || !user) return;
+    const status = target || newStatus;
+    if (parcel.status === status) return;
     setStatusLoading(true);
+    setNewStatus(status);
     try {
-    await updateParcelStatus(parcel.id, newStatus, user.id, user.full_name);
-    await logActivity(user.id, user.full_name, `a changé le statut du colis ${parcel.tracking_number} à ${PARCEL_STATUS_LABELS[newStatus]}`, 'parcel', parcel.id, '');
-    const [p, hist] = await Promise.all([
-      getParcelById(parcel.id),
-      getStatusHistory(parcel.id),
-    ]);
-    setParcel(p || null);
-    setHistory(hist);
-    setStatusModalOpen(false);
-    addToast({
-      type: 'success',
-      title: 'Statut mis à jour',
-      description: `Le colis a été déplacé vers ${PARCEL_STATUS_LABELS[newStatus]}.`,
-    });
+      await updateParcelStatus(parcel.id, status, user.id, user.full_name);
+      await logActivity(user.id, user.full_name, `a changé le statut du colis ${parcel.tracking_number} à ${PARCEL_STATUS_LABELS[status]}`, 'parcel', parcel.id, '');
+      const [p, hist] = await Promise.all([
+        getParcelById(parcel.id),
+        getStatusHistory(parcel.id),
+      ]);
+      setParcel(p || null);
+      setHistory(hist);
+      setStatusModalOpen(false);
+      addToast({
+        type: 'success',
+        title: 'Statut mis à jour',
+        description: `Le colis a été déplacé vers ${PARCEL_STATUS_LABELS[status]}.`,
+      });
     } catch (error) {
       setNewStatus(parcel.status);
       const message = userErrorMessage(error, 'Impossible de mettre à jour le statut du colis.');
@@ -282,11 +285,7 @@ export function ParcelDetailPage() {
             variant={parcel.status === status ? 'primary' : 'secondary'}
             size="sm"
             disabled={parcel.status === status || statusLoading}
-            onClick={async () => {
-              if (statusLoading) return;
-              setNewStatus(status);
-              await handleStatusChange();
-            }}
+            onClick={() => handleStatusChange(status)}
           >
             {PARCEL_STATUS_LABELS[status]}
           </Button>
@@ -480,7 +479,7 @@ export function ParcelDetailPage() {
           </Select>
           <div className="flex justify-end gap-3">
             <button onClick={() => setStatusModalOpen(false)} className="btn-secondary" disabled={statusLoading}>Annuler</button>
-            <button onClick={handleStatusChange} className="btn-primary" disabled={statusLoading}>{statusLoading ? 'Mise à jour...' : 'Confirmer'}</button>
+            <button onClick={() => handleStatusChange()} className="btn-primary" disabled={statusLoading}>{statusLoading ? 'Mise à jour...' : 'Confirmer'}</button>
           </div>
         </div>
       </Modal>

@@ -7,6 +7,7 @@ import type { Client, Parcel } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
 import { Input, Select } from '../../components/ui/Input';
+import { Pagination } from '../../components/ui/Pagination';
 import { formatCurrency } from '../../lib/format';
 
 export function ClientsListPage() {
@@ -17,6 +18,8 @@ export function ClientsListPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'with_balance' | 'paid_up'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   useEffect(() => {
     let active = true;
@@ -90,6 +93,14 @@ export function ClientsListPage() {
       return matchesSearch && matchesStatus;
     });
   }, [clients, getClientStats, search, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedClients = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return (
     <div className="space-y-4">
@@ -168,7 +179,8 @@ export function ClientsListPage() {
           />
         </Card>
       ) : (
-        <div className="data-table-container">
+        <>
+        <div className="hidden md:block data-table-container">
           <div className="overflow-x-auto">
             <table className="data-table min-w-[820px]">
               <thead>
@@ -183,7 +195,7 @@ export function ClientsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((client) => {
+                {pagedClients.map((client) => {
                   const stats = getClientStats(client.id);
                   const hasOutstanding = stats.outstanding > 0;
                   return (
@@ -271,6 +283,89 @@ export function ClientsListPage() {
             </table>
           </div>
         </div>
+        <div className="md:hidden space-y-3">
+          {pagedClients.map((client) => {
+            const stats = getClientStats(client.id);
+            const hasOutstanding = stats.outstanding > 0;
+            return (
+              <Card key={client.id} className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    {client.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Link to={`/clients/${client.id}`} className="block font-bold text-slate-900 dark:text-white truncate">
+                      {client.full_name}
+                    </Link>
+                    {client.company_name && (
+                      <p className="text-xs text-slate-400 truncate">{client.company_name}</p>
+                    )}
+                    {client.phone && (
+                      <p className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 mt-1">
+                        <Phone size={12} className="text-slate-400 flex-shrink-0" />
+                        <span className="truncate">{client.phone}</span>
+                      </p>
+                    )}
+                    {client.email && (
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{client.email}</p>
+                    )}
+                    {(client.city || client.neighborhood) && (
+                      <p className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 mt-1">
+                        <MapPin size={12} className="text-slate-400 flex-shrink-0" />
+                        <span className="truncate min-w-0">
+                          {client.city}
+                          {client.neighborhood ? `, ${client.neighborhood}` : ''}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] text-slate-400">Colis</p>
+                    <Badge className="mt-0.5 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      {stats.count}
+                    </Badge>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-slate-400">Montant total</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white tabular-nums truncate">
+                      {formatCurrency(stats.totalAmount)}
+                    </p>
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p className="text-[11px] text-slate-400">Solde</p>
+                    {hasOutstanding ? (
+                      <p className="text-sm font-bold text-error-600 dark:text-error-400 tabular-nums truncate">
+                        {formatCurrency(stats.outstanding)}
+                      </p>
+                    ) : (
+                      <Badge className="mt-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <CheckCircle2 size={11} /> À jour
+                      </Badge>
+                    )}
+                  </div>
+                  <Link
+                    to={`/clients/${client.id}`}
+                    className="btn-secondary flex-shrink-0"
+                    aria-label={`Voir la fiche de ${client.full_name}`}
+                  >
+                    Fiche
+                    <ArrowUpRight size={14} />
+                  </Link>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+        <Pagination
+          currentPage={safePage}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setCurrentPage}
+          onPerPageChange={setPerPage}
+        />
+        </>
       )}
     </div>
   );

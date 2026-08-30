@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { OfflineNotice } from '../components/ui/OfflineNotice';
 import { EmptyState, Skeleton } from '../components/ui/Badge';
+import { Pagination } from '../components/ui/Pagination';
 import { Input, Select } from '../components/ui/Input';
 import { formatDateTime, timeAgo } from '../lib/format';
 
@@ -16,6 +17,8 @@ export function LogsPage() {
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [userFilter, setUserFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   useEffect(() => {
     let active = true;
@@ -50,6 +53,14 @@ export function LogsPage() {
       return matchesSearch && matchesUser;
     });
   }, [logs, search, userFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, userFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedLogs = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return (
     <div className="space-y-4">
@@ -112,6 +123,7 @@ export function LogsPage() {
           <EmptyState icon={<ScrollText size={32} />} title="Aucune action trouvée" />
         </Card>
       ) : (
+        <>
         <div className="data-table-container">
           <div className="overflow-x-auto">
             <table className="data-table">
@@ -124,7 +136,7 @@ export function LogsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((log) => (
+                {pagedLogs.map((log) => (
                   <tr key={log.id}>
                     <td className="text-xs text-slate-500 whitespace-nowrap">
                       <span>{formatDateTime(log.created_at)}</span>
@@ -163,6 +175,14 @@ export function LogsPage() {
             </table>
           </div>
         </div>
+        <Pagination
+          currentPage={safePage}
+          totalItems={filtered.length}
+          perPage={perPage}
+          onPageChange={setCurrentPage}
+          onPerPageChange={setPerPage}
+        />
+        </>
       )}
     </div>
   );

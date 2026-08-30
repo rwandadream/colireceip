@@ -7,6 +7,7 @@ import {
   Edit2,
   Printer,
   CalendarDays,
+  Receipt,
 } from 'lucide-react';
 import {
   getTripExpenses,
@@ -21,11 +22,13 @@ import {
 import type { Attachment, TripExpense, ExpenseCategory, Parcel } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
+import { EmptyState } from '../../components/ui/Badge';
 import { OfflineNotice } from '../../components/ui/OfflineNotice';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { AttachmentManager } from '../../components/ui/AttachmentManager';
+import { Pagination } from '../../components/ui/Pagination';
 import { formatCurrency, formatDate, formatTrackingNumber } from '../../lib/format';
 import { generateReportPDF } from '../../lib/pdf';
 import { useToast } from '../../context/ToastContext';
@@ -62,6 +65,8 @@ export function ExpensesPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [showModal, setShowModal] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<TripExpense | null>(null);
@@ -69,6 +74,7 @@ export function ExpensesPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
 
   const [form, setForm] = useState({
     parcel_id: '',
@@ -149,6 +155,14 @@ export function ExpensesPage() {
     });
   }, [expenses, parcelMap, search, categoryFilter, fromDate, toDate]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter, fromDate, toDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedExpenses = filteredExpenses.slice((safePage - 1) * perPage, safePage * perPage);
+
   const totalAmount = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   const spendCount = filteredExpenses.length;
   const tripsCount = new Set(filteredExpenses.map((expense) => expense.parcel_id)).size;
@@ -179,6 +193,7 @@ export function ExpensesPage() {
       location: '',
       notes: '',
     });
+    setFormError('');
     setShowModal(true);
   };
 
@@ -195,6 +210,7 @@ export function ExpensesPage() {
       location: expense.location,
       notes: expense.notes,
     });
+    setFormError('');
     setShowModal(true);
   };
 
@@ -218,7 +234,28 @@ export function ExpensesPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.parcel_id || !form.category_name || !form.label || Number(form.amount) <= 0) return;
+    setFormError('');
+    const amountNum = Number(form.amount);
+    if (!form.parcel_id) {
+      setFormError('Sélectionnez le colis auquel rattacher cette dépense.');
+      return;
+    }
+    if (!form.category_name) {
+      setFormError('Sélectionnez ou créez une catégorie.');
+      return;
+    }
+    if (!form.label.trim()) {
+      setFormError('Le libellé est obligatoire.');
+      return;
+    }
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      setFormError('Le montant doit être supérieur à 0.');
+      return;
+    }
+    if (!form.expense_date) {
+      setFormError('La date de la dépense est obligatoire.');
+      return;
+    }
     if (!submitLockRef.current) submitLockRef.current = new SubmitLock();
     if (!submitLockRef.current.acquire()) return;
     setSaving(true);
@@ -233,7 +270,7 @@ export function ExpensesPage() {
         category_id: category?.id,
         category_name: category?.name || form.category_name,
         label: form.label,
-        amount: Number(form.amount),
+        amount: amountNum,
         expense_date: form.expense_date,
         location: form.location,
         notes: form.notes,
@@ -247,6 +284,7 @@ export function ExpensesPage() {
           await saveAttachmentsForEntity('expense', selectedExpense.id, attachments);
           setExpenses((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
           setShowModal(false);
+          setFormError('');
         }
       } else {
         const created = await createTripExpense(payload);
@@ -256,6 +294,7 @@ export function ExpensesPage() {
           }
           setExpenses((prev) => [created, ...prev]);
           setShowModal(false);
+          setFormError('');
         }
       }
     } catch (error) {
@@ -333,15 +372,15 @@ export function ExpensesPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="p-5">
           <p className="text-xs text-slate-400 uppercase tracking-wide">Total dépensé</p>
-          <p className="text-3xl font-bold text-slate-900 dark:text-white mt-3">{formatCurrency(totalAmount)}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-3 break-words tabular-nums leading-tight">{formatCurrency(totalAmount)}</p>
         </Card>
         <Card className="p-5">
           <p className="text-xs text-slate-400 uppercase tracking-wide">Nombre de dépenses</p>
-          <p className="text-3xl font-bold text-slate-900 dark:text-white mt-3">{spendCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-3 break-words tabular-nums leading-tight">{spendCount}</p>
         </Card>
         <Card className="p-5">
           <p className="text-xs text-slate-400 uppercase tracking-wide">Nombre de colis concernés</p>
-          <p className="text-3xl font-bold text-slate-900 dark:text-white mt-3">{tripsCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-3 break-words tabular-nums leading-tight">{tripsCount}</p>
         </Card>
       </div>
 
@@ -400,10 +439,26 @@ export function ExpensesPage() {
               ))}
             </div>
           ) : filteredExpenses.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Aucune dépense ne correspond aux critères.</p>
+            <div className="py-10">
+              <EmptyState
+                icon={<Receipt size={32} />}
+                title="Aucune dépense"
+                description={
+                  search.trim() || categoryFilter !== 'all' || fromDate || toDate
+                    ? 'Aucune dépense ne correspond à vos critères de recherche.'
+                    : 'Commencez par enregistrer votre première dépense.'
+                }
+                action={
+                  !search.trim() && categoryFilter === 'all' && !fromDate && !toDate ? (
+                    <Button onClick={openNewExpense}>
+                      <Plus size={16} /> Nouvelle dépense
+                    </Button>
+                  ) : undefined
+                }
+              />
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <div className="grid min-w-[1080px] gap-3">
                 <div className="grid grid-cols-12 gap-3 text-xs text-slate-500 uppercase tracking-wide border-b border-slate-200 dark:border-slate-700 py-3">
@@ -415,7 +470,7 @@ export function ExpensesPage() {
                   <div className="col-span-1">Observation</div>
                   <div className="sticky right-0 z-10 col-span-2 text-right bg-white dark:bg-slate-900">Actions</div>
                 </div>
-                {filteredExpenses.map((expense) => (
+                {pagedExpenses.map((expense) => (
                   <div key={expense.id} className="grid grid-cols-12 gap-3 items-center py-4 border-b border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200">
                     <div className="col-span-2">{formatDate(expense.expense_date)}</div>
                     <div className="col-span-2 font-medium">{expense.category_name}</div>
@@ -436,6 +491,14 @@ export function ExpensesPage() {
                 ))}
               </div>
             </div>
+            <Pagination
+              currentPage={safePage}
+              totalItems={filteredExpenses.length}
+              perPage={perPage}
+              onPageChange={setCurrentPage}
+              onPerPageChange={setPerPage}
+            />
+            </>
           )}
         </Card>
       )}
@@ -453,7 +516,17 @@ export function ExpensesPage() {
       </Card>
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={selectedExpense ? 'Modifier la dépense' : 'Nouvelle dépense'} size="lg">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          {formError && (
+            <Card className="border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-900/40 dark:bg-error-950/20 dark:text-error-300">
+              {formError}
+            </Card>
+          )}
+          {!form.parcel_id && parcels.length === 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Aucun colis disponible pour le moment. Créez d'abord un colis avant d'enregistrer une dépense.
+            </p>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Select
               label="Colis"
