@@ -263,6 +263,10 @@ export function ParcelNewPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.recipient_phone.trim()) {
+      addToast({ type: 'error', title: 'Téléphone requis', description: 'Le numéro de téléphone du destinataire est obligatoire pour enregistrer un colis.' });
+      return;
+    }
     if (!form.client_id || !form.package_type || items.length === 0 || items.some((item) => !item.designation || Number(item.quantity) <= 0)) return;
     if (form.payment_condition === 'paid_origin' && amountPaidNum <= 0) {
       addToast({ type: 'error', title: 'Montant payé requis', description: 'Un colis « Payé au départ » doit avoir un montant payé supérieur à 0.' });
@@ -490,6 +494,7 @@ export function ParcelNewPage() {
                   label="Téléphone du destinataire"
                   value={form.recipient_phone}
                   onChange={(e) => setForm({ ...form, recipient_phone: e.target.value })}
+                  required
                 />
                 <div className="sm:col-span-2">
                   <Input

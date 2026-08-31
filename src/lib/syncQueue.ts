@@ -204,6 +204,22 @@ export async function requeueMutation(id: string): Promise<void> {
   await put(mutation);
 }
 
+// Clears the backoff window of a PENDING mutation so the very next drain retries
+// it immediately. Used after a formerly-missing dependency has been resolved:
+// the parcel create waiting on a transient 400 ("client introuvable") must not
+// sit out the rest of its backoff once its client now exists server-side.
+export async function retryPendingNow(id: string): Promise<void> {
+  const db = await getDB();
+  const all = await db.getAll('sync_queue');
+  const mutation = all.find((m) => m.id === id && m.status === 'pending');
+  if (!mutation) return;
+  mutation.retryCount = 0;
+  mutation.lastAttemptAt = undefined;
+  mutation.lastError = undefined;
+  mutation.updatedAt = toISO();
+  await put(mutation);
+}
+
 // Earliest absolute timestamp (ms) at which a pending mutation may be retried,
 // i.e. the moment its current backoff window elapses. Mutations that never
 // failed (or have no recorded attempt) are already due and ignored here: they
@@ -249,5 +265,11 @@ export async function listConflicts(): Promise<SyncMutation[]> {
 export async function listFailed(): Promise<SyncMutation[]> {
   const db = await getDB();
   const all = await db.getAllFromIndex('sync_queue', 'by-status', 'failed');
+  return all.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+}
+
+export async function listPending(): Promise<SyncMutation[]> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('sync_queue', 'by-status', 'pending');
   return all.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 }

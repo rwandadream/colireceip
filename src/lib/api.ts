@@ -44,3 +44,12 @@ export async function fetchWithTimeout(
     globalThis.clearTimeout(timer);
   }
 }
+
+export async function parseApiError(response: Response): Promise<ApiError> {
+  let message = `API_${response.status}`;
+  try {
+    const body = await response.clone().json() as { error?: string; data?: { error?: string } };
+    message = body.error || body.data?.error || message;
+  } catch { /* non-JSON fallback */ }
+  return new ApiError(response.status, message);
+}

@@ -57,10 +57,17 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Error in /api/data handler:', error);
     const status = classifyApiErrorStatus(error);
+    // A missing-dependency 400 (the referenced client/trip/parent does not
+    // exist server-side yet) is a sequencing problem, not a permanent one: the
+    // sync engine must be able to tell it apart from a genuine validation
+    // error so it can retry once the dependency has been synced. Preserve the
+    // specific server message in that case; every other 400 stays generic.
+    const isMissingDependency = /introuvable|Missing/i.test(error.message || '');
     const message = status === 403 ? 'Accès refusé.'
       : status === 409 ? error.code === 'P2003' ? 'Suppression impossible : des données liées existent.' : error.code === 'STATUS_CONFLICT' ? 'Conflit de statut : le colis a été modifié sur le serveur.' : error.code === 'DUPLICATE_PHONE' ? error.message : 'Conflit d\'idempotence.'
       : status === 503 ? 'Le service est temporairement indisponible. Réessayez dans quelques instants.'
       : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 'En-tête Idempotency-Key requis.'
+      : isMissingDependency ? error.message
       : 'Requête invalide. Vérifiez les champs saisies.';
     return res.status(status).json({ error: message });
   }

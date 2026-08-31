@@ -17,8 +17,9 @@ import type { DashboardStats, Parcel } from '../lib/types';
 import { StatCard } from '../components/ui/Card';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Badge, Skeleton } from '../components/ui/Badge';
-import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS } from '../lib/types';
+import { Skeleton } from '../components/ui/Badge';
+import { ActivityChart, type ChartRange } from '../components/ui/ActivityChart';
+import { ParcelStatusBadge } from '../components/ui/ParcelStatusBadge';
 import { formatCurrency } from '../lib/format';
 import { TrackingBadge } from '../components/ui/TrackingBadge';
 import { useAuth } from '../context/AuthContext';
@@ -81,9 +82,11 @@ export function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentParcels, setRecentParcels] = useState<Parcel[]>([]);
+  const [allParcels, setAllParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [chartRange, setChartRange] = useState<ChartRange>(7);
 
   useEffect(() => {
     let active = true;
@@ -99,6 +102,7 @@ export function DashboardPage() {
 
         if (!active) return;
         setStats(statsData);
+        setAllParcels(parcelsData);
         setRecentParcels(parcelsData.slice(0, 5));
       } catch (error) {
         console.error('Erreur de chargement du tableau de bord:', error);
@@ -272,6 +276,9 @@ export function DashboardPage() {
         </div>
       </Card>
 
+      {/* 3b. Activity Chart */}
+      <ActivityChart parcels={allParcels} range={chartRange} onRangeChange={setChartRange} />
+
       {/* 4. Financial Performance Section */}
       <Card className="p-5 space-y-4">
         <div>
@@ -380,9 +387,7 @@ export function DashboardPage() {
                           {parcel.origin} ➔ {parcel.destination}
                         </td>
                         <td className="py-3 px-2">
-                          <Badge className={PARCEL_STATUS_COLORS[parcel.status]}>
-                            {PARCEL_STATUS_LABELS[parcel.status]}
-                          </Badge>
+                          <ParcelStatusBadge status={parcel.status} />
                         </td>
                         <td className="py-3 px-2 text-right tabular-nums">
                           <p className="font-semibold text-slate-900 dark:text-white">{formatCurrency(parcel.total_amount)}</p>

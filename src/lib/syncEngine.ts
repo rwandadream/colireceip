@@ -19,12 +19,14 @@ import {
   discardMutation,
   listConflicts,
   listFailed,
+  listPending,
   markConflict,
   markFailed,
   nextPendingMutation,
   nextPendingRetryDeadlineMs,
   registerTransientFailure,
   requeueMutation,
+  retryPendingNow,
 } from './syncQueue';
 import {
   refreshClients,
@@ -102,7 +104,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'Erreur inconnue.';
 }
 
-function classifyError(error: unknown, action: SyncMutation['action']): Outcome {
+function classifyError(error: unknown, action: SyncMutation['action'], entity?: SyncMutation['entity']): Outcome {
   if (isTransientApiError(error)) return { kind: 'transient', message: messageOf(error) };
   if (error instanceof ApiError) {
     const status = error.status;
@@ -113,7 +115,13 @@ function classifyError(error: unknown, action: SyncMutation['action']): Outcome 
     if (status === 404 && action === 'update') {
       return { kind: 'conflict', message: 'Enregistrement introuvable sur le serveur.' };
     }
-    return { kind: 'permanent', code: status, message: `API_${status}` };
+    if (status === 400 && action === 'create' && entity === 'parcels') {
+      const msg = messageOf(error);
+      if (msg.includes('introuvable') || msg.includes('Missing')) {
+        return { kind: 'transient', message: msg };
+      }
+    }
+    return { kind: 'permanent', code: status, message: messageOf(error) };
   }
   return { kind: 'transient', message: messageOf(error) };
 }
@@ -265,7 +273,7 @@ async function runMutation(mutation: SyncMutation): Promise<Outcome> {
     }
     return { kind: 'success', value };
   } catch (error) {
-    return classifyError(error, mutation.action);
+    return classifyError(error, mutation.action, mutation.entity);
   }
 }
 
@@ -489,6 +497,48 @@ async function scheduleRetry(): Promise<void> {
   }, delay);
 }
 
+// Automatically re-queues permanently failed parcel/settings creates whose
+// dependency (a client that had not yet synced, causing "Client introuvable.")
+// may now exist on the server. Without this, a parcel created against a not-yet
+// synced client stays permanently failed forever even though the obstacle is
+// gone. Only create mutations are retried here (no risk of re-applying a
+// destructive delete), and only when the referenced dependency actually exists
+// on the server.
+async function requeueResolvedDependencyFails(): Promise<void> {
+  try {
+    // A missing-dependency 400 is classified transient: the parcel create stays
+    // PENDING (with a backoff window) rather than failed. It can only become
+    // failed later once the backoff is exhausted and canRetryAfter() returns
+    // false. Cover both states so the resolution is acted on immediately:
+    //  - pending -> retryPendingNow() clears the backoff so the next drain retries
+    //  - failed  -> requeueMutation() moves it back to pending and clears retries
+    const failed = await listFailed();
+    const pending = await listPending();
+    const candidates = [...pending, ...failed];
+    if (candidates.length === 0) return;
+    const onlineClients = await listOnlineClients();
+    if (!Array.isArray(onlineClients)) return;
+    const onlineClientIds = new Set(onlineClients.map((client) => client.id));
+    for (const mutation of candidates) {
+      if (
+        mutation.entity === 'parcels' &&
+        mutation.action === 'create' &&
+        mutation.payload &&
+        typeof mutation.payload === 'object'
+      ) {
+        const parcel = (mutation.payload as { parcel?: { client_id?: string } }).parcel;
+        const clientId = parcel?.client_id;
+        if (clientId && onlineClientIds.has(clientId)) {
+          if (mutation.status === 'pending') await retryPendingNow(mutation.id);
+          else await requeueMutation(mutation.id);
+        }
+      }
+    }
+  } catch {
+    // best-effort; the manual retry button still covers the user.
+  }
+}
+
 export async function requestSync(): Promise<void> {
   if (running) {
     syncQueued = true;
@@ -506,6 +556,7 @@ export async function requestSync(): Promise<void> {
   syncedInLastRun = 0;
   await emitState();
   try {
+    await requeueResolvedDependencyFails();
     const blocked = await drain();
     if (blocked) {
       lastError = 'Synchronisation différée : nouvelle tentative dans quelques secondes.';

@@ -1,5 +1,5 @@
 import type { Payment } from './types';
-import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
+import { fetchWithTimeout, isTransientApiError, parseApiError } from './api';
 
 export type PaymentCreateInput = Pick<Payment, 'parcel_id' | 'amount' | 'payment_method' | 'payment_date' | 'note'>;
 
@@ -41,7 +41,7 @@ const request = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unkno
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    throw new ApiError(response.status, `API_${response.status}`);
+    throw await parseApiError(response);
   }
   // 204 No Content is OK; no JSON body expected.
   if (response.status === 204) return null;

@@ -13,6 +13,7 @@ import {
   Printer,
   Trash2,
   Clock,
+  BellRing,
   CheckCircle2,
   Truck,
   History,
@@ -42,6 +43,9 @@ import { formatCurrency, formatDateTime, formatDate } from '../../lib/format';
 import { generateReceiptPDF } from '../../lib/pdf';
 import { userErrorMessage } from '../../lib/userMessage';
 import { OfflineNotice } from '../../components/ui/OfflineNotice';
+import { ParcelStatusStepper } from '../../components/ui/ParcelStatusStepper';
+import { ParcelStatusBadge } from '../../components/ui/ParcelStatusBadge';
+import { PaymentReminderModal } from '../../components/ui/PaymentReminderModal';
 
 const STATUS_DOT_COLORS: Record<ParcelStatus, string> = {
   pending: 'bg-amber-500',
@@ -70,6 +74,7 @@ export function ParcelDetailPage() {
   const [statusLoading, setStatusLoading] = useState(false);
   const [deleteSummary, setDeleteSummary] = useState<RelatedItemSummary[]>([]);
   const [newStatus, setNewStatus] = useState<ParcelStatus>('received');
+  const [remindOpen, setRemindOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -243,9 +248,7 @@ export function ParcelDetailPage() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
               <TrackingBadge tracking={parcel.tracking_number} size="lg" />
-              <Badge className={PARCEL_STATUS_COLORS[parcel.status]}>
-                {PARCEL_STATUS_LABELS[parcel.status]}
-              </Badge>
+              <ParcelStatusBadge status={parcel.status} />
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Enregistré le {formatDate(parcel.received_date)} par {parcel.registered_by_name}
@@ -253,6 +256,9 @@ export function ParcelDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Parcel Status Progression */}
+      <ParcelStatusStepper status={parcel.status} />
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2">
@@ -264,6 +270,12 @@ export function ParcelDetailPage() {
           <Clock size={16} />
           Changer le statut
         </Button>
+        {parcel.balance > 0 && (
+          <Button variant="secondary" size="sm" onClick={() => setRemindOpen(true)}>
+            <BellRing size={16} />
+            Relancer paiement
+          </Button>
+        )}
         {parcel.balance > 0 && (
           <Link to={`/payments/new?parcel=${parcel.id}`} className="btn-primary text-sm">
             <CreditCard size={16} />
@@ -483,6 +495,17 @@ export function ParcelDetailPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Relancer paiement Modal */}
+      <PaymentReminderModal
+        open={remindOpen}
+        onClose={() => setRemindOpen(false)}
+        clientName={parcel.client_name}
+        clientPhone={parcel.client_phone}
+        tracking={parcel.tracking_number}
+        balance={parcel.balance}
+        addToast={addToast}
+      />
 
       <ConfirmModalWithDetails
         open={deleteModalOpen}

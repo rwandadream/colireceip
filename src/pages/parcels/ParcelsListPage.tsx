@@ -7,17 +7,22 @@ import {
   User as UserIcon,
   ArrowUpRight,
   AlertTriangle,
+  FileDown,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { getParcels } from '../../lib/data';
 import type { Parcel } from '../../lib/types';
-import { PARCEL_STATUS_LABELS, PARCEL_STATUS_COLORS, PARCEL_STATUSES } from '../../lib/types';
+import { PARCEL_STATUS_LABELS, PARCEL_STATUSES } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Badge';
+import { ParcelStatusBadge } from '../../components/ui/ParcelStatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
 import { Pagination } from '../../components/ui/Pagination';
 import { TrackingBadge } from '../../components/ui/TrackingBadge';
-import { formatCurrency } from '../../lib/format';
+import { formatCurrency, formatDate, formatTrackingNumber } from '../../lib/format';
+import { generateReportPDF } from '../../lib/pdf';
+import * as XLSX from 'xlsx';
 import { useToast } from '../../context/ToastContext';
 
 export function ParcelsListPage() {
@@ -29,7 +34,8 @@ export function ParcelsListPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'outstanding' | 'paid' | 'paid_origin'>('all');
-  const [sortBy, setSortBy] = useState<'recent' | 'balance' | 'amount'>('recent');
+  const [sortBy, setSortBy] = useState<'recent' | 'balance' | 'amount' | 'date'>('recent');
+  const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
 
@@ -54,6 +60,44 @@ export function ParcelsListPage() {
   }, [addToast, refreshKey]);
 
   const handleRetry = () => setRefreshKey((k) => k + 1);
+
+  const exportPDF = () => {
+    generateReportPDF(
+      'Registre des colis (filtré)',
+      ['N° Colis', 'Client', 'Téléphone', 'Trajet', 'Statut', 'Total', 'Payé', 'Reste', 'Date'],
+      filtered.map((p) => [
+        formatTrackingNumber(p.tracking_number),
+        p.client_name,
+        p.client_phone || '—',
+        `${p.origin} → ${p.destination}`,
+        PARCEL_STATUS_LABELS[p.status],
+        formatCurrency(p.total_amount),
+        formatCurrency(p.amount_paid),
+        formatCurrency(p.balance),
+        formatDate(p.received_date || p.created_at),
+      ]),
+      `${filtered.length} colis · Généré le ${formatDate(new Date(), 'dd/MM/yyyy à HH:mm')}`
+    );
+  };
+
+  const exportExcel = () => {
+    const data = filtered.map((p) => ({
+      'N° Colis': formatTrackingNumber(p.tracking_number),
+      Client: p.client_name,
+      Téléphone: p.client_phone || '',
+      Origine: p.origin,
+      Destination: p.destination,
+      Statut: PARCEL_STATUS_LABELS[p.status],
+      Total: p.total_amount,
+      'Montant payé': p.amount_paid,
+      'Reste à payer': p.balance,
+      'Date réception': formatDate(p.received_date || p.created_at),
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Registre');
+    XLSX.writeFile(wb, 'registre-colis.xlsx');
+  };
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -89,13 +133,18 @@ export function ParcelsListPage() {
     return [...result].sort((a, b) => {
       if (sortBy === 'balance') return b.balance - a.balance;
       if (sortBy === 'amount') return b.total_amount - a.total_amount;
+      if (sortBy === 'date') {
+        const aTime = new Date(a.received_date || a.created_at).getTime();
+        const bTime = new Date(b.received_date || b.created_at).getTime();
+        return dateSortDirection === 'asc' ? aTime - bTime : bTime - aTime;
+      }
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [parcels, search, statusFilter, paymentFilter, sortBy]);
+  }, [parcels, search, statusFilter, paymentFilter, sortBy, dateSortDirection]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, paymentFilter, sortBy]);
+  }, [search, statusFilter, paymentFilter, sortBy, dateSortDirection]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(currentPage, totalPages);
@@ -113,13 +162,23 @@ export function ParcelsListPage() {
             Registre des Colis
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {parcels.length} colis au total · suivi opérationnel centralisé
+            {parcels.length} colis au total · {filtered.length} affichés
           </p>
         </div>
-        <Link to="/parcels/new" className="btn-primary">
-          <Plus size={16} />
-          Nouveau colis
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={exportPDF} disabled={filtered.length === 0}>
+            <FileDown size={15} />
+            PDF
+          </Button>
+          <Button variant="secondary" size="sm" onClick={exportExcel} disabled={filtered.length === 0}>
+            <FileSpreadsheet size={15} />
+            Excel
+          </Button>
+          <Link to="/parcels/new" className="btn-primary">
+            <Plus size={16} />
+            Nouveau colis
+          </Link>
+        </div>
       </div>
 
       {/* Toolbar Filters */}
@@ -157,14 +216,19 @@ export function ParcelsListPage() {
             </Select>
             <Select
               value={sortBy}
-              onChange={(e) =>
-                setSortBy(e.target.value as 'recent' | 'balance' | 'amount')
-              }
+              onChange={(e) => {
+                const value = e.target.value as 'recent' | 'balance' | 'amount' | 'date';
+                if (value === 'date') {
+                  setDateSortDirection(dateSortDirection === 'asc' ? 'desc' : 'asc');
+                }
+                setSortBy(value);
+              }}
               className="col-span-2 sm:col-span-1"
             >
               <option value="recent">Plus récents</option>
               <option value="balance">Plus de solde</option>
               <option value="amount">Plus de montant</option>
+              <option value="date">{dateSortDirection === 'asc' ? 'Date (croissante)' : 'Date (décroissante)'}</option>
             </Select>
           </div>
         </div>
@@ -214,6 +278,17 @@ export function ParcelsListPage() {
                   <th>N° Colis</th>
                   <th>Client</th>
                   <th>Trajet</th>
+                  <th>
+                    <button
+                      type="button"
+                      onClick={() => { setDateSortDirection(dateSortDirection === 'asc' ? 'desc' : 'asc'); setSortBy('date'); }}
+                      className="inline-flex items-center gap-1 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                      aria-label={`Trier par date ${dateSortDirection === 'asc' ? 'croissante' : 'décroissante'}`}
+                    >
+                      Date
+                      {dateSortDirection === 'asc' ? <ArrowUpRight size={11} className="rotate-180" /> : <ArrowUpRight size={11} />}
+                    </button>
+                  </th>
                   <th>Statut</th>
                   <th className="text-right">Montant</th>
                   <th className="text-right">Solde / Statut</th>
@@ -241,10 +316,11 @@ export function ParcelsListPage() {
                       {parcel.origin} <span className="text-slate-400 font-normal">➔</span>{' '}
                       {parcel.destination}
                     </td>
+                    <td className="text-xs whitespace-nowrap text-slate-600 dark:text-slate-300 tabular-nums">
+                      {formatDate(parcel.received_date || parcel.created_at)}
+                    </td>
                     <td>
-                      <Badge className={PARCEL_STATUS_COLORS[parcel.status]}>
-                        {PARCEL_STATUS_LABELS[parcel.status]}
-                      </Badge>
+                      <ParcelStatusBadge status={parcel.status} />
                     </td>
                     <td className="text-right font-medium tabular-nums">
                       {formatCurrency(parcel.total_amount)}

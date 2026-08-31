@@ -1,5 +1,5 @@
 import type { AppSettings } from './types';
-import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
+import { fetchWithTimeout, isTransientApiError, parseApiError } from './api';
 
 const toSnake = (value: unknown): unknown =>
   Array.isArray(value)
@@ -24,7 +24,7 @@ const request = async (method: string, id?: string, body?: unknown) => {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, `API_${response.status}`);
+    throw await parseApiError(response);
   }
 
   return ((await response.json()) as { data: unknown }).data;

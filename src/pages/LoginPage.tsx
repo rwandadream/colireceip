@@ -55,7 +55,7 @@ export function LoginPage() {
         </div>
 
         {/* Card Form */}
-        <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-sm space-y-5 animate-slide-up">
+        <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-lg shadow-slate-200/50 dark:shadow-none space-y-5 animate-slide-up">
           
           {error && (
             <div role="alert" className="flex items-center gap-2.5 p-3.5 rounded-xl bg-error-50 dark:bg-error-950/20 text-error-700 dark:text-error-400 text-sm animate-fade-in border border-error-100 dark:border-error-900/30">
@@ -119,7 +119,7 @@ export function LoginPage() {
             <Button
               type="submit"
               loading={loading}
-              variant="accent"
+              variant="primary"
               size="lg"
               className="w-full mt-4 shadow-md hover:shadow-lg"
               icon={<LogIn size={18} />}

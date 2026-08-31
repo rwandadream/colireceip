@@ -1,5 +1,5 @@
 import type { Parcel, ParcelItem, ParcelStatus, StatusHistory } from './types';
-import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
+import { fetchWithTimeout, isTransientApiError, parseApiError } from './api';
 
 type OnlineParcelInput = Record<string, unknown>;
 
@@ -31,7 +31,7 @@ const request = async (method: string, id?: string, body?: unknown, extraQuery?:
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, `API_${response.status}`);
+    throw await parseApiError(response);
   }
 
   return response.status === 204 ? undefined : (await response.json() as { data: unknown }).data;

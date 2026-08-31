@@ -1,12 +1,12 @@
 import type { Client } from './types';
-import { ApiError, fetchWithTimeout, isTransientApiError } from './api';
+import { fetchWithTimeout, isTransientApiError, parseApiError } from './api';
 
 const toSnake = (value: unknown): unknown => Array.isArray(value) ? value.map(toSnake) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`), toSnake(item)])) : value;
 const request = async (method: string, id?: string, body?: unknown) => {
   const query = new URLSearchParams({ resource: 'clients' }); if (id) query.set('id', id);
   const response = await fetchWithTimeout(`/api/data?${query}`, { method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
   if (!response.ok) {
-    throw new ApiError(response.status, `API_${response.status}`);
+    throw await parseApiError(response);
   }
   return response.status === 204 ? undefined : (await response.json() as { data: unknown }).data;
 };
