@@ -382,6 +382,7 @@ try {
     try { await invokeApi({ method: 'DELETE', resource: 'parcels', id: pid, cookie: adminCookie }); } catch { /* ignore */ }
   }
   if (created.vehicleExtra?.id) { try { await invokeApi({ method: 'DELETE', resource: 'trip-vehicles', id: created.vehicleExtra.id, cookie: adminCookie }); } catch { /* ignore */ } }
+  if (created.vehicleInline?.id) { try { await invokeApi({ method: 'DELETE', resource: 'trip-vehicles', id: created.vehicleInline.id, cookie: adminCookie }); } catch { /* ignore */ } }
   if (created.trip?.id) { try { await invokeApi({ method: 'DELETE', resource: 'trips', id: created.trip.id, cookie: adminCookie }); } catch { /* ignore */ } }
   for (const cid of [created.clientOfB?.id, created.clientBase?.id].filter(Boolean)) {
     try { await invokeApi({ method: 'DELETE', resource: 'clients', id: cid, cookie: adminCookie }); } catch { /* ignore */ }

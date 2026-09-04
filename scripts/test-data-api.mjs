@@ -6,11 +6,12 @@ const marker = `api-test-${Date.now()}`;
 const user = await authenticate(process.env.INITIAL_ADMIN_EMAIL, process.env.INITIAL_ADMIN_PASSWORD);
 if (!user) throw new Error('Test authentication failed.');
 
-let product; let client; let trip; let parcel; let payment;
+let product; let client; let trip; let tripVehicle; let parcel; let payment;
 try {
   product = await create('products', { name: `${marker}-product`, category: 'Test', defaultPrice: 1000 }, user);
   client = await create('clients', { fullName: `${marker}-client`, phone: `+223${String(Date.now()).slice(-8)}`, city: 'Bamako', address: 'Test address' }, user);
   trip = await create('trips', { tripNumber: marker, tripDate: new Date().toISOString(), origin: 'Bamako', destination: 'Abidjan', vehicles: [{ registration: `${marker}-truck` }] }, user);
+  tripVehicle = trip.vehicles?.[0];
   parcel = await create('parcels', { clientId: client.id, recipientName: 'Recipient', recipientPhone: '+22370000000', recipientAddress: 'Test address', merchandiseType: 'Test', weight: 1, vehicle: `${marker}-truck`, origin: 'Bamako', destination: 'Abidjan', departureBranch: 'Bamako', arrivalBranch: 'Abidjan', packageType: 'Petit colis', tripId: trip.id, items: [{ productId: product.id, designation: product.name, quantity: 1, unitPrice: 1000 }] }, user);
   payment = await create('payments', { parcelId: parcel.id, amount: 250, paymentMethod: 'cash', paymentDate: new Date().toISOString() }, user, { idempotencyKey: `${marker}-payment` });
   const { update } = await import('../server/data.js');
@@ -26,6 +27,7 @@ try {
 } finally {
   if (payment) await remove('payments', payment.id, user);
   if (parcel) await remove('parcels', parcel.id, user);
+  if (tripVehicle) await remove('trip-vehicles', tripVehicle.id, user);
   if (trip) await remove('trips', trip.id, user);
   if (client) await remove('clients', client.id, user);
   if (product) await remove('products', product.id, user);
