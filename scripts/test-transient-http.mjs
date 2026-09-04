@@ -43,10 +43,17 @@ record('dnsNotFound503', classifyApiErrorStatus(mk('ENOTFOUND')) === 503);
 // --- B. Existing contract preserved ----------------------------------------
 record('forbiddenStays403', classifyApiErrorStatus(new Error('Forbidden.')) === 403);
 record('fkViolationStays409', classifyApiErrorStatus(mk('P2003')) === 409);
+record('driverFkViolationP2039Stays409', classifyApiErrorStatus(mk('P2039')) === 409);
+record('driverFkViolationMessageStays409', classifyApiErrorStatus(mk(undefined, 'delete on table "clients" violates RESTRICT setting of foreign key constraint "parcels_client_id_fkey"')) === 409);
 record('duplicatePhoneStays409', classifyApiErrorStatus(mk('DUPLICATE_PHONE')) === 409);
 record('idempotencyConflictStays409', classifyApiErrorStatus(mk('IDEMPOTENCY_CONFLICT')) === 409);
 record('statusConflictStays409', classifyApiErrorStatus(mk('STATUS_CONFLICT')) === 409);
 record('duplicateKeyStays409', classifyApiErrorStatus(mk('P2002')) === 409);
+// Business rule: deleting a trip that has linked data is refused as 409 with a
+// dedicated code, while associating a parcel with a cancelled trip is a 400
+// validation error.
+record('tripHasLinkedDataStays409', classifyApiErrorStatus(mk('TRIP_HAS_LINKED_DATA')) === 409);
+record('tripCancelledStays400', classifyApiErrorStatus(mk('TRIP_CANCELLED')) === 400);
 record('missingIdempotencyKeyStays400', classifyApiErrorStatus(mk('MISSING_IDEMPOTENCY_KEY')) === 400);
 record('configMissingStays503', classifyApiErrorStatus(mk('REQUIRED_CONFIG_MISSING')) === 503);
 record('writeConflictStays503', classifyApiErrorStatus(mk('P2034')) === 503);

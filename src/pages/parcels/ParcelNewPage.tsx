@@ -267,7 +267,10 @@ export function ParcelNewPage() {
       addToast({ type: 'error', title: 'Téléphone requis', description: 'Le numéro de téléphone du destinataire est obligatoire pour enregistrer un colis.' });
       return;
     }
-    if (!form.client_id || !form.package_type || items.length === 0 || items.some((item) => !item.designation || Number(item.quantity) <= 0)) return;
+    if (!form.client_id || !form.package_type || items.length === 0 || items.some((item) => !item.designation || Number(item.quantity) <= 0)) {
+      addToast({ type: 'error', title: 'Informations manquantes', description: 'Veuillez sélectionner un client, un type de colis et renseigner au moins un article valide (désignation et quantité positive).' });
+      return;
+    }
     if (form.payment_condition === 'paid_origin' && amountPaidNum <= 0) {
       addToast({ type: 'error', title: 'Montant payé requis', description: 'Un colis « Payé au départ » doit avoir un montant payé supérieur à 0.' });
       return;
@@ -478,7 +481,7 @@ export function ParcelNewPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Select label="Voyage (optionnel)" value={form.trip_id} onChange={(e) => setForm({ ...form, trip_id: e.target.value, trip_vehicle_id: '', vehicle: '' })}>
                   <option value="">— Aucun voyage —</option>
-                  {trips.map((trip) => <option key={trip.id} value={trip.id}>Voyage {trip.trip_number} · {trip.origin} → {trip.destination}</option>)}
+                  {trips.filter((trip) => trip.status !== 'cancelled').map((trip) => <option key={trip.id} value={trip.id}>Voyage {trip.trip_number} · {trip.origin} → {trip.destination}</option>)}
                 </Select>
                 <Select label="Véhicule du voyage" value={form.trip_vehicle_id} disabled={!form.trip_id} onChange={(e) => { const selected = tripVehicles.find((vehicle) => vehicle.id === e.target.value); setForm({ ...form, trip_vehicle_id: e.target.value, vehicle: selected?.registration || '' }); }}>
                   <option value="">— Aucun véhicule —</option>

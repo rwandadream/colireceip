@@ -31,7 +31,10 @@
     "test-excel-exports": "node scripts/test-excel-exports.mjs",
     "test-reconnect-sync": "node scripts/test-reconnect-sync.mjs",
     "test-crud-persistence": "node scripts/test-crud-persistence.mjs",
-    "test-director-delete-guard": "node scripts/test-director-delete-guard.mjs"
+    "test-director-delete-guard": "node scripts/test-director-delete-guard.mjs",
+    "test-trip-detail-fallback": "node scripts/test-trip-detail-fallback.mjs",
+    "test-trip-lifecycle": "node scripts/test-trip-lifecycle.mjs",
+    "test-trip-visibility": "node scripts/test-trip-visibility.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

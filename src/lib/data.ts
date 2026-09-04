@@ -79,23 +79,21 @@ export async function getTrips(): Promise<Trip[]> {
       const db = await getDB();
       const local = await db.getAll('trips');
       const protectedIds = await collectProtectedIds('trips', local.map((t) => t.id));
-      const user = getAuthenticatedUser();
+      // Trips are shared within the agency: every authenticated user sees all
+      // trips regardless of creator (visibility is a distinct permission).
       return mergeLocalPending(server, local, protectedIds)
-        .filter((trip) => canAccessOwnedRecord(user, trip.created_by))
         .sort((a, b) => b.trip_date.localeCompare(a.trip_date));
     } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
   }
   const db = await getDB();
-  const user = getAuthenticatedUser();
-  const trips = (await db.getAll('trips')).filter((trip) => canAccessOwnedRecord(user, trip.created_by));
+  const trips = await db.getAll('trips');
   return trips.sort((a, b) => b.trip_date.localeCompare(a.trip_date));
 }
 
 export async function getTripById(id: string): Promise<Trip | undefined> {
   const db = await getDB();
-  const user = getAuthenticatedUser();
   const cached = await db.get('trips', id);
-  if (cached && canAccessOwnedRecord(user, cached.created_by)) return cached;
+  if (cached) return cached;
   const all = await getTrips();
   return all.find((trip) => trip.id === id);
 }
@@ -122,7 +120,10 @@ export async function updateTrip(id: string, data: Partial<Trip>): Promise<Trip 
   const db = await getDB();
   const existing = await db.get('trips', id);
   if (!existing) return undefined;
-  requireOwnedAccess(existing.created_by);
+  const structuralChanged = data.trip_number !== undefined || data.trip_date !== undefined || data.origin !== undefined || data.destination !== undefined;
+  if (structuralChanged && getAuthenticatedUser()?.role !== 'admin') {
+    throw new Error('Seul un administrateur peut modifier les informations du voyage.');
+  }
   const trip = { ...existing, ...data, id, updated_at: toISO() };
   await db.put('trips', trip);
   const changed = pickChanged(existing, trip, ['trip_number', 'trip_date', 'origin', 'destination', 'status']);
@@ -137,7 +138,9 @@ export async function deleteTrip(id: string): Promise<void> {
   const db = await getDB();
   const existing = await db.get('trips', id);
   if (!existing) return;
-  requireOwnedAccess(existing.created_by);
+  if (getAuthenticatedUser()?.role !== 'admin') {
+    throw new Error('Seul un administrateur peut supprimer un voyage.');
+  }
   const vehicles = await db.getAllFromIndex('trip_vehicles', 'by-trip', id);
   for (const vehicle of vehicles) await db.delete('trip_vehicles', vehicle.id);
   await db.delete('trips', id);
@@ -162,7 +165,14 @@ export async function getTripVehicles(tripId: string): Promise<TripVehicle[]> {
       const local = await db.getAllFromIndex('trip_vehicles', 'by-trip', tripId);
       const protectedIds = await collectProtectedIds('trip-vehicles', local.map((v) => v.id));
       return mergeLocalPending(server, local, protectedIds).sort((a, b) => a.vehicle_number - b.vehicle_number);
-    } catch (error) { if (!isTripApiUnavailable(error)) throw error; }
+    } catch (error) {
+      // A 403 "Forbidden" here means the parent trip is not (yet) visible to
+      // this user server-side (e.g. it was just created offline and has not
+      // synced yet, so the server cannot find/own it). This is a temporary
+      // sequencing condition, not a permanent authorization failure, so we
+      // fall back to the local cache instead of failing the whole page.
+      if (!(error instanceof ApiError && error.status === 403) && !isTripApiUnavailable(error)) throw error;
+    }
   }
   const db = await getDB();
   if (!(await getTripById(tripId))) return [];
@@ -835,6 +845,18 @@ export async function updateParcel(id: string, data: Partial<Parcel>): Promise<v
     payload.status = data.status;
     payload.expectedStatus = existing.status;
   }
+  if (data.vehicle !== undefined) payload.vehicle = data.vehicle;
+  if (data.trip_id !== undefined) payload.tripId = data.trip_id;
+  if (data.trip_vehicle_id !== undefined) payload.tripVehicleId = data.trip_vehicle_id;
+  if (data.recipient_name !== undefined) payload.recipientName = data.recipient_name;
+  if (data.recipient_phone !== undefined) payload.recipientPhone = data.recipient_phone;
+  if (data.recipient_address !== undefined) payload.recipientAddress = data.recipient_address;
+  if (data.origin !== undefined) payload.origin = data.origin;
+  if (data.destination !== undefined) payload.destination = data.destination;
+  if (data.departure_branch !== undefined) payload.departureBranch = data.departure_branch;
+  if (data.arrival_branch !== undefined) payload.arrivalBranch = data.arrival_branch;
+  if (data.package_type !== undefined) payload.packageType = data.package_type;
+  if (data.weight !== undefined) payload.weight = data.weight;
   if (Object.keys(payload).length > 0) {
     await enqueueMutation({ entity: 'parcels', entityId: id, action: 'update', payload });
     notifySync();

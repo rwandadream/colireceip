@@ -32,9 +32,17 @@ export function isTransientServiceError(error) {
 // without a live database. Contract for every resource:
 //   Forbidden -> 403 ; conflicts -> 409 ; client/validation -> 400 ;
 //   missing config / write-conflict / transient infra -> 503.
+// A foreign-key violation surfaces as P2003 (classic Prisma) or, with the pg
+// driver adapter, as P2039 whose underlying Postgres code is 23001/23503
+// (RESTRICT/NO ACTION delete). Both mean the row is referenced and cannot be
+// deleted -> an HTTP 409 "conflict".
+const FK_VIOLATION = (error) => error.code === 'P2003'
+  || error.code === 'P2039'
+  || /(update or )?delete on table .*violates RESTRICT|violates foreign key constraint|not present in table "parent"/i.test(error.message || '');
+
 export function classifyApiErrorStatus(error) {
   return error.message === 'Forbidden.' ? 403
-    : error.code === 'IDEMPOTENCY_CONFLICT' || error.code === 'DUPLICATE_PHONE' || error.code === 'P2002' || error.code === 'P2003' || error.code === 'STATUS_CONFLICT' ? 409
+    : error.code === 'IDEMPOTENCY_CONFLICT' || error.code === 'DUPLICATE_PHONE' || error.code === 'P2002' || FK_VIOLATION(error) || error.code === 'STATUS_CONFLICT' || error.code === 'TRIP_HAS_LINKED_DATA' ? 409
     : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 400
     : error.code === 'REQUIRED_CONFIG_MISSING' || error.code === 'P2034' || error.message?.startsWith('Required server configuration') ? 503
     : isTransientServiceError(error) ? 503
@@ -64,8 +72,9 @@ export default async function handler(req, res) {
     // specific server message in that case; every other 400 stays generic.
     const isMissingDependency = /introuvable|Missing/i.test(error.message || '');
     const message = status === 403 ? 'Accès refusé.'
-      : status === 409 ? error.code === 'P2003' ? 'Suppression impossible : des données liées existent.' : error.code === 'STATUS_CONFLICT' ? 'Conflit de statut : le colis a été modifié sur le serveur.' : error.code === 'DUPLICATE_PHONE' ? error.message : 'Conflit d\'idempotence.'
+      : status === 409 ? error.code === 'TRIP_HAS_LINKED_DATA' ? 'Suppression impossible : des données liées existent.' : error.code === 'P2003' || error.code === 'P2039' ? 'Suppression impossible : des données liées existent.' : error.code === 'STATUS_CONFLICT' ? 'Conflit de statut : le colis a été modifié sur le serveur.' : error.code === 'DUPLICATE_PHONE' ? error.message : 'Conflit d\'idempotence.'
       : status === 503 ? 'Le service est temporairement indisponible. Réessayez dans quelques instants.'
+      : error.code === 'TRIP_CANCELLED' ? error.message
       : error.code === 'MISSING_IDEMPOTENCY_KEY' ? 'En-tête Idempotency-Key requis.'
       : isMissingDependency ? error.message
       : 'Requête invalide. Vérifiez les champs saisies.';

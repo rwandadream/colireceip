@@ -271,18 +271,31 @@ try {
   const expenseRefreshAfterDelete = await invokeApi({ method: 'GET', resource: 'expenses', cookie: adminCookie });
   record('expenses.deletePersists', expenseDelete.statusCode === 204 && dbExpenseGone === 0 && !(expenseRefreshAfterDelete.payload?.data ?? []).some((e) => e.id === created.expense?.id), { status: expenseDelete.statusCode });
 
-  // Trip deletion: vehicles are removed, referencing parcels survive with
-  // trip_id/trip_vehicle_id set to NULL (no orphans).
+  // Trip deletion: a trip that has linked data (vehicles, parcels, expenses)
+  // is REFUSED with HTTP 409. Nothing is cascade-deleted or nulled: the trip,
+  // its vehicles and the referencing parcels all survive intact (rules 7/8/9).
   const tripDelete = await invokeApi({ method: 'DELETE', resource: 'trips', id: created.trip?.id, cookie: adminCookie });
-  const dbTripGone = await prisma.trip.count({ where: { id: created.trip?.id } });
-  const dbVehicleCount = await prisma.tripVehicle.count({ where: { tripId: created.trip?.id } });
+  const dbTripAfterDel = await prisma.trip.count({ where: { id: created.trip?.id } });
+  const dbVehicleAfterDel = await prisma.tripVehicle.count({ where: { tripId: created.trip?.id } });
   const dbParcelAfterTripDel = created.parcel?.id ? await prisma.parcel.findUnique({ where: { id: created.parcel.id } }) : null;
   const tripRefreshAfterDelete = await invokeApi({ method: 'GET', resource: 'trips', cookie: adminCookie });
   record(
-    'trips.deleteCascadesVehiclesAndNullsParcels',
-    tripDelete.statusCode === 204 && dbTripGone === 0 && dbVehicleCount === 0 && dbParcelAfterTripDel?.tripId === null && !(tripRefreshAfterDelete.payload?.data ?? []).some((t) => t.id === created.trip?.id),
-    { status: tripDelete.statusCode, parcelsTripId: dbParcelAfterTripDel?.tripId ?? null },
+    'trips.deleteRefusedWhenLinkedData409',
+    tripDelete.statusCode === 409
+      && String(tripDelete.payload?.error ?? '').includes('des donn\u00e9es li\u00e9es existent')
+      && dbTripAfterDel === 1
+      && dbVehicleAfterDel === 1
+      && dbParcelAfterTripDel?.tripId === created.trip?.id
+      && (tripRefreshAfterDelete.payload?.data ?? []).some((t) => t.id === created.trip?.id),
+    { status: tripDelete.statusCode, error: tripDelete.payload?.error, tripsLeft: dbTripAfterDel, vehiclesLeft: dbVehicleAfterDel, parcelsTripId: dbParcelAfterTripDel?.tripId ?? null },
   );
+  // Deleting an un-used trip (no vehicles, parcels or expenses) is allowed and
+  // removes the trip only.
+  const emptyTripDelete = await (async () => {
+    const emptyTrip = await invokeApi({ resource: 'trips', body: { tripNumber: `${marker}-empty`, tripDate: new Date().toISOString(), origin: 'Bamako', destination: 'Abidjan' }, cookie: adminCookie });
+    return invokeApi({ method: 'DELETE', resource: 'trips', id: emptyTrip.payload?.data?.id, cookie: adminCookie });
+  })();
+  record('trips.deleteAllowedWhenUnused', emptyTripDelete.statusCode === 204, { status: emptyTripDelete.statusCode });
 
   // Code-level cascade: deleting a parcel removes its payments, items and
   // status history in one transaction and the DB ends up consistent.

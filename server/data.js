@@ -31,6 +31,12 @@ const paymentFingerprint = (parcelId, paymentAmount, paymentMethod, paymentDate,
 const idempotencyConflict = () => { const error = new Error('Idempotency key conflict.'); error.code = 'IDEMPOTENCY_CONFLICT'; return error; };
 const statusConflict = () => { const error = new Error('Le colis a été modifié sur le serveur.'); error.code = 'STATUS_CONFLICT'; return error; };
 const missingIdempotencyKey = () => { const error = new Error('Missing Idempotency-Key.'); error.code = 'MISSING_IDEMPOTENCY_KEY'; return error; };
+const tripHasLinkedData = () => { const error = new Error('Suppression impossible : des données liées existent.'); error.code = 'TRIP_HAS_LINKED_DATA'; return error; };
+// Rule 11: a cancelled trip must no longer be selectable for new parcels. When
+// a tripId is provided, reject the association if the trip exists and is
+// cancelled. If the trip is not yet found server-side (offline sequencing) the
+// FK/dependency handling elsewhere applies instead.
+const assertTripSelectable = async (tripId) => { if (!tripId) return; const trip = await prisma.trip.findUnique({ where: { id: tripId } }); if (!trip) return; if (trip.status === 'cancelled') { const error = new Error('Impossible de rattacher un colis à un voyage annulé.'); error.code = 'TRIP_CANCELLED'; throw error; } };
 const resolveExistingPayment = (existing, user, fingerprint) => { if (existing.idempotencyFingerprint !== fingerprint) throw idempotencyConflict(); return publicValue(existing); };
 const MAX_TX_RETRIES = 3;
 // Retries a serializable transaction when PostgreSQL detects a write skew /
@@ -73,15 +79,27 @@ export async function list(resource, user, query = {}) {
       return users.map(publicUser);
     }
     case 'products': return publicValue(await prisma.product.findMany({ orderBy: { name: 'asc' } }));
-    case 'clients': return publicValue(await prisma.client.findMany({ orderBy: { createdAt: 'desc' } }));
+    case 'clients': {
+      const whereClients = isAdmin(user) ? {} : { createdById: user.id };
+      return publicValue(await prisma.client.findMany({ where: whereClients, orderBy: { createdAt: 'desc' } }));
+    }
     case 'trips': {
-      const where = isAdmin(user) ? {} : { createdById: user.id };
-      return publicValue(await prisma.trip.findMany({ where, include: { vehicles: true }, orderBy: { tripDate: 'desc' } }));
+      // Shared within the agency (single Groupe-Gaff entity): every
+      // authenticated user sees all trips, not just their own. Visibility is a
+      // permission distinct from edit (status/everyone, structure/admin) and
+      // delete (admin only).
+      return publicValue(await prisma.trip.findMany({ include: { vehicles: true }, orderBy: { tripDate: 'desc' } }));
     }
     case 'trip-vehicles': { await ownedTrip(query.tripId, user); return publicValue(await prisma.tripVehicle.findMany({ where: { tripId: query.tripId }, orderBy: { vehicleNumber: 'asc' } })); }
-    case 'parcels': return publicValue(await prisma.parcel.findMany({ include: { items: true }, orderBy: { createdAt: 'desc' } }));
+    case 'parcels': {
+      const whereParcels = isAdmin(user) ? {} : { OR: [{ registeredById: user.id }, { agentId: user.id }] };
+      return publicValue(await prisma.parcel.findMany({ where: whereParcels, include: { items: true }, orderBy: { createdAt: 'desc' } }));
+    }
     case 'status-history': { const parcel = await prisma.parcel.findUnique({ where: { id: required(query.parcelId, 'parcelId') } }); if (!parcel) throw new Error('Colis introuvable.'); if (!canAccessParcel(user, parcel)) throw new Error('Forbidden.'); return publicValue(await prisma.statusHistory.findMany({ where: { parcelId: parcel.id }, orderBy: { createdAt: 'asc' } })); }
-    case 'payments': return publicValue(await prisma.payment.findMany({ orderBy: { paymentDate: 'desc' } }));
+    case 'payments': {
+      const wherePayments = isAdmin(user) ? {} : { recordedById: user.id };
+      return publicValue(await prisma.payment.findMany({ where: wherePayments, orderBy: { paymentDate: 'desc' } }));
+    }
     case 'expenses': {
       if (!isAdmin(user)) throw new Error('Forbidden.');
       return publicValue(await prisma.tripExpense.findMany({ orderBy: { expenseDate: 'desc' } }));
@@ -129,6 +147,7 @@ export async function create(resource, input, user, options = {}) {
   if (resource === 'parcels') {
     const client = await prisma.client.findUnique({ where: { id: required(input.clientId, 'clientId') } }); if (!client) throw new Error('Client introuvable.');
     const items = Array.isArray(input.items) ? input.items : []; if (!items.length) throw new Error('Missing items.');
+    await assertTripSelectable(input.tripId);
     if (input.id) { const existing = await prisma.parcel.findUnique({ where: { id: clean(input.id) }, include: { items: true } }); if (existing) { if (!canAccessParcel(user, existing)) throw new Error('Forbidden.'); return publicValue(existing); } }
     const subTotal = items.reduce((sum, item) => sum + amount(item.quantity, 'quantity') * amount(item.unitPrice, 'unitPrice'), 0); const transportPrice = amount(input.transportPrice ?? 0, 'transportPrice'); const additionalFees = amount(input.additionalFees ?? 0, 'additionalFees'); const amountPaid = amount(input.amountPaid ?? 0, 'amountPaid'); const condition = allowed(input.paymentCondition ?? 'unpaid', paymentConditions, 'paymentCondition'); const totalAmount = subTotal + transportPrice + additionalFees;
     if (condition === 'paid_origin' && amountPaid <= 0) throw new Error('Un colis payé au départ doit avoir un montant payé supérieur à zéro.');
@@ -247,8 +266,24 @@ export async function remove(resource, id, user) {
   }
   const model = resource === 'clients' ? prisma.client : resource === 'trips' ? prisma.trip : resource === 'parcels' ? prisma.parcel : null; if (!model) throw new Error('Unknown resource.'); const record = await model.findUnique({ where: { id } }); if (!record) return null; if (!owned(user, record)) throw new Error('Forbidden.');
   if (resource === 'trips') {
+    // Rule 6: only an administrator can permanently delete a trip.
+    if (!isAdmin(user)) throw new Error('Forbidden.');
+    // Rule 7/8/9: refuse (HTTP 409) whenever any dependent data exists. The
+    // FK relations (TripVehicle Cascade, Parcel/TripExpense SetNull) must never
+    // be allowed to delete or detach dependent rows automatically: nothing
+    // (parcels, payments, history, expenses) is ever removed or unlinked by a
+    // trip deletion.
+    const vehicleCount = await prisma.tripVehicle.count({ where: { tripId: record.id } });
+    const parcelCount = await prisma.parcel.count({ where: { tripId: record.id } });
+    const expenseCount = await prisma.tripExpense.count({ where: { tripId: record.id } });
+    // Parcels may reference one of this trip's vehicles via tripVehicleId.
+    const linkedVehicleParcels = vehicleCount > 0
+      ? await prisma.parcel.count({ where: { tripVehicle: { tripId: record.id } } })
+      : 0;
+    if (vehicleCount > 0 || parcelCount > 0 || expenseCount > 0 || linkedVehicleParcels > 0) {
+      throw tripHasLinkedData();
+    }
     return publicValue(await deleteIdempotent(prisma.$transaction(async (tx) => {
-      await tx.tripVehicle.deleteMany({ where: { tripId: record.id } });
       return tx.trip.delete({ where: { id: record.id } });
     })));
   }
@@ -329,12 +364,13 @@ export async function update(resource, id, input, user) {
   }
   if (resource === 'products') { if (!isAdmin(user)) throw new Error('Forbidden.'); return publicValue(await prisma.product.update({ where: { id }, data: { ...(input.name !== undefined ? { name: required(input.name, 'name') } : {}), ...(input.category !== undefined ? { category: required(input.category, 'category') } : {}), ...(input.defaultPrice !== undefined ? { defaultPrice: amount(input.defaultPrice, 'defaultPrice') } : {}) } })); }
   if (resource === 'clients') { const record = await prisma.client.findUnique({ where: { id } }); if (!record) throw new Error('Client introuvable.'); if (!owned(user, record)) throw new Error('Forbidden.'); return publicValue(await prisma.client.update({ where: { id }, data: { ...(input.fullName !== undefined ? { fullName: required(input.fullName, 'fullName') } : {}), ...(input.phone !== undefined ? { phone: clean(input.phone) || '' } : {}), ...(input.companyName !== undefined ? { companyName: clean(input.companyName) || null } : {}), ...(input.email !== undefined ? { email: clean(input.email)?.toLowerCase() || null } : {}), ...(input.city !== undefined ? { city: clean(input.city) || '' } : {}), ...(input.neighborhood !== undefined ? { neighborhood: clean(input.neighborhood) || null } : {}), ...(input.address !== undefined ? { address: clean(input.address) || '' } : {}), ...(input.reference !== undefined ? { reference: clean(input.reference) || null } : {}), ...(input.notes !== undefined ? { notes: clean(input.notes) || '' } : {}) } })); }
-  if (resource === 'trips') { const record = await prisma.trip.findUnique({ where: { id } }); if (!record || !owned(user, record)) throw new Error('Forbidden.'); return publicValue(await prisma.trip.update({ where: { id }, data: { ...(input.status !== undefined ? { status: allowed(input.status, tripStatuses, 'status') } : {}), ...(input.tripNumber !== undefined ? { tripNumber: clean(input.tripNumber) || record.tripNumber } : {}), ...(input.tripDate !== undefined ? { tripDate: date(input.tripDate, 'tripDate') } : {}), ...(input.origin !== undefined ? { origin: required(input.origin, 'origin') } : {}), ...(input.destination !== undefined ? { destination: required(input.destination, 'destination') } : {}) } })); }
+  if (resource === 'trips') { const record = await prisma.trip.findUnique({ where: { id } }); if (!record) throw new Error('Forbidden.'); const structuralChanged = input.tripNumber !== undefined || input.tripDate !== undefined || input.origin !== undefined || input.destination !== undefined; if (!isAdmin(user) && structuralChanged) throw new Error('Forbidden.'); return publicValue(await prisma.trip.update({ where: { id }, data: { ...(input.status !== undefined ? { status: allowed(input.status, tripStatuses, 'status') } : {}), ...(input.tripNumber !== undefined ? { tripNumber: clean(input.tripNumber) || record.tripNumber } : {}), ...(input.tripDate !== undefined ? { tripDate: date(input.tripDate, 'tripDate') } : {}), ...(input.origin !== undefined ? { origin: required(input.origin, 'origin') } : {}), ...(input.destination !== undefined ? { destination: required(input.destination, 'destination') } : {}) } })); }
   if (resource === 'parcels') {
     return publicValue(await prisma.$transaction(async (tx) => {
       const record = await tx.parcel.findUnique({ where: { id } });
       if (!record) throw new Error('Colis introuvable.');
 if (!owned(user, record)) throw new Error('Forbidden.');
+      if (input.tripId !== undefined) await assertTripSelectable(input.tripId);
       if (input.expectedStatus && record.status !== input.expectedStatus) throw statusConflict();
       const status = input.status === undefined ? record.status : allowed(input.status, parcelStatuses, 'status');
       const statusChanged = input.status !== undefined && status !== record.status;
@@ -344,6 +380,18 @@ if (!owned(user, record)) throw new Error('Forbidden.');
         data: {
           ...(input.description !== undefined ? { description: clean(input.description) || '' } : {}),
           ...(input.status !== undefined ? { status } : {}),
+          ...(input.vehicle !== undefined ? { vehicle: clean(input.vehicle) || '' } : {}),
+          ...(input.tripId !== undefined ? { tripId: clean(input.tripId) || null } : {}),
+          ...(input.tripVehicleId !== undefined ? { tripVehicleId: clean(input.tripVehicleId) || null } : {}),
+          ...(input.recipientName !== undefined ? { recipientName: clean(input.recipientName) || 'Destinataire' } : {}),
+          ...(input.recipientPhone !== undefined ? { recipientPhone: clean(input.recipientPhone) || '' } : {}),
+          ...(input.recipientAddress !== undefined ? { recipientAddress: clean(input.recipientAddress) || '' } : {}),
+          ...(input.origin !== undefined ? { origin: required(input.origin, 'origin') } : {}),
+          ...(input.destination !== undefined ? { destination: required(input.destination, 'destination') } : {}),
+          ...(input.departureBranch !== undefined ? { departureBranch: clean(input.departureBranch) || '' } : {}),
+          ...(input.arrivalBranch !== undefined ? { arrivalBranch: clean(input.arrivalBranch) || '' } : {}),
+          ...(input.packageType !== undefined ? { packageType: clean(input.packageType) || 'Petit colis' } : {}),
+          ...(input.weight !== undefined ? { weight: amount(input.weight, 'weight') } : {}),
           ...(statusChanged && status === 'in_transit' && !record.departureDate ? { departureDate: now } : {}),
           ...(statusChanged && status === 'arrived' && !record.arrivalDate ? { arrivalDate: now } : {}),
           ...(statusChanged && status === 'delivered' && !record.deliveryDate ? { deliveryDate: now } : {}),

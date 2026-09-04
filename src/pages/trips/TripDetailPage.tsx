@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, ClipboardList, Package, Route, Trash2, Truck } from 'lucide-react';
-import { deleteTripVehicle, getParcelsByTripId, getTripById, getTripStatusLabel, getTripVehicles, updateTrip } from '../../lib/data';
+import { deleteTrip, deleteTripVehicle, getParcelsByTripId, getTripById, getTripStatusLabel, getTripVehicles, updateTrip } from '../../lib/data';
 import type { Parcel, Trip, TripVehicle } from '../../lib/types';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -12,6 +12,7 @@ import { Skeleton } from '../../components/ui/Badge';
 import { formatCurrency, formatDate } from '../../lib/format';
 import { userErrorMessage } from '../../lib/userMessage';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 type ViewMode = 'overview' | 'vehicles' | 'parcels';
 type FeeKey = 'road_bamako_frontier' | 'customs_fee' | 'frontier_formalities' | 'road_frontier_bouake' | 'road_bouake_abidjan' | 'road_abidjan' | 'loading_fee' | 'unloading_fee' | 'truck_quota' | 'monthly_fee';
@@ -47,6 +48,10 @@ export function TripDetailPage() {
     const [statusLoading, setStatusLoading] = useState(false);
     const [deletingVehicle, setDeletingVehicle] = useState<TripVehicle | null>(null);
     const [vehicleDeleteLoading, setVehicleDeleteLoading] = useState(false);
+    const [confirmTripDelete, setConfirmTripDelete] = useState(false);
+    const [tripDeleteLoading, setTripDeleteLoading] = useState(false);
+
+    const isAdmin = useAuth().user?.role === 'admin';
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -123,6 +128,24 @@ export function TripDetailPage() {
             setStatusLoading(false);
         }
     };
+    const confirmDeleteTrip = async () => {
+        if (tripDeleteLoading) return;
+        setTripDeleteLoading(true);
+        try {
+            await deleteTrip(trip.id);
+            addToast({ type: 'success', title: 'Voyage supprimé', description: 'Le voyage a été supprimé définitivement.' });
+            navigate('/trips');
+        } catch (error) {
+            addToast({
+                type: 'error',
+                title: 'Suppression impossible',
+                description: userErrorMessage(error, 'Impossible de supprimer ce voyage. Des données liées existent peut-être.'),
+            });
+        } finally {
+            setTripDeleteLoading(false);
+            setConfirmTripDelete(false);
+        }
+    };
     const views: { value: ViewMode; label: string; icon: typeof Route }[] = [
         { value: 'overview', label: 'Synthese', icon: Route },
         { value: 'vehicles', label: 'Vehicules', icon: Truck },
@@ -138,9 +161,16 @@ export function TripDetailPage() {
                         <Link to="/trips" className="rounded-xl p-2 text-white/80 transition hover:bg-white/15 hover:text-white" aria-label="Retour aux voyages"><ArrowLeft size={20} /></Link>
                         <div><p className="text-sm font-medium text-white/70">Voyage {trip.trip_number || 'sans numéro'}</p><h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{trip.origin || 'Départ non renseigné'} <span className="text-white/50">→</span> {trip.destination || 'Destination non renseignée'}</h1><p className="mt-3 text-sm text-white/75">Depart le {formatDate(trip.trip_date)} · {getTripStatusLabel(trip.status)}</p></div>
                     </div>
-                    <select className="input w-full border-white/20 bg-white/10 text-white shadow-none lg:w-auto" value={trip.status} disabled={statusLoading} onChange={(event) => void setStatus(event.target.value as Trip['status'])}>
-                        <option value="planned">Planifie</option><option value="in_transit">En route</option><option value="arrived">Arrive</option><option value="closed">Cloture</option><option value="cancelled">Annule</option>
-                    </select>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <select className="input w-full border-white/20 bg-white/10 text-white shadow-none lg:w-auto" value={trip.status} disabled={statusLoading} onChange={(event) => void setStatus(event.target.value as Trip['status'])}>
+                            <option value="planned">Planifie</option><option value="in_transit">En route</option><option value="arrived">Arrive</option><option value="closed">Cloture</option><option value="cancelled">Annule</option>
+                        </select>
+                        {isAdmin && (
+                            <button type="button" onClick={() => setConfirmTripDelete(true)} className="rounded-xl bg-red-500/90 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-500">
+                                <Trash2 size={16} className="inline-block mr-1" />Supprimer
+                            </button>
+                        )}
+                    </div>
                 </div>
                 <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/15 pt-5 sm:grid-cols-4">
                     <div><p className="text-xs uppercase tracking-wide text-white/60">Vehicules</p><p className="mt-1 text-2xl font-bold">{vehicles.length}</p></div><div><p className="text-xs uppercase tracking-wide text-white/60">Colis</p><p className="mt-1 text-2xl font-bold">{parcels.length}</p></div><div><p className="text-xs uppercase tracking-wide text-white/60">Frais</p><p className="mt-1 text-lg font-bold sm:text-2xl break-words leading-tight">{formatCurrency(totalFees)}</p></div><div><p className="text-xs uppercase tracking-wide text-white/60">Etapes</p><p className="mt-1 text-lg font-bold sm:text-2xl">3</p></div>
@@ -164,6 +194,13 @@ export function TripDetailPage() {
                 <div className="flex gap-3 justify-end mt-5">
                     <button className="btn-secondary" onClick={() => setDeletingVehicle(null)} disabled={vehicleDeleteLoading}>Annuler</button>
                     <button className="btn-danger" onClick={() => void confirmDeleteVehicle()} disabled={vehicleDeleteLoading}>{vehicleDeleteLoading ? 'Suppression...' : 'Supprimer'}</button>
+                </div>
+            </Modal>
+            <Modal open={confirmTripDelete} onClose={() => { if (!tripDeleteLoading) setConfirmTripDelete(false); }} title="Supprimer le voyage" size="sm">
+                <p className="text-sm text-slate-500">Voulez-vous vraiment supprimer définitivement ce voyage ? La suppression sera refusée (409) si des donnees liees existent (colis, vehicules, depenses).</p>
+                <div className="flex gap-3 justify-end mt-5">
+                    <button className="btn-secondary" onClick={() => setConfirmTripDelete(false)} disabled={tripDeleteLoading}>Annuler</button>
+                    <button className="btn-danger" onClick={() => void confirmDeleteTrip()} disabled={tripDeleteLoading}>{tripDeleteLoading ? 'Suppression...' : 'Supprimer'}</button>
                 </div>
             </Modal>
         </div>
